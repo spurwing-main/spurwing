@@ -35,7 +35,7 @@ function customCursor() {
 
 			gsap.to(cursor, {
 				autoAlpha: 1, //show cursor
-				duration: 0.2,
+				duration: 0.1,
 				scale: 1,
 			});
 
@@ -52,7 +52,7 @@ function customCursor() {
 
 			gsap.to(cursor, {
 				autoAlpha: 0, //show cursor
-				duration: 0.2,
+				duration: 0.1,
 				scale: 0.5,
 			});
 		});
