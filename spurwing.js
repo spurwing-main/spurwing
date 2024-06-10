@@ -1,3 +1,55 @@
+function loadSliders() {
+	/* splide defaults */
+	Splide.defaults = {
+		perMove: 1,
+		gap: "0rem",
+		arrows: false,
+		pagination: false,
+		focus: 0,
+		speed: 600,
+		dragAngleThreshold: 60,
+		autoWidth: false,
+		rewind: false,
+		rewindSpeed: 400,
+		waitForTransition: false,
+		updateOnMove: true,
+		trimSpace: "move",
+		type: "loop",
+		drag: true,
+		snap: true,
+		autoWidth: false,
+		autoplay: false,
+	};
+
+	function initializeSplide(selector, options) {
+		let targets = document.querySelectorAll(selector);
+		let splides = [];
+
+		for (let i = 0; i < targets.length; i++) {
+			let splide = new Splide(targets[i], options);
+			splide.mount();
+			splides.push(splide);
+		}
+
+		return splides;
+	}
+
+	const splides = [
+		{
+			selector: ".hero-slider",
+			options: {
+				type: "loop",
+				perPage: 1,
+				autoplay: false,
+			},
+		},
+	];
+
+	splides.forEach(({ selector, options }) => {
+		initializeSplide(selector, options);
+	});
+}
+
 function customCursor() {
 	//
 	const cursor = document.querySelector(".custom-cursor"); // get cursor
