@@ -1,4 +1,5 @@
 function loadSliders() {
+	//
 	/* splide defaults */
 	Splide.defaults = {
 		perMove: 1,
@@ -21,6 +22,7 @@ function loadSliders() {
 		autoplay: false,
 	};
 
+	/* get and launch all chosen splide instances */
 	function initializeSplide(selector, options) {
 		let targets = document.querySelectorAll(selector);
 		let splides = [];
@@ -34,7 +36,7 @@ function loadSliders() {
 		return splides;
 	}
 
-	const splides = [
+	const sliders = [
 		{
 			selector: ".hero-slider",
 			options: {
@@ -45,7 +47,7 @@ function loadSliders() {
 		},
 	];
 
-	splides.forEach(({ selector, options }) => {
+	sliders.forEach(({ selector, options }) => {
 		initializeSplide(selector, options);
 	});
 }
@@ -83,7 +85,7 @@ function customCursor() {
 
 			gsap.killTweensOf(target); // kill active tweens
 
-			console.log("play");
+			// console.log("play");
 
 			gsap.to(cursor, {
 				autoAlpha: 1, //show cursor
@@ -101,7 +103,7 @@ function customCursor() {
 
 			gsap.killTweensOf(target); //kill tweens of target we're leaving to avoid cursor persisting if we move too quick
 
-			console.log("reverse");
+			// console.log("reverse");
 
 			gsap.to(cursor, {
 				autoAlpha: 0, //show cursor
