@@ -92,7 +92,7 @@ function customCursor() {
 				ease: "power3.out",
 			});
 
-			cursor.innerHTML = content; //update content
+			if (content) cursor.innerHTML = content; //update content
 		});
 
 		target.addEventListener("mouseleave", (e) => {
