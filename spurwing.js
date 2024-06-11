@@ -1,4 +1,6 @@
 function loadSliders() {
+	/* this is a change */
+
 	/* splide defaults */
 	Splide.defaults = {
 		perMove: 1,
