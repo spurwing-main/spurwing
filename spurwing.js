@@ -83,8 +83,11 @@ function loadSliders() {
 					console.log("mounted");
 					// Call the createTimelines helper function
 					helperFunctions.createTimelines.call(this);
+					// Set custom cursor text on prev and next slides
+					helperFunctions.setCursorContent.call(this);
 				},
 			},
+
 			eventCallbacks: {
 				active: function (helperFunctions, Slide) {
 					// grow active slide
@@ -99,6 +102,9 @@ function loadSliders() {
 				resize: function (helperFunctions) {
 					// when window resized, recalculate timeline distances
 					helperFunctions.createTimelines.call(this);
+				},
+				move: function (helperFunctions) {
+					helperFunctions.setCursorContent.call(this);
 				},
 			},
 			helperFunctions: {
@@ -122,6 +128,23 @@ function loadSliders() {
 							if (splide_slide.index == 0) {
 								splide_slide.slide.timeline.play();
 							}
+						}
+					});
+				},
+				setCursorContent: function () {
+					// Set custom cursor text on prev and next slides
+					console.log("Update cursors");
+					this.Components.Slides.forEach((splide_slide) => {
+						const slideElement = splide_slide.slide;
+						const targetElement =
+							splide_slide.slide.querySelector("[data-spw-cursor"); // the element with the custom cursor enabled
+						if (slideElement.classList.contains("is-next")) {
+							console.log(targetElement);
+							targetElement.setAttribute("data-spw-cursor-content", "Next");
+						} else if (slideElement.classList.contains("is-prev")) {
+							targetElement.setAttribute("data-spw-cursor-content", "Prev");
+						} else {
+							targetElement.setAttribute("data-spw-cursor-content", "View");
 						}
 					});
 				},
@@ -222,15 +245,13 @@ function customCursor() {
 	/* hide/show cursor on hover */
 	targets.forEach((target) => {
 		//
-		let content = target.dataset.spwCursorContent;
 
 		target.addEventListener("mouseenter", (e) => {
+			let content = target.dataset.spwCursorContent;
 			//
 			document.documentElement.classList.add("custom-cursor-on");
 
 			gsap.killTweensOf(target); // kill active tweens
-
-			// console.log("play");
 
 			gsap.to(cursor, {
 				autoAlpha: 1, //show cursor
@@ -248,8 +269,6 @@ function customCursor() {
 
 			gsap.killTweensOf(target); //kill tweens of target we're leaving to avoid cursor persisting if we move too quick
 
-			// console.log("reverse");
-
 			gsap.to(cursor, {
 				autoAlpha: 0, //show cursor
 				duration: 0.25,
@@ -259,3 +278,5 @@ function customCursor() {
 		});
 	});
 }
+
+/* TO DO */
