@@ -27,7 +27,8 @@ function loadSliders() {
 		options,
 		initCallbacks,
 		eventCallbacks,
-		helperFunctions
+		helperFunctions,
+		useExtensions = false
 	) {
 		let targets = document.querySelectorAll(selector);
 		let splides = [];
@@ -43,9 +44,12 @@ function loadSliders() {
 				}
 			}
 
-			/* mount splide instance */
-			splide.mount();
-			// splide.mount(window.splide.Extensions);
+			// Mount splide instance with or without extensions
+			if (useExtensions) {
+				splide.mount(window.splide.Extensions);
+			} else {
+				splide.mount();
+			}
 
 			// Apply event callbacks if any
 			if (eventCallbacks) {
@@ -167,18 +171,27 @@ function loadSliders() {
 			},
 			eventCallbacks: {},
 			helperFunctions: {},
+			useExtensions: true, // use Autoscroll
 		},
 	];
 
 	/* loop through and initialize each slider */
 	sliders.forEach(
-		({ selector, options, initCallbacks, eventCallbacks, helperFunctions }) => {
+		({
+			selector,
+			options,
+			initCallbacks,
+			eventCallbacks,
+			helperFunctions,
+			useExtensions,
+		}) => {
 			initializeSplide(
 				selector,
 				options,
 				initCallbacks,
 				eventCallbacks,
-				helperFunctions
+				helperFunctions,
+				useExtensions
 			);
 		}
 	);
