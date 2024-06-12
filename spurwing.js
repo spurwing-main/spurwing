@@ -1,3 +1,75 @@
+function updateCopyrightYear() {
+	const year = new Date().getFullYear().toString();
+	document
+		.querySelectorAll('[copyright="year"]')
+		.forEach((el) => (el.textContent = year));
+}
+
+function startLenis() {
+	let lenis;
+	if (Webflow.env("editor") === undefined) {
+		// if we're not in the Editor
+		lenis = new Lenis({
+			lerp: 0.3,
+			wheelMultiplier: 0.8,
+			gestureOrientation: "vertical",
+			normalizeWheel: false,
+			smoothTouch: false,
+		});
+		function raf(time) {
+			lenis.raf(time);
+			requestAnimationFrame(raf);
+		}
+		requestAnimationFrame(raf);
+	}
+	$("[data-lenis-start]").on("click", function () {
+		lenis.start();
+	});
+	$("[data-lenis-stop]").on("click", function () {
+		lenis.stop();
+	});
+	$("[data-lenis-toggle]").on("click", function () {
+		$(this).toggleClass("stop-scroll");
+		if ($(this).hasClass("stop-scroll")) {
+			lenis.stop();
+		} else {
+			lenis.start();
+		}
+	});
+}
+
+function linkHover() {
+	// Check if window width is at least 768px
+	if ($(window).width() >= 768) {
+		// Apply hover effects directly to elements with 'link-fade' attributes set to 'navi'
+		$('[link-fade="navi"]').hover(
+			function () {
+				// On hover, add 'is-dim' class to other '[link-fade="navi"]' elements not being hovered
+				$('[link-fade="navi"]').not(this).addClass("is-dim");
+			},
+			function () {
+				// On hover out, remove 'is-dim' class from all '[link-fade="navi"]' elements
+				$('[link-fade="navi"]').removeClass("is-dim");
+			}
+		);
+
+		// Apply hover effects for elements with 'link-fade' attributes set to 'list'
+		$('[link-fade="list"]').each(function () {
+			var items = $(this).find('a, [link-fade="include"]');
+			items.hover(
+				function () {
+					// On hover, add 'is-dim' class to other items not being hovered
+					items.not(this).addClass("is-dim");
+				},
+				function () {
+					// On hover out, remove 'is-dim' class from all items
+					items.removeClass("is-dim");
+				}
+			);
+		});
+	}
+}
+
 function loadSliders() {
 	/* splide defaults */
 	Splide.defaults = {
@@ -280,3 +352,8 @@ function customCursor() {
 }
 
 /* TO DO */
+/* 
+- prev and next slides should act as arrows, not open links
+- first clone doesn't pick up the custom cursor for some reason
+
+*/

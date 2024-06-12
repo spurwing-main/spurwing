@@ -1,0 +1,122 @@
+<!-- Copywrite Year -->
+<script>
+	// Writes the current year to elements with the attribute 'copyright="year"'
+	document.addEventListener("DOMContentLoaded", () => {
+		const year = new Date().getFullYear().toString();
+		document
+			.querySelectorAll('[copyright="year"]')
+			.forEach((el) => (el.textContent = year));
+	});
+</script>
+
+<!-- Lenis Smooth Scroll -->
+<script>
+	let lenis;
+	if (Webflow.env("editor") === undefined) {
+		lenis = new Lenis({
+			lerp: 0.3,
+			wheelMultiplier: 0.8,
+			gestureOrientation: "vertical",
+			normalizeWheel: false,
+			smoothTouch: false,
+		});
+		function raf(time) {
+			lenis.raf(time);
+			requestAnimationFrame(raf);
+		}
+		requestAnimationFrame(raf);
+	}
+	$("[data-lenis-start]").on("click", function () {
+		lenis.start();
+	});
+	$("[data-lenis-stop]").on("click", function () {
+		lenis.stop();
+	});
+	$("[data-lenis-toggle]").on("click", function () {
+		$(this).toggleClass("stop-scroll");
+		if ($(this).hasClass("stop-scroll")) {
+			lenis.stop();
+		} else {
+			lenis.start();
+		}
+	});
+</script>
+
+<!-- Link Hover Fade Effects -->
+<script>
+	$(document).ready(function () {
+		// Check if window width is at least 768px
+		if ($(window).width() >= 768) {
+			// Apply hover effects directly to elements with 'link-fade' attributes set to 'navi'
+			$('[link-fade="navi"]').hover(
+				function () {
+					// On hover, add 'is-dim' class to other '[link-fade="navi"]' elements not being hovered
+					$('[link-fade="navi"]').not(this).addClass("is-dim");
+				},
+				function () {
+					// On hover out, remove 'is-dim' class from all '[link-fade="navi"]' elements
+					$('[link-fade="navi"]').removeClass("is-dim");
+				}
+			);
+
+			// Apply hover effects for elements with 'link-fade' attributes set to 'list'
+			$('[link-fade="list"]').each(function () {
+				var items = $(this).find('a, [link-fade="include"]');
+				items.hover(
+					function () {
+						// On hover, add 'is-dim' class to other items not being hovered
+						items.not(this).addClass("is-dim");
+					},
+					function () {
+						// On hover out, remove 'is-dim' class from all items
+						items.removeClass("is-dim");
+					}
+				);
+			});
+		}
+	});
+</script>
+
+<!-- custom code -->
+<script>
+	document.addEventListener("DOMContentLoaded", () => {
+		const spw_ENV = "live"; // dev or live
+		const spw_VERS = "5bec2b98ff5e80afd6d4c3ca4e33a04ee89f2691"; //github commit id
+		const spw_scr = "spurwing.js"; // script name
+		const spw_dev = `http://localhost:5500/${spw_scr}`; // local location
+		const spw_live = `https://cdn.jsdelivr.net/gh/spurwing-main/spurwing@${spw_VERS}/${spw_scr}`; // live location
+
+		function loadCustomScripts() {
+			const spw_js = document.createElement("script");
+			spw_js.src = spw_ENV === "dev" ? spw_dev : spw_live;
+
+			spw_js.onload = function () {
+				console.log("script loaded");
+				// run scripts
+				customCursor();
+				loadSliders();
+			};
+
+			document.head.appendChild(spw_js);
+
+			if (spw_ENV === "dev") {
+				try {
+					document.querySelector(".dev-banner").style.display = "block"; // show dev mode banner
+					document.querySelector(".dev-banner").textContent = "dev mode";
+				} catch (error) {
+					console.error("Error displaying dev banner:", error);
+				}
+			}
+		}
+
+		const swup = new Swup(); // Initialize Swup
+
+		// Load custom scripts initially
+		loadCustomScripts();
+
+		// Reload scripts after each page transition
+		swup.hooks.on("page:view", () => {
+			loadCustomScripts();
+		});
+	});
+</script>
