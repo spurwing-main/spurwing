@@ -152,7 +152,7 @@ function loadSliders() {
 			},
 			initCallbacks: {
 				mounted: function (helperFunctions) {
-					console.log("mounted");
+					console.log("Hero slider mounted");
 					// Call the createTimelines helper function
 					helperFunctions.createTimelines.call(this);
 					// Set custom cursor text on prev and next slides
@@ -181,7 +181,6 @@ function loadSliders() {
 			},
 			helperFunctions: {
 				createTimelines: function () {
-					console.log("Create timelines");
 					this.Components.Slides.forEach((splide_slide) => {
 						const imgWrap = splide_slide.slide.querySelector(
 							".hero-slide_img-wrap"
@@ -205,13 +204,11 @@ function loadSliders() {
 				},
 				setCursorContent: function () {
 					// Set custom cursor text on prev and next slides
-					console.log("Update cursors");
 					this.Components.Slides.forEach((splide_slide) => {
 						const slideElement = splide_slide.slide;
 						const targetElement =
 							splide_slide.slide.querySelector("[data-spw-cursor"); // the element with the custom cursor enabled
 						if (slideElement.classList.contains("is-next")) {
-							console.log(targetElement);
 							targetElement.setAttribute("data-spw-cursor-content", "Next");
 						} else if (slideElement.classList.contains("is-prev")) {
 							targetElement.setAttribute("data-spw-cursor-content", "Prev");
@@ -248,6 +245,7 @@ function loadSliders() {
 			},
 			initCallbacks: {
 				mounted: function () {
+					console.log("About slider mounted");
 					/* on mount, add additional slides required to fill screen */
 					const splide = this;
 					const totalSlides = splide.length;
@@ -299,6 +297,7 @@ function customCursor() {
 	const cursor_h = cursor.offsetHeight / 2;
 
 	let targets = gsap.utils.toArray("[data-spw-cursor='true']"); // get all targets
+	const successfulTargets = [];
 
 	const xSetter = gsap.quickSetter(cursor, "x", "px");
 	const ySetter = gsap.quickSetter(cursor, "y", "px");
@@ -348,7 +347,11 @@ function customCursor() {
 				ease: "power3.out",
 			});
 		});
+
+		successfulTargets.push(target);
 	});
+
+	console.log(`Custom cursor added to ${successfulTargets.length} targets`);
 }
 
 /* TO DO */
