@@ -74,8 +74,14 @@ function loadSwiperSliders() {
 	const swiper = new Swiper(".hero-slider_list-wrapper.swiper", {
 		// effect: "coverflow",
 		centeredSlides: true,
+		slideToClickedSlide: true,
 		slidesPerView: 1,
 		loop: true,
+		freeMode: {
+			enabled: true,
+			sticky: true,
+			minimumVelocity: 0.05,
+		},
 		// createElements: true,
 		// autoplay: true,
 		// breakpoints: {
@@ -85,6 +91,7 @@ function loadSwiperSliders() {
 		// },
 		effect: "creative",
 		creativeEffect: {
+			limitProgress: 2,
 			prev: {
 				// Slide scale
 				scale: 0.9,
@@ -333,6 +340,7 @@ function loadSliders() {
 }
 
 function customCursor() {
+	return;
 	//
 	const cursor = document.querySelector(".custom-cursor"); // get cursor
 	const cursor_w = cursor.offsetWidth / 2;
