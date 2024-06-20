@@ -290,6 +290,41 @@ function loadSliders() {
 	);
 }
 
+function loadSwiperSliders() {
+	const swiper = new Swiper(".hero-slider_list-wrapper.swiper", {
+		centeredSlides: true,
+		slideToClickedSlide: true /* click on slide to scroll to it */,
+		slidesPerView: 1,
+		loop: true,
+		loopAdditionalSlides: 5 /* render more slides */,
+		freeMode: {
+			/* allow 'flick scrolling */ enabled: true,
+			sticky: true /* snap to slides */,
+			minimumVelocity: 0.05,
+			momentumRatio: 0.5 /* dial it down a little */,
+		},
+		effect: "creative" /* enable scaling effect */,
+		creativeEffect: {
+			limitProgress: 2,
+			prev: {
+				// Slide scale
+				scale: 0.9,
+				translate: ["-100%", 0, 0],
+			},
+			next: {
+				// Slide scale
+				scale: 0.9,
+				translate: ["100%", 0, 0],
+			},
+		},
+		keyboard: {
+			enabled: true,
+			onlyInViewport: false,
+		},
+		// resistanceRatio: 0.85,
+	});
+}
+
 function customCursor() {
 	//
 	const cursor = document.querySelector(".custom-cursor"); // get cursor
