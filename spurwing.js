@@ -310,11 +310,15 @@ function loadSwiperSliders() {
 				// Slide scale
 				scale: 0.9,
 				translate: ["-100%", 0, 0],
+				origin: "right center",
+				opacity: 0.75,
 			},
 			next: {
 				// Slide scale
 				scale: 0.9,
 				translate: ["100%", 0, 0],
+				origin: "left center",
+				opacity: 0.75,
 			},
 		},
 		keyboard: {
@@ -322,6 +326,45 @@ function loadSwiperSliders() {
 			onlyInViewport: false,
 		},
 		// resistanceRatio: 0.85,
+		on: {
+			afterInit: function () {
+				console.log("Swiper initialised");
+
+				// Set custom cursor text on prev, next, and active slides
+				this.slides.forEach((slideElement) => {
+					const targetElement = slideElement.querySelector("[data-spw-cursor]"); // fixed the selector
+					if (targetElement) {
+						if (slideElement.classList.contains("swiper-slide-next")) {
+							targetElement.setAttribute("data-spw-cursor-content", "Next");
+						} else if (slideElement.classList.contains("swiper-slide-prev")) {
+							targetElement.setAttribute("data-spw-cursor-content", "Prev");
+						} else if (slideElement.classList.contains("swiper-slide-active")) {
+							targetElement.setAttribute("data-spw-cursor-content", "View");
+						} else {
+							targetElement.removeAttribute("data-spw-cursor-content");
+						}
+					}
+				});
+			},
+			transitionEnd: function () {
+				console.log("change");
+				// Set custom cursor text on prev, next, and active slides
+				this.slides.forEach((slideElement) => {
+					const targetElement = slideElement.querySelector("[data-spw-cursor]"); // fixed the selector
+					if (targetElement) {
+						if (slideElement.classList.contains("swiper-slide-next")) {
+							targetElement.setAttribute("data-spw-cursor-content", "Next");
+						} else if (slideElement.classList.contains("swiper-slide-prev")) {
+							targetElement.setAttribute("data-spw-cursor-content", "Prev");
+						} else if (slideElement.classList.contains("swiper-slide-active")) {
+							targetElement.setAttribute("data-spw-cursor-content", "View");
+						} else {
+							targetElement.removeAttribute("data-spw-cursor-content");
+						}
+					}
+				});
+			},
+		},
 	});
 }
 
