@@ -81,6 +81,7 @@ function loadSwiperSliders() {
 			enabled: true,
 			sticky: true,
 			minimumVelocity: 0.05,
+			momentumRatio: 0.5,
 		},
 		// createElements: true,
 		// autoplay: true,
