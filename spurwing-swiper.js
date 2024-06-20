@@ -77,6 +77,7 @@ function loadSwiperSliders() {
 		slideToClickedSlide: true,
 		slidesPerView: 1,
 		loop: true,
+		loopAdditionalSlides: 5,
 		freeMode: {
 			enabled: true,
 			sticky: true,
