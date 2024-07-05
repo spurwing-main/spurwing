@@ -374,7 +374,7 @@ function customCursor() {
 	const cursor_w = cursor.offsetWidth / 2;
 	const cursor_h = cursor.offsetHeight / 2;
 
-	let targets = gsap.utils.toArray("[data-spw-cursor='true']"); // get all targets
+	let targets = gsap.utils.toArray("[spw-cursor='on']"); // get all targets
 	const successfulTargets = [];
 
 	const xSetter = gsap.quickSetter(cursor, "x", "px");
@@ -396,9 +396,11 @@ function customCursor() {
 		//
 
 		target.addEventListener("mouseenter", (e) => {
-			let content = target.dataset.spwCursorContent;
+			let cursorContent = target.getAttribute("spw-cursor-content");
+			let cursorStyle = target.getAttribute("spw-cursor-style");
 			//
 			document.documentElement.classList.add("custom-cursor-on");
+			if (cursorStyle) cursor.setAttribute("spw-cursor-style", cursorStyle); // if a style has been defined for this cursor, set it
 
 			gsap.killTweensOf(target); // kill active tweens
 
@@ -409,12 +411,13 @@ function customCursor() {
 				ease: "power3.out",
 			});
 
-			if (content) cursor.innerHTML = content; //update content
+			if (cursorContent) cursor.innerHTML = cursorContent; //update content
 		});
 
 		target.addEventListener("mouseleave", (e) => {
 			//
 			document.documentElement.classList.remove("custom-cursor-on");
+			cursor.setAttribute("spw-cursor-style", ""); // remove any styling from cursor
 
 			gsap.killTweensOf(target); //kill tweens of target we're leaving to avoid cursor persisting if we move too quick
 
