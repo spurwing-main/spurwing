@@ -290,86 +290,108 @@ function loadSliders() {
 	);
 }
 
-function loadSwiperSliders() {
-	const swiper = new Swiper(".hero-slider_list-wrapper.swiper", {
-		centeredSlides: true,
-		slideToClickedSlide: true /* click on slide to scroll to it */,
-		slidesPerView: 1,
-		loop: true,
-		loopAdditionalSlides: 5 /* render more slides */,
-		freeMode: {
-			/* allow 'flick scrolling */ enabled: true,
-			sticky: true /* snap to slides */,
-			minimumVelocity: 0.05,
-			momentumRatio: 0.5 /* dial it down a little */,
-		},
-		effect: "creative" /* enable scaling effect */,
-		creativeEffect: {
-			limitProgress: 2,
-			prev: {
-				// Slide scale
-				scale: 0.9,
-				translate: ["-100%", 0, 0],
-				origin: "right center",
-				opacity: 0.75,
-			},
-			next: {
-				// Slide scale
-				scale: 0.9,
-				translate: ["100%", 0, 0],
-				origin: "left center",
-				opacity: 0.75,
-			},
-		},
-		keyboard: {
-			enabled: true,
-			onlyInViewport: false,
-		},
-		// resistanceRatio: 0.85,
-		on: {
-			afterInit: function () {
-				console.log("Swiper initialised");
+function loadSwiperSliders(mySelector = ".hero-slider_list-wrapper.swiper") {
+	// Get all swiper containers
+	const swiperContainers = document.querySelectorAll(mySelector);
 
-				// Set custom cursor text on prev, next, and active slides
-				this.slides.forEach((slideElement) => {
-					const targetElement = slideElement.querySelector("[data-spw-cursor]"); // fixed the selector
-					if (targetElement) {
-						if (slideElement.classList.contains("swiper-slide-next")) {
-							targetElement.setAttribute("data-spw-cursor-content", "Next");
-						} else if (slideElement.classList.contains("swiper-slide-prev")) {
-							targetElement.setAttribute("data-spw-cursor-content", "Prev");
-						} else if (slideElement.classList.contains("swiper-slide-active")) {
-							targetElement.setAttribute("data-spw-cursor-content", "View");
-						} else {
-							targetElement.removeAttribute("data-spw-cursor-content");
-						}
-					}
-				});
+	swiperContainers.forEach((container) => {
+		// Get the swiper-wrapper within the current container
+		const swiperWrapper = container.querySelector(".swiper-wrapper");
+
+		// Get all swiper-slide elements within the current container
+		const swiperSlides = container.querySelectorAll(".swiper-slide");
+
+		// Clone each swiper-slide element 4 times and append to the swiper-wrapper
+		for (let i = 0; i < 4; i++) {
+			swiperSlides.forEach((slide) => {
+				const clone = slide.cloneNode(true);
+				swiperWrapper.appendChild(clone);
+			});
+		}
+
+		const swiper = new Swiper(container, {
+			centeredSlides: true,
+			slideToClickedSlide: true /* click on slide to scroll to it */,
+			slidesPerView: 1,
+			loop: true,
+			loopAdditionalSlides: 5 /* render more slides */,
+			freeMode: {
+				/* allow 'flick scrolling */ enabled: true,
+				sticky: true /* snap to slides */,
+				minimumVelocity: 0.05,
+				momentumRatio: 0.5 /* dial it down a little */,
 			},
-			transitionEnd: function () {
-				console.log("change");
-				// Set custom cursor text on prev, next, and active slides
-				this.slides.forEach((slideElement) => {
-					const targetElement = slideElement.querySelector("[data-spw-cursor]"); // fixed the selector
-					if (targetElement) {
-						if (slideElement.classList.contains("swiper-slide-next")) {
-							targetElement.setAttribute("data-spw-cursor-content", "Next");
-						} else if (slideElement.classList.contains("swiper-slide-prev")) {
-							targetElement.setAttribute("data-spw-cursor-content", "Prev");
-						} else if (slideElement.classList.contains("swiper-slide-active")) {
-							targetElement.setAttribute("data-spw-cursor-content", "View");
-						} else {
-							targetElement.removeAttribute("data-spw-cursor-content");
-						}
-					}
-				});
+			effect: "creative" /* enable scaling effect */,
+			creativeEffect: {
+				limitProgress: 2,
+				prev: {
+					// Slide scale
+					scale: 0.9,
+					translate: ["-100%", 0, 0],
+					origin: "right center",
+					opacity: 0.75,
+				},
+				next: {
+					// Slide scale
+					scale: 0.9,
+					translate: ["100%", 0, 0],
+					origin: "left center",
+					opacity: 0.75,
+				},
 			},
-		},
+			keyboard: {
+				enabled: true,
+				onlyInViewport: false,
+			},
+			// resistanceRatio: 0.85,
+			on: {
+				afterInit: function () {
+					console.log("Swiper initialised");
+
+					// Set custom cursor text on prev, next, and active slides
+					this.slides.forEach((slideElement) => {
+						const targetElement = slideElement.querySelector("[spw-cursor]"); // fixed the selector
+						if (targetElement) {
+							if (slideElement.classList.contains("swiper-slide-next")) {
+								targetElement.setAttribute("spw-cursor-content", "Next");
+							} else if (slideElement.classList.contains("swiper-slide-prev")) {
+								targetElement.setAttribute("spw-cursor-content", "Prev");
+							} else if (
+								slideElement.classList.contains("swiper-slide-active")
+							) {
+								targetElement.setAttribute("spw-cursor-content", "View");
+							} else {
+								targetElement.removeAttribute("spw-cursor-content");
+							}
+						}
+					});
+				},
+				transitionEnd: function () {
+					console.log("change");
+					// Set custom cursor text on prev, next, and active slides
+					this.slides.forEach((slideElement) => {
+						const targetElement = slideElement.querySelector("[spw-cursor]"); // fixed the selector
+						if (targetElement) {
+							if (slideElement.classList.contains("swiper-slide-next")) {
+								targetElement.setAttribute("spw-cursor-content", "Next");
+							} else if (slideElement.classList.contains("swiper-slide-prev")) {
+								targetElement.setAttribute("spw-cursor-content", "Prev");
+							} else if (
+								slideElement.classList.contains("swiper-slide-active")
+							) {
+								targetElement.setAttribute("spw-cursor-content", "View");
+							} else {
+								targetElement.removeAttribute("spw-cursor-content");
+							}
+						}
+					});
+				},
+			},
+		});
 	});
 }
 
 function customCursor() {
-	//
 	const cursor = document.querySelector(".custom-cursor"); // get cursor
 	const cursor_w = cursor.offsetWidth / 2;
 	const cursor_h = cursor.offsetHeight / 2;
@@ -383,46 +405,42 @@ function customCursor() {
 	document.addEventListener("mousemove", mouseMove);
 
 	function mouseMove(e) {
-		xSetter(e.x - cursor_w);
-		ySetter(e.y - cursor_h);
+		xSetter(e.clientX - cursor_w);
+		ySetter(e.clientY - cursor_h);
 	}
 
 	gsap.set(cursor, {
 		scale: 0.5, // initial starting state
 	});
 
-	/* hide/show cursor on hover */
-	targets.forEach((target) => {
-		//
-
+	function applyCustomCursor(target) {
 		target.addEventListener("mouseenter", (e) => {
 			let cursorContent = target.getAttribute("spw-cursor-content");
 			let cursorStyle = target.getAttribute("spw-cursor-style");
-			//
+
 			document.documentElement.classList.add("custom-cursor-on");
 			if (cursorStyle) cursor.setAttribute("spw-cursor-style", cursorStyle); // if a style has been defined for this cursor, set it
 
 			gsap.killTweensOf(target); // kill active tweens
 
 			gsap.to(cursor, {
-				autoAlpha: 1, //show cursor
+				autoAlpha: 1, // show cursor
 				duration: 0.25,
 				scale: 1,
 				ease: "power3.out",
 			});
 
-			if (cursorContent) cursor.innerHTML = cursorContent; //update content
+			if (cursorContent) cursor.innerHTML = cursorContent; // update content
 		});
 
 		target.addEventListener("mouseleave", (e) => {
-			//
 			document.documentElement.classList.remove("custom-cursor-on");
 			cursor.setAttribute("spw-cursor-style", ""); // remove any styling from cursor
 
-			gsap.killTweensOf(target); //kill tweens of target we're leaving to avoid cursor persisting if we move too quick
+			gsap.killTweensOf(target); // kill tweens of target we're leaving to avoid cursor persisting if we move too quick
 
 			gsap.to(cursor, {
-				autoAlpha: 0, //show cursor
+				autoAlpha: 0, // hide cursor
 				duration: 0.25,
 				scale: 0.5,
 				ease: "power3.out",
@@ -430,7 +448,31 @@ function customCursor() {
 		});
 
 		successfulTargets.push(target);
+	}
+
+	// Apply the custom cursor to initial targets
+	targets.forEach((target) => {
+		applyCustomCursor(target);
 	});
+
+	// Observe the entire document for any new elements added
+	const observer = new MutationObserver((mutations) => {
+		mutations.forEach((mutation) => {
+			mutation.addedNodes.forEach((node) => {
+				if (node.nodeType === Node.ELEMENT_NODE) {
+					// Check if the added node or any of its children have the spw-cursor attribute
+					if (node.matches("[spw-cursor='on']")) {
+						applyCustomCursor(node);
+					}
+					node.querySelectorAll("[spw-cursor='on']").forEach((child) => {
+						applyCustomCursor(child);
+					});
+				}
+			});
+		});
+	});
+
+	observer.observe(document.body, { childList: true, subtree: true });
 
 	console.log(`Custom cursor added to ${successfulTargets.length} targets`);
 }
