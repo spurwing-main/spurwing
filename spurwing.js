@@ -343,10 +343,30 @@ function loadSwiperSliders(mySelector = ".hero-slider_list-wrapper.swiper") {
 				enabled: true,
 				onlyInViewport: false,
 			},
-			// resistanceRatio: 0.85,
+			resistanceRatio: 0,
 			on: {
+				sliderFirstMove: function () {
+					console.log("sliderFirstMove");
+					const activeSlide = this.slides[this.activeIndex];
+					const prevSlide = this.slides[this.activeIndex - 1];
+					const nextSlide = this.slides[this.activeIndex + 1];
+					[activeSlide, prevSlide, nextSlide].forEach((slide) => {
+						const video = slide.querySelector("video");
+						if (video) {
+							video.loop = true;
+							video.play();
+						}
+					});
+				},
 				afterInit: function () {
 					console.log("Swiper initialised");
+
+					const activeSlide = this.slides[this.activeIndex];
+					const video = activeSlide.querySelector("video");
+					if (video) {
+						video.loop = true;
+						video.play();
+					}
 
 					// Set custom cursor text on prev, next, and active slides
 					this.slides.forEach((slideElement) => {
@@ -367,9 +387,23 @@ function loadSwiperSliders(mySelector = ".hero-slider_list-wrapper.swiper") {
 					});
 				},
 				transitionEnd: function () {
-					console.log("change");
+					console.log("transitionEnd");
+					const activeSlide = this.slides[this.activeIndex];
+
 					// Set custom cursor text on prev, next, and active slides
 					this.slides.forEach((slideElement) => {
+						const video = slideElement.querySelector("video");
+						if (slideElement === activeSlide) {
+							if (video) {
+								video.loop = true;
+								video.play();
+							}
+						} else {
+							if (video) {
+								video.pause();
+							}
+						}
+
 						const targetElement = slideElement.querySelector("[spw-cursor]"); // fixed the selector
 						if (targetElement) {
 							if (slideElement.classList.contains("swiper-slide-next")) {
