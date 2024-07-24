@@ -319,6 +319,7 @@ function loadSwiperSliders(mySelector = ".hero-slider_list-wrapper.swiper") {
 				/* allow 'flick scrolling */ enabled: true,
 				sticky: true /* snap to slides */,
 				minimumVelocity: 0.05,
+				momentumVelocityRatio: 0.1,
 				momentumRatio: 0.5 /* dial it down a little */,
 			},
 			effect: "creative" /* enable scaling effect */,
@@ -343,7 +344,6 @@ function loadSwiperSliders(mySelector = ".hero-slider_list-wrapper.swiper") {
 				enabled: true,
 				onlyInViewport: false,
 			},
-			resistanceRatio: 0,
 			on: {
 				sliderFirstMove: function () {
 					console.log("sliderFirstMove");
