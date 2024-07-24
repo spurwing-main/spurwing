@@ -451,9 +451,11 @@ function customCursor() {
 		target.addEventListener("mouseenter", (e) => {
 			let cursorContent = target.getAttribute("spw-cursor-content");
 			let cursorStyle = target.getAttribute("spw-cursor-style");
+			let cursorIcon = target.getAttribute("spw-cursor-icon");
 
 			document.documentElement.classList.add("custom-cursor-on");
 			if (cursorStyle) cursor.setAttribute("spw-cursor-style", cursorStyle); // if a style has been defined for this cursor, set it
+			if (cursorIcon) cursor.setAttribute("spw-cursor-icon", cursorIcon); // if icon is enabled
 
 			gsap.killTweensOf(target); // kill active tweens
 
@@ -470,6 +472,7 @@ function customCursor() {
 		target.addEventListener("mouseleave", (e) => {
 			document.documentElement.classList.remove("custom-cursor-on");
 			cursor.setAttribute("spw-cursor-style", ""); // remove any styling from cursor
+			cursor.setAttribute("spw-cursor-icon", ""); // remove any styling from cursor
 
 			gsap.killTweensOf(target); // kill tweens of target we're leaving to avoid cursor persisting if we move too quick
 
