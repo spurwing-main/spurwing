@@ -1,13 +1,7 @@
 function main() {
-	// declare global obj for storing cursor etc on
-	// const spw = {
-	// 	cursorElement: document.querySelector(".custom-cursor"),
-	// 	targetElement: null,
-	// };
-
+	/* set up custom cursor */
 	spw.cursorElement = document.querySelector(".custom-cursor");
 	spw.targetElement = null;
-
 	console.log(spw);
 
 	updateCopyrightYear();
