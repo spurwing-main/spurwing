@@ -1,4 +1,15 @@
 function main() {
+	// declare global obj for storing cursor etc on
+	// const spw = {
+	// 	cursorElement: document.querySelector(".custom-cursor"),
+	// 	targetElement: null,
+	// };
+
+	spw.cursorElement = document.querySelector(".custom-cursor");
+	spw.targetElement = null;
+
+	console.log(spw);
+
 	startLenis();
 	linkHover();
 	customCursor();
@@ -397,6 +408,7 @@ function main() {
 					},
 					transitionEnd: function () {
 						console.log("transitionEnd");
+						console.log(spw);
 						const activeSlide = this.slides[this.activeIndex];
 
 						// Set custom cursor text on prev, next, and active slides
@@ -430,6 +442,9 @@ function main() {
 								}
 							}
 						});
+
+						// update cursor for current target
+						updateCursor(spw.cursorElement, spw.targetElement);
 					},
 				},
 			});
@@ -438,7 +453,7 @@ function main() {
 
 	function customCursor() {
 		// get cursor
-		const cursor = document.querySelector(".custom-cursor");
+		const cursor = spw.cursorElement;
 		const cursor_w = cursor.offsetWidth / 2;
 		const cursor_h = cursor.offsetHeight / 2;
 
@@ -469,15 +484,19 @@ function main() {
 		function applyCustomCursor(target) {
 			// when mouse enters target
 			target.addEventListener("mouseenter", (e) => {
+				// store target
+				spw.targetElement = target;
 				// add a top level class to the doc
 				document.documentElement.classList.add(doc_active_class);
 				// update and animate in cursor
-				updateCursor(target);
+				updateCursor(cursor, target);
 				animateCursorIn(target);
 			});
 
 			// when mouse leaves target
 			target.addEventListener("mouseleave", (e) => {
+				// clear target
+				spw.targetElement = null;
 				// remove class from doc
 				document.documentElement.classList.remove(doc_active_class);
 				cursor.setAttribute("spw-cursor-style", ""); // remove any styling from cursor
@@ -486,22 +505,9 @@ function main() {
 				animateCursorOut(target);
 			});
 
+			target.setAttribute("spw-cursor-applied", true);
+
 			successfulTargets.push(target);
-		}
-
-		function updateCursor(target) {
-			// get data from the target
-			let cursorContent = target.getAttribute("spw-cursor-content");
-			let cursorStyle = target.getAttribute("spw-cursor-style");
-			let cursorIcon = target.getAttribute("spw-cursor-icon");
-
-			// if a style has been defined for this cursor, set it
-			if (cursorStyle) cursor.setAttribute("spw-cursor-style", cursorStyle);
-			// if icon is enabled, set it on cursor
-			if (cursorIcon) cursor.setAttribute("spw-cursor-icon", cursorIcon);
-
-			// update content
-			if (cursorContent) cursor.innerHTML = cursorContent;
 		}
 
 		function animateCursorIn(target) {
@@ -555,5 +561,28 @@ function main() {
 		observer.observe(document.body, { childList: true, subtree: true });
 
 		console.log(`Custom cursor added to ${successfulTargets.length} targets`);
+	}
+
+	/* helper function for updating cursor - used by other functions outside customCursor() */
+	function updateCursor(cursor, target) {
+		if (!cursor || !target) {
+			console.log("cursor or target is missing");
+			return;
+		}
+		// get data from the target
+		let cursorContent = target.getAttribute("spw-cursor-content");
+		let cursorStyle = target.getAttribute("spw-cursor-style");
+		let cursorIcon = target.getAttribute("spw-cursor-icon");
+
+		// if a style has been defined for this cursor, set it
+		if (cursorStyle) cursor.setAttribute("spw-cursor-style", cursorStyle);
+		// if icon is enabled, set it on cursor
+		if (cursorIcon) cursor.setAttribute("spw-cursor-icon", cursorIcon);
+
+		// update content
+		if (cursorContent) cursor.innerHTML = cursorContent;
+
+		console.log("Cursor updated");
+		console.log(spw);
 	}
 }
