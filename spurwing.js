@@ -10,11 +10,12 @@ function main() {
 
 	console.log(spw);
 
+	updateCopyrightYear();
 	startLenis();
 	linkHover();
 	customCursor();
-	loadSwiperSliders();
-	updateCopyrightYear();
+	loadHomeHeroSlider();
+	loadSwiperSliders(".latest_col-wrap.swiper");
 
 	function updateCopyrightYear() {
 		const year = new Date().getFullYear().toString();
@@ -308,7 +309,7 @@ function main() {
 		);
 	}
 
-	function loadSwiperSliders(mySelector = ".hero-slider_list-wrapper.swiper") {
+	function loadHomeHeroSlider(mySelector = ".hero-slider_list-wrapper.swiper") {
 		// Get all swiper containers
 		const swiperContainers = document.querySelectorAll(mySelector);
 
@@ -446,6 +447,48 @@ function main() {
 						// update cursor for current target
 						updateCursor(spw.cursorElement, spw.targetElement);
 					},
+				},
+			});
+		});
+	}
+
+	function loadSwiperSliders(mySelector) {
+		console.log("test");
+		// Get all swiper containers
+		const swiperContainers = document.querySelectorAll(mySelector);
+
+		swiperContainers.forEach((container) => {
+			// Get the swiper-wrapper within the current container
+			const swiperWrapper = container.querySelector(".swiper-wrapper");
+
+			// Get all swiper-slide elements within the current container
+			const swiperSlides = container.querySelectorAll(".swiper-slide");
+
+			const swiper = new Swiper(container, {
+				slidesPerView: 4,
+				breakpoints: {
+					992: {
+						slidesPerView: 3,
+					},
+					768: {
+						slidesPerView: 2,
+					},
+					480: {
+						slidesPerView: 1,
+					},
+				},
+
+				freeMode: {
+					/* allow 'flick scrolling */ enabled: true,
+					sticky: true /* snap to slides */,
+					minimumVelocity: 0.05,
+					momentumVelocityRatio: 0.1,
+					momentumRatio: 0.5 /* dial it down a little */,
+				},
+
+				keyboard: {
+					enabled: true,
+					onlyInViewport: false,
 				},
 			});
 		});
