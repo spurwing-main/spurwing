@@ -1,8 +1,9 @@
 function main() {
 	/* set up custom cursor */
-	spw.cursorElement = document.querySelector(".custom-cursor");
-	spw.targetElement = null;
-	console.log(spw);
+	spw.cursor = {};
+	spw.cursor.element = document.querySelector(".custom-cursor");
+	spw.cursor.target = null;
+	spw.log();
 
 	updateCopyrightYear();
 	startLenis();
@@ -165,7 +166,7 @@ function main() {
 				},
 				initCallbacks: {
 					mounted: function (helperFunctions) {
-						console.log("Hero slider mounted");
+						spw.log("Hero slider mounted");
 						// Call the createTimelines helper function
 						helperFunctions.createTimelines.call(this);
 						// Set custom cursor text on prev and next slides
@@ -258,7 +259,7 @@ function main() {
 				},
 				initCallbacks: {
 					mounted: function () {
-						console.log("About slider mounted");
+						spw.log("About slider mounted");
 						/* on mount, add additional slides required to fill screen */
 						const splide = this;
 						const totalSlides = splide.length;
@@ -359,7 +360,7 @@ function main() {
 				},
 				on: {
 					sliderFirstMove: function () {
-						console.log("sliderFirstMove");
+						// spw.log("sliderFirstMove");
 						const activeSlide = this.slides[this.activeIndex];
 						const prevSlide = this.slides[this.activeIndex - 1];
 						const nextSlide = this.slides[this.activeIndex + 1];
@@ -372,7 +373,7 @@ function main() {
 						});
 					},
 					afterInit: function () {
-						console.log("Swiper initialised");
+						// spw.log("Swiper initialised");
 
 						const activeSlide = this.slides[this.activeIndex];
 						const video = activeSlide.querySelector("video");
@@ -402,8 +403,8 @@ function main() {
 						});
 					},
 					transitionEnd: function () {
-						console.log("transitionEnd");
-						console.log(spw);
+						// spw.log("transitionEnd");
+						// spw.log(spw);
 						const activeSlide = this.slides[this.activeIndex];
 
 						// Set custom cursor text on prev, next, and active slides
@@ -439,7 +440,7 @@ function main() {
 						});
 
 						// update cursor for current target
-						updateCursor(spw.cursorElement, spw.targetElement);
+						updateCursor(spw.cursor.element, spw.cursor.target);
 					},
 				},
 			});
@@ -447,7 +448,6 @@ function main() {
 	}
 
 	function loadSwiperSliders(mySelector) {
-		console.log("test");
 		// Get all swiper containers
 		const swiperContainers = document.querySelectorAll(mySelector);
 
@@ -490,7 +490,7 @@ function main() {
 
 	function customCursor() {
 		// get cursor
-		const cursor = spw.cursorElement;
+		const cursor = spw.cursor.element;
 		const cursor_w = cursor.offsetWidth / 2;
 		const cursor_h = cursor.offsetHeight / 2;
 
@@ -522,7 +522,7 @@ function main() {
 			// when mouse enters target
 			target.addEventListener("mouseenter", (e) => {
 				// store target
-				spw.targetElement = target;
+				spw.cursor.target = target;
 				// add a top level class to the doc
 				document.documentElement.classList.add(doc_active_class);
 				// update and animate in cursor
@@ -533,7 +533,7 @@ function main() {
 			// when mouse leaves target
 			target.addEventListener("mouseleave", (e) => {
 				// clear target
-				spw.targetElement = null;
+				spw.cursor.target = null;
 				// remove class from doc
 				document.documentElement.classList.remove(doc_active_class);
 				cursor.setAttribute("spw-cursor-style", ""); // remove any styling from cursor
@@ -597,13 +597,13 @@ function main() {
 
 		observer.observe(document.body, { childList: true, subtree: true });
 
-		console.log(`Custom cursor added to ${successfulTargets.length} targets`);
+		spw.log(`Custom cursor added to ${successfulTargets.length} targets`);
 	}
 
 	/* helper function for updating cursor - used by other functions outside customCursor() */
 	function updateCursor(cursor, target) {
 		if (!cursor || !target) {
-			console.log("cursor or target is missing");
+			spw.log("cursor or target is missing");
 			return;
 		}
 		// get data from the target
@@ -619,7 +619,7 @@ function main() {
 		// update content
 		if (cursorContent) cursor.innerHTML = cursorContent;
 
-		console.log("Cursor updated");
-		console.log(spw);
+		// spw.log("Cursor updated");
+		// spw.log(spw);
 	}
 }
