@@ -147,8 +147,8 @@ function main() {
 		// update content
 		if (cursorContent) cursor.innerHTML = cursorContent;
 
-		spw.log("Cursor updated");
-		spw.log(spw);
+		// spw.log("Cursor updated");
+		// spw.log(spw);
 	};
 
 	/* helper function for resetting cursor */
