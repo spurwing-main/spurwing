@@ -54,7 +54,7 @@ function main() {
 		const cursor_h = cursor.offsetHeight / 2;
 
 		// get all targets
-		let targets = gsap.utils.toArray("[spw-cursor='on']");
+		let newTargets = gsap.utils.toArray("[spw-cursor='on']");
 		const successfulTargets = [];
 
 		// create gsap functions to update cursor position
@@ -74,32 +74,33 @@ function main() {
 			scale: 0.5,
 		});
 
-		function applyCustomCursor(cursor, target) {
+		function applyCustomCursor(newTarget) {
 			// when mouse enters target
-			target.addEventListener("mouseenter", (e) => {
+			newTarget.addEventListener("mouseenter", (e) => {
 				// store target
-				cursor.target = target;
+				spw.cursor.target = newTarget;
 				// add a top level class to the doc
-				document.documentElement.classList.add(cursor.activeClass);
+				document.documentElement.classList.add(spw.cursor.activeClass);
 				// update and animate in cursor
-				spw.cursor.update(cursor, target);
-				spw.cursor.animateIn(cursor, target);
+				spw.cursor.update(newTarget);
+				spw.cursor.animateIn(newTarget);
+				spw.log(newTarget);
 			});
 
 			// when mouse leaves target
-			target.addEventListener("mouseleave", (e) => {
+			newTarget.addEventListener("mouseleave", (e) => {
 				spw.log("cursor exit");
 				spw.cursor.reset();
 			});
 
-			target.setAttribute("spw-cursor-applied", true);
+			newTarget.setAttribute("spw-cursor-applied", true);
 
-			successfulTargets.push(target);
+			successfulTargets.push(newTarget);
 		}
 
 		// Apply the custom cursor to initial targets
-		targets.forEach((target) => {
-			applyCustomCursor(cursor, target);
+		newTargets.forEach((newTarget) => {
+			applyCustomCursor(newTarget);
 		});
 
 		// Observe the entire document for any new elements added
@@ -109,10 +110,10 @@ function main() {
 					if (node.nodeType === Node.ELEMENT_NODE) {
 						// Check if the added node or any of its children have the spw-cursor attribute
 						if (node.matches("[spw-cursor='on']")) {
-							applyCustomCursor(cursor, node);
+							applyCustomCursor(node);
 						}
 						node.querySelectorAll("[spw-cursor='on']").forEach((child) => {
-							applyCustomCursor(cursor, child);
+							applyCustomCursor(child);
 						});
 					}
 				});
@@ -146,22 +147,24 @@ function main() {
 		// update content
 		if (cursorContent) cursor.innerHTML = cursorContent;
 
-		// spw.log("Cursor updated");
-		// spw.log(spw);
+		spw.log("Cursor updated");
+		spw.log(spw);
 	};
 
 	/* helper function for resetting cursor */
 	spw.cursor.reset = function () {
 		const cursor = spw.cursor.element;
-		let target = spw.cursor.target;
 
-		spw.cursor.animateOut(target);
+		// animate out cursor
+		spw.cursor.animateOut(spw.cursor.target);
 
 		// clear target
-		target = null;
+		spw.cursor.target = null;
+
 		// remove class from doc
-		document.documentElement.classList.remove(cursor.activeClass);
-		// remove any styling from cursor
+		document.documentElement.classList.remove(spw.cursor.activeClass);
+
+		// reset any styling on cursor
 		cursor.setAttribute("spw-cursor-style", "");
 		cursor.setAttribute("spw-cursor-icon", "");
 		spw.log("Cursor reset");
@@ -507,7 +510,7 @@ function main() {
 				},
 				on: {
 					sliderFirstMove: function () {
-						// spw.log("sliderFirstMove");
+						spw.log("sliderFirstMove");
 						const activeSlide = this.slides[this.activeIndex];
 						const prevSlide = this.slides[this.activeIndex - 1];
 						const nextSlide = this.slides[this.activeIndex + 1];
@@ -520,7 +523,7 @@ function main() {
 						});
 					},
 					afterInit: function () {
-						// spw.log("Swiper initialised");
+						spw.log("Swiper initialised");
 
 						const activeSlide = this.slides[this.activeIndex];
 						const video = activeSlide.querySelector("video");
@@ -531,7 +534,7 @@ function main() {
 
 						// Set custom cursor text on prev, next, and active slides
 						this.slides.forEach((slideElement) => {
-							const targetElement = slideElement.querySelector("[spw-cursor]"); // fixed the selector
+							const targetElement = slideElement.querySelector("[spw-cursor]");
 							if (targetElement) {
 								if (slideElement.classList.contains("swiper-slide-next")) {
 									targetElement.setAttribute("spw-cursor-content", "Next");
@@ -550,8 +553,8 @@ function main() {
 						});
 					},
 					transitionEnd: function () {
-						// spw.log("transitionEnd");
-						// spw.log(spw);
+						spw.log("transitionEnd");
+						spw.log(spw);
 						const activeSlide = this.slides[this.activeIndex];
 
 						// Set custom cursor text on prev, next, and active slides
@@ -568,7 +571,7 @@ function main() {
 								}
 							}
 
-							const targetElement = slideElement.querySelector("[spw-cursor]"); // fixed the selector
+							const targetElement = slideElement.querySelector("[spw-cursor]");
 							if (targetElement) {
 								if (slideElement.classList.contains("swiper-slide-next")) {
 									targetElement.setAttribute("spw-cursor-content", "Next");
