@@ -84,12 +84,12 @@ function main() {
 				// update and animate in cursor
 				spw.cursor.update(newTarget);
 				spw.cursor.animateIn(newTarget);
-				spw.log(newTarget);
+				// spw.log(newTarget);
 			});
 
 			// when mouse leaves target
 			newTarget.addEventListener("mouseleave", (e) => {
-				spw.log("cursor exit");
+				// spw.log("cursor exit");
 				spw.cursor.reset();
 			});
 
@@ -167,7 +167,7 @@ function main() {
 		// reset any styling on cursor
 		cursor.setAttribute("spw-cursor-style", "");
 		cursor.setAttribute("spw-cursor-icon", "");
-		spw.log("Cursor reset");
+		// spw.log("Cursor reset");
 	};
 
 	/* helper functions for animating cursor in and out */
