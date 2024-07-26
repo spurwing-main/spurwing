@@ -1,25 +1,19 @@
 function main() {
 	/* set up custom cursor */
-	spw.cursor = {};
-	spw.cursor.element = document.querySelector(".custom-cursor");
-	spw.cursor.target = null;
+	spw.cursor = {}; // obj for storing cursor info
+	spw.cursor.element = document.querySelector(".custom-cursor"); // the cursor element itself
+	spw.cursor.target = null; // target element
+	spw.cursor.activeClass = "doc_active_class"; // class we add to the <html> element when cursor active
 	spw.log();
 
-	updateCopyrightYear();
-	startLenis();
-	linkHover();
-	customCursor();
-	loadHomeHeroSlider();
-	loadSwiperSliders(".latest_col-wrap.swiper");
-
-	function updateCopyrightYear() {
+	spw.updateCopyrightYear = function () {
 		const year = new Date().getFullYear().toString();
 		document
 			.querySelectorAll('[copyright="year"]')
 			.forEach((el) => (el.textContent = year));
-	}
+	};
 
-	function startLenis() {
+	spw.startLenis = function () {
 		let lenis;
 		if (Webflow.env("editor") === undefined) {
 			// if we're not in the Editor
@@ -50,9 +44,160 @@ function main() {
 				lenis.start();
 			}
 		});
-	}
+	};
 
-	function linkHover() {
+	/* initialise cursor */
+	spw.cursor.init = function () {
+		// get cursor dims
+		const cursor = spw.cursor.element;
+		const cursor_w = cursor.offsetWidth / 2;
+		const cursor_h = cursor.offsetHeight / 2;
+
+		// get all targets
+		let targets = gsap.utils.toArray("[spw-cursor='on']");
+		const successfulTargets = [];
+
+		// create gsap functions to update cursor position
+		const xSetter = gsap.quickSetter(cursor, "x", "px");
+		const ySetter = gsap.quickSetter(cursor, "y", "px");
+
+		// when mouse moves, update position of custom cursor
+		// updated from a mousemove to pointermove event to also support drag actions
+		document.addEventListener("pointermove", mouseMove);
+		function mouseMove(e) {
+			xSetter(e.clientX - cursor_w);
+			ySetter(e.clientY - cursor_h);
+		}
+
+		// set initial starting state
+		gsap.set(cursor, {
+			scale: 0.5,
+		});
+
+		function applyCustomCursor(cursor, target) {
+			// when mouse enters target
+			target.addEventListener("mouseenter", (e) => {
+				// store target
+				cursor.target = target;
+				// add a top level class to the doc
+				document.documentElement.classList.add(cursor.activeClass);
+				// update and animate in cursor
+				spw.cursor.update(cursor, target);
+				spw.cursor.animateIn(cursor, target);
+			});
+
+			// when mouse leaves target
+			target.addEventListener("mouseleave", (e) => {
+				spw.log("cursor exit");
+				spw.cursor.reset();
+			});
+
+			target.setAttribute("spw-cursor-applied", true);
+
+			successfulTargets.push(target);
+		}
+
+		// Apply the custom cursor to initial targets
+		targets.forEach((target) => {
+			applyCustomCursor(cursor, target);
+		});
+
+		// Observe the entire document for any new elements added
+		const observer = new MutationObserver((mutations) => {
+			mutations.forEach((mutation) => {
+				mutation.addedNodes.forEach((node) => {
+					if (node.nodeType === Node.ELEMENT_NODE) {
+						// Check if the added node or any of its children have the spw-cursor attribute
+						if (node.matches("[spw-cursor='on']")) {
+							applyCustomCursor(cursor, node);
+						}
+						node.querySelectorAll("[spw-cursor='on']").forEach((child) => {
+							applyCustomCursor(cursor, child);
+						});
+					}
+				});
+			});
+		});
+
+		observer.observe(document.body, { childList: true, subtree: true });
+
+		spw.log(`Custom cursor added to ${successfulTargets.length} targets`);
+	};
+
+	/* helper function for updating cursor - used by other functions outside customCursor() */
+	spw.cursor.update = function (target = spw.cursor.target) {
+		if (!target) {
+			// spw.log("target is missing");
+			return;
+		}
+
+		const cursor = spw.cursor.element;
+
+		// get data from the target
+		let cursorContent = target.getAttribute("spw-cursor-content");
+		let cursorStyle = target.getAttribute("spw-cursor-style");
+		let cursorIcon = target.getAttribute("spw-cursor-icon");
+
+		// if a style has been defined for this cursor, set it
+		if (cursorStyle) cursor.setAttribute("spw-cursor-style", cursorStyle);
+		// if icon is enabled, set it on cursor
+		if (cursorIcon) cursor.setAttribute("spw-cursor-icon", cursorIcon);
+
+		// update content
+		if (cursorContent) cursor.innerHTML = cursorContent;
+
+		// spw.log("Cursor updated");
+		// spw.log(spw);
+	};
+
+	/* helper function for resetting cursor */
+	spw.cursor.reset = function () {
+		const cursor = spw.cursor.element;
+		let target = spw.cursor.target;
+
+		spw.cursor.animateOut(target);
+
+		// clear target
+		target = null;
+		// remove class from doc
+		document.documentElement.classList.remove(cursor.activeClass);
+		// remove any styling from cursor
+		cursor.setAttribute("spw-cursor-style", "");
+		cursor.setAttribute("spw-cursor-icon", "");
+		spw.log("Cursor reset");
+	};
+
+	/* helper functions for animating cursor in and out */
+	spw.cursor.animateIn = function (target = null) {
+		const cursor = spw.cursor.element;
+
+		// kill active tweens
+		if (target) gsap.killTweensOf(target);
+
+		// animate cursor - scale up and show
+		gsap.to(cursor, {
+			autoAlpha: 1,
+			duration: 0.25,
+			scale: 1,
+			ease: "power3.out",
+		});
+	};
+	spw.cursor.animateOut = function (target = null) {
+		const cursor = spw.cursor.element;
+
+		// kill active tweens
+		if (target) gsap.killTweensOf(target);
+
+		// animate cursor - shrink down and hide
+		gsap.to(cursor, {
+			autoAlpha: 0,
+			duration: 0.25,
+			scale: 0.5,
+			ease: "power3.out",
+		});
+	};
+
+	spw.linkHover = function () {
 		// Check if window width is at least 768px
 		if ($(window).width() >= 768) {
 			// Apply hover effects directly to elements with 'link-fade' attributes set to 'navi'
@@ -82,9 +227,9 @@ function main() {
 				);
 			});
 		}
-	}
+	};
 
-	function loadSliders() {
+	spw.loadSliders = function () {
 		/* splide defaults */
 		Splide.defaults = {
 			perMove: 1,
@@ -302,9 +447,11 @@ function main() {
 				);
 			}
 		);
-	}
+	};
 
-	function loadHomeHeroSlider(mySelector = ".hero-slider_list-wrapper.swiper") {
+	spw.loadHomeHeroSlider = function (
+		mySelector = ".hero-slider_list-wrapper.swiper"
+	) {
 		// Get all swiper containers
 		const swiperContainers = document.querySelectorAll(mySelector);
 
@@ -440,14 +587,14 @@ function main() {
 						});
 
 						// update cursor for current target
-						updateCursor(spw.cursor.element, spw.cursor.target);
+						spw.cursor.update();
 					},
 				},
 			});
 		});
-	}
+	};
 
-	function loadSwiperSliders(mySelector) {
+	spw.loadSwiperSliders = function (mySelector) {
 		// Get all swiper containers
 		const swiperContainers = document.querySelectorAll(mySelector);
 
@@ -486,140 +633,12 @@ function main() {
 				},
 			});
 		});
-	}
+	};
 
-	function customCursor() {
-		// get cursor
-		const cursor = spw.cursor.element;
-		const cursor_w = cursor.offsetWidth / 2;
-		const cursor_h = cursor.offsetHeight / 2;
-
-		// set class for adding at document level
-		const doc_active_class = "custom-cursor-on";
-
-		// get all targets
-		let targets = gsap.utils.toArray("[spw-cursor='on']");
-		const successfulTargets = [];
-
-		// create gsap functions to update cursor position
-		const xSetter = gsap.quickSetter(cursor, "x", "px");
-		const ySetter = gsap.quickSetter(cursor, "y", "px");
-
-		// when mouse moves, update position of custom cursor
-		// updated from a mousemove to pointermove event to also support drag actions
-		document.addEventListener("pointermove", mouseMove);
-		function mouseMove(e) {
-			xSetter(e.clientX - cursor_w);
-			ySetter(e.clientY - cursor_h);
-		}
-
-		// set initial starting state
-		gsap.set(cursor, {
-			scale: 0.5,
-		});
-
-		function applyCustomCursor(target) {
-			// when mouse enters target
-			target.addEventListener("mouseenter", (e) => {
-				// store target
-				spw.cursor.target = target;
-				// add a top level class to the doc
-				document.documentElement.classList.add(doc_active_class);
-				// update and animate in cursor
-				updateCursor(cursor, target);
-				animateCursorIn(target);
-			});
-
-			// when mouse leaves target
-			target.addEventListener("mouseleave", (e) => {
-				// clear target
-				spw.cursor.target = null;
-				// remove class from doc
-				document.documentElement.classList.remove(doc_active_class);
-				cursor.setAttribute("spw-cursor-style", ""); // remove any styling from cursor
-				cursor.setAttribute("spw-cursor-icon", ""); // remove any styling from cursor
-
-				animateCursorOut(target);
-			});
-
-			target.setAttribute("spw-cursor-applied", true);
-
-			successfulTargets.push(target);
-		}
-
-		function animateCursorIn(target) {
-			// kill active tweens
-			gsap.killTweensOf(target);
-
-			// animate cursor - scale up and show
-			gsap.to(cursor, {
-				autoAlpha: 1,
-				duration: 0.25,
-				scale: 1,
-				ease: "power3.out",
-			});
-		}
-
-		function animateCursorOut(target) {
-			// kill tweens of target we're leaving to avoid cursor persisting if we move too quick
-			gsap.killTweensOf(target);
-
-			// animate cursor - shrink down and hide
-			gsap.to(cursor, {
-				autoAlpha: 0,
-				duration: 0.25,
-				scale: 0.5,
-				ease: "power3.out",
-			});
-		}
-
-		// Apply the custom cursor to initial targets
-		targets.forEach((target) => {
-			applyCustomCursor(target);
-		});
-
-		// Observe the entire document for any new elements added
-		const observer = new MutationObserver((mutations) => {
-			mutations.forEach((mutation) => {
-				mutation.addedNodes.forEach((node) => {
-					if (node.nodeType === Node.ELEMENT_NODE) {
-						// Check if the added node or any of its children have the spw-cursor attribute
-						if (node.matches("[spw-cursor='on']")) {
-							applyCustomCursor(node);
-						}
-						node.querySelectorAll("[spw-cursor='on']").forEach((child) => {
-							applyCustomCursor(child);
-						});
-					}
-				});
-			});
-		});
-
-		observer.observe(document.body, { childList: true, subtree: true });
-
-		spw.log(`Custom cursor added to ${successfulTargets.length} targets`);
-	}
-
-	/* helper function for updating cursor - used by other functions outside customCursor() */
-	function updateCursor(cursor, target) {
-		if (!cursor || !target) {
-			spw.log("cursor or target is missing");
-			return;
-		}
-		// get data from the target
-		let cursorContent = target.getAttribute("spw-cursor-content");
-		let cursorStyle = target.getAttribute("spw-cursor-style");
-		let cursorIcon = target.getAttribute("spw-cursor-icon");
-
-		// if a style has been defined for this cursor, set it
-		if (cursorStyle) cursor.setAttribute("spw-cursor-style", cursorStyle);
-		// if icon is enabled, set it on cursor
-		if (cursorIcon) cursor.setAttribute("spw-cursor-icon", cursorIcon);
-
-		// update content
-		if (cursorContent) cursor.innerHTML = cursorContent;
-
-		// spw.log("Cursor updated");
-		// spw.log(spw);
-	}
+	spw.updateCopyrightYear();
+	spw.startLenis();
+	spw.linkHover();
+	spw.cursor.init();
+	spw.loadHomeHeroSlider();
+	spw.loadSwiperSliders(".latest_col-wrap.swiper");
 }
