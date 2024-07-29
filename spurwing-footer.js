@@ -1,7 +1,7 @@
 // Set up global Spurwing object
 const spw = {
 	config: {
-		scriptVers: "68dd0e3a34183db1591065ff2539f8a8477bd17f", // github commit id. Updated manually on each release
+		scriptVers: "9493f61877af534ba217ce197fc548bd37a22a14", // github commit id. Updated manually on each release
 		scriptName: "spurwing.js", // script name
 		get devPath() {
 			return `http://localhost:5500/${this.scriptName}`; // local script path
@@ -26,11 +26,17 @@ spw.log = function (str) {
 	else console.log(spw);
 };
 
+// array of third party scripts to load
+spw.scriptsExt = [
+	"https://cdn.jsdelivr.net/npm/@finsweet/attributes-cmsfilter@1/cmsfilter.js",
+];
+
 document.addEventListener("DOMContentLoaded", () => {
 	// This runs on initial load only
 
 	// Load custom scripts at start of session
 	loadCustomScripts();
+	loadExtScripts();
 
 	// Initialize Swup
 	const swup_options = {
@@ -61,20 +67,34 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	}
 
+	// Function to load external scripts
+	function loadExtScripts() {
+		for (var i = 0; i < spw.scriptsExt.length; i++) {
+			console.log(spw.scriptsExt[i]);
+			var scriptEl = document.createElement("script");
+			scriptEl.src = spw.scriptsExt[i];
+			document.head.appendChild(scriptEl);
+			scriptEl.onload = function () {
+				console.log("External script loaded: " + scriptEl.src);
+			};
+		}
+	}
+
 	// Function to restart Webflow
-	const restartWebflow = () => {
+	function restartWebflow() {
 		spw.log("restart WF");
 		window.Webflow.destroy();
 		window.Webflow.ready();
 		window.Webflow.require("ix2")?.init();
 		document.dispatchEvent(new Event("readystatechange"));
-	};
+	}
 
 	// Event before page transition starts
 	spw.swup.hooks.on("visit:start", async (visit) => {
 		spw.log("Swup visit:start");
 
 		// kill custom cursor
+		spw.cursor.enabled = false;
 		spw.cursor.reset();
 	});
 
@@ -98,6 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 		/* load scripts */
 		loadCustomScripts();
+		loadExtScripts();
 		console.log(`Site code reloaded from ${spw.config.ENV} source by swup.js`);
 	});
 });

@@ -4,6 +4,7 @@ function main() {
 	spw.cursor.element = document.querySelector(".custom-cursor"); // the cursor element itself
 	spw.cursor.target = null; // target element
 	spw.cursor.activeClass = "doc_active_class"; // class we add to the <html> element when cursor active
+	spw.cursor.enabled = false; // cursor can only be shown if this is enabled. Helps control behaviour on page transitions
 	spw.log();
 
 	spw.updateCopyrightYear = function () {
@@ -48,6 +49,9 @@ function main() {
 
 	/* initialise cursor */
 	spw.cursor.init = function () {
+		// turn cursor on
+		spw.cursor.enabled = true;
+
 		// get cursor dims
 		const cursor = spw.cursor.element;
 		const cursor_w = cursor.offsetWidth / 2;
@@ -82,9 +86,11 @@ function main() {
 				// add a top level class to the doc
 				document.documentElement.classList.add(spw.cursor.activeClass);
 				// update and animate in cursor
-				spw.cursor.update(newTarget);
-				spw.cursor.animateIn(newTarget);
-				// spw.log(newTarget);
+				// only if cursor is enabled
+				if (spw.cursor.enabled) {
+					spw.cursor.update(newTarget);
+					spw.cursor.animateIn(newTarget);
+				}
 			});
 
 			// when mouse leaves target
