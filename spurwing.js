@@ -11,6 +11,8 @@ function main() {
 
 	// Method to disable scroll
 	spw.scrollDisabler.run = function () {
+		spw.log("Scroll disabler run");
+
 		if (spw.scrollDisabler.scrollDisabled) return;
 
 		spw.scrollDisabler.scrollPosition = window.scrollY;
@@ -27,6 +29,8 @@ function main() {
 
 	// Method to enable scroll
 	spw.scrollDisabler.kill = function () {
+		spw.log("Scroll disabler kill");
+
 		if (!spw.scrollDisabler.scrollDisabled) return;
 
 		document.body.style.position = "";
@@ -43,6 +47,7 @@ function main() {
 
 	// initialise scroll disabler
 	spw.scrollDisabler.init = function () {
+		spw.log("Scroll disabler init");
 		// Define variables to track scroll state and position
 		spw.scrollDisabler.scrollDisabled = false;
 		spw.scrollDisabler.scrollPosition = 0;
