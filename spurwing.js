@@ -7,60 +7,64 @@ function main() {
 	spw.cursor.enabled = false; // cursor can only be shown if this is enabled. Helps control behaviour on page transitions
 
 	/* set up scroll disabling */
-	// Define variables to track scroll state and position
-	spw.scrollDisabled = false;
-	spw.scrollPosition = 0;
-
-	// Select the toggle element and preserve elements
-	spw.scrollToggleElement = document.querySelector(
-		'[fs-scrolldisable-element="toggle"]'
-	);
-	spw.ScrollPreserveElements = document.querySelectorAll(
-		'[fs-scrolldisable-element="preserve"]'
-	);
+	spw.scrollDisabler = {};
 
 	// Method to disable scroll
-	spw.disableScroll = function () {
-		if (spw.scrollDisabled) return;
+	spw.scrollDisabler.run = function () {
+		if (spw.scrollDisabler.scrollDisabled) return;
 
-		spw.scrollPosition = window.scrollY;
+		spw.scrollDisabler.scrollPosition = window.scrollY;
 		document.body.style.position = "fixed";
-		document.body.style.top = `-${spw.scrollPosition}px`;
+		document.body.style.top = `-${spw.scrollDisabler.scrollPosition}px`;
 		document.body.style.width = "100%";
 
-		spw.ScrollPreserveElements.forEach((el) => {
+		spw.scrollDisabler.preserveElements.forEach((el) => {
 			el.style.overflow = "auto";
 		});
 
-		spw.scrollDisabled = true;
+		spw.scrollDisabler.scrollDisabled = true;
 	};
 
 	// Method to enable scroll
-	spw.enableScroll = function () {
-		if (!spw.scrollDisabled) return;
+	spw.scrollDisabler.kill = function () {
+		if (!spw.scrollDisabler.scrollDisabled) return;
 
 		document.body.style.position = "";
 		document.body.style.top = "";
 		document.body.style.width = "";
-		window.scrollTo(0, spw.scrollPosition);
+		window.scrollTo(0, spw.scrollDisabler.scrollPosition);
 
-		spw.ScrollPreserveElements.forEach((el) => {
+		spw.scrollDisabler.preserveElements.forEach((el) => {
 			el.style.overflow = "";
 		});
 
-		spw.scrollDisabled = false;
+		spw.scrollDisabler.scrollDisabled = false;
 	};
 
-	// Add event listener to the toggle element
-	if (spw.scrollToggleElement) {
-		spw.scrollToggleElement.addEventListener("click", () => {
-			if (spw.scrollDisabled) {
-				spw.enableScroll();
-			} else {
-				spw.disableScroll();
-			}
-		});
-	}
+	// initialise scroll disabler
+	spw.scrollDisabler.init = function () {
+		// Define variables to track scroll state and position
+		spw.scrollDisabler.scrollDisabled = false;
+		spw.scrollDisabler.scrollPosition = 0;
+
+		// Select the toggle element and preserve elements
+		spw.scrollDisabler.toggleElement = document.querySelector(
+			'[fs-scrolldisable-element="toggle"]'
+		);
+		spw.scrollDisabler.preserveElements = document.querySelectorAll(
+			'[fs-scrolldisable-element="preserve"]'
+		);
+		// Add event listener to the toggle element
+		if (spw.scrollDisabler.toggleElement) {
+			spw.scrollDisabler.toggleElement.addEventListener("click", () => {
+				if (spw.scrollDisabler.scrollDisabled) {
+					spw.scrollDisabler.kill();
+				} else {
+					spw.scrollDisabler.run();
+				}
+			});
+		}
+	};
 
 	spw.log();
 
@@ -531,4 +535,5 @@ function main() {
 	spw.loadHomeHeroSlider();
 	spw.loadLatestSlider(".latest_col-wrap.swiper");
 	spw.loadAboutHeroSlider();
+	spw.scrollDisabler.init();
 }
