@@ -483,16 +483,16 @@ function main() {
 			const swiperSlides = container.querySelectorAll(".swiper-slide");
 
 			const swiper = new Swiper(container, {
-				slidesPerView: 4,
+				slidesPerView: 1,
 				breakpoints: {
 					992: {
-						slidesPerView: 3,
+						slidesPerView: 4,
 					},
 					768: {
-						slidesPerView: 2,
+						slidesPerView: 3,
 					},
 					480: {
-						slidesPerView: 1,
+						slidesPerView: 2,
 					},
 				},
 
