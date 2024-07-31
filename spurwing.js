@@ -5,6 +5,8 @@ function main() {
 	spw.cursor.target = null; // target element
 	spw.cursor.activeClass = "custom-cursor-on"; // class we add to the <html> element when cursor active
 	spw.cursor.enabled = false; // cursor can only be shown if this is enabled. Helps control behaviour on page transitions
+	spw.gsapMM = gsap.matchMedia();
+
 	spw.log();
 
 	spw.updateCopyrightYear = function () {
@@ -178,6 +180,10 @@ function main() {
 
 	/* helper functions for animating cursor in and out */
 	spw.cursor.animateIn = function (target = null) {
+		// only animate in for big screens
+		if (window.innerWidth < 768) {
+			return;
+		}
 		const cursor = spw.cursor.element;
 
 		// kill active tweens
