@@ -27,7 +27,7 @@ function main() {
 				smoothTouch: false,
 			});
 			function raf(time) {
-				lenis.raf(time);
+				spw.lenis.raf(time);
 				requestAnimationFrame(raf);
 			}
 			requestAnimationFrame(raf);
