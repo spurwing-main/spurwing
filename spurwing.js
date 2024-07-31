@@ -17,6 +17,7 @@ function main() {
 	};
 
 	spw.startLenis = function () {
+		return;
 		if (Webflow.env("editor") === undefined) {
 			// if we're not in the Editor
 			spw.lenis = new Lenis({
