@@ -17,10 +17,9 @@ function main() {
 	};
 
 	spw.startLenis = function () {
-		let lenis;
 		if (Webflow.env("editor") === undefined) {
 			// if we're not in the Editor
-			lenis = new Lenis({
+			spw.lenis = new Lenis({
 				lerp: 0.3,
 				wheelMultiplier: 0.8,
 				gestureOrientation: "vertical",
@@ -34,17 +33,17 @@ function main() {
 			requestAnimationFrame(raf);
 		}
 		$("[data-lenis-start]").on("click", function () {
-			lenis.start();
+			spw.lenis.start();
 		});
 		$("[data-lenis-stop]").on("click", function () {
-			lenis.stop();
+			spw.lenis.stop();
 		});
 		$("[data-lenis-toggle]").on("click", function () {
 			$(this).toggleClass("stop-scroll");
 			if ($(this).hasClass("stop-scroll")) {
-				lenis.stop();
+				spw.lenis.stop();
 			} else {
-				lenis.start();
+				spw.lenis.start();
 			}
 		});
 	};
