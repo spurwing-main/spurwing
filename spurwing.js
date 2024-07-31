@@ -52,14 +52,6 @@ function main() {
 		spw.scrollDisabler.scrollDisabled = false;
 		spw.scrollDisabler.scrollPosition = 0;
 
-		// if scroll disabler has already been init'd we don't want to duplicate event listeners.
-		if (
-			document.documentElement.getAttribute("data-disable-scroll") ===
-			"initialised"
-		) {
-			return;
-		}
-
 		// Select the toggle element and preserve elements
 		spw.scrollDisabler.toggleElement = document.querySelector(
 			'[fs-scrolldisable-element="toggle"]'
@@ -67,6 +59,14 @@ function main() {
 		spw.scrollDisabler.preserveElements = document.querySelectorAll(
 			'[fs-scrolldisable-element="preserve"]'
 		);
+
+		// if scroll disabler has already been init'd we don't want to duplicate event listeners.
+		if (
+			document.documentElement.getAttribute("data-disable-scroll") ===
+			"initialised"
+		) {
+			return;
+		}
 		// Add event listener to the toggle element
 		if (spw.scrollDisabler.toggleElement) {
 			spw.scrollDisabler.toggleElement.addEventListener("click", () => {
