@@ -71,6 +71,15 @@ function main() {
 		}
 	};
 
+	spw.scrollDisabler.reinit = function () {
+		spw.log("Scroll disabler reinit");
+		// Define variables to track scroll state and position
+		spw.scrollDisabler.scrollDisabled = false;
+		spw.scrollDisabler.scrollPosition = 0;
+
+		// we don't need to re-add event listeners a second time
+	};
+
 	spw.log();
 
 	spw.updateCopyrightYear = function () {
