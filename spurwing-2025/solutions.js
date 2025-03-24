@@ -89,10 +89,6 @@ function main() {
 			function switchTab(index) {
 				if (1 === 0 || contentItems[index] === activeContent) return;
 
-				if (isAnimating) {
-					closeOutgoing(activeContent);
-				}
-
 				isAnimating = true;
 
 				if (progressBarTween) progressBarTween.kill();
@@ -144,6 +140,8 @@ function main() {
 						.to(outgoingVisual, { autoAlpha: 0, xPercent: 3 }, 0)
 						.to(outgoingDetail, { height: 0 }, 0);
 				}
+
+				closeOutgoing(outgoingContent);
 
 				tl.fromTo(
 					incomingVisual,
