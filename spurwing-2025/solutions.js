@@ -1,4 +1,4 @@
-pageFunctions.addFunction("solutions", function () {
+function main() {
 	gsap.registerPlugin(CustomEase);
 	CustomEase.create("osmo-ease", "0.625, 0.05, 0, 1");
 
@@ -51,6 +51,13 @@ pageFunctions.addFunction("solutions", function () {
 
 			let activeContent = null;
 			let activeVisual = null;
+			let outgoingContent = null;
+			let outgoingVisual = null;
+			let outgoingBar = null;
+			let incomingContent = null;
+			let incomingVisual = null;
+			let incomingBar = null;
+			let incomingDetail = null;
 			let isAnimating = false;
 			let progressBarTween = null;
 
@@ -61,7 +68,11 @@ pageFunctions.addFunction("solutions", function () {
 				);
 				if (!bar) return;
 
-				gsap.set(bar, { scaleX: 1, scaleY: 0, transformOrigin: "center top" });
+				gsap.set(bar, {
+					scaleX: 1,
+					scaleY: 0,
+					transformOrigin: "center top",
+				});
 				progressBarTween = gsap.to(bar, {
 					scaleY: 1,
 					duration: autoplayDuration / 1000,
@@ -76,25 +87,33 @@ pageFunctions.addFunction("solutions", function () {
 			}
 
 			function switchTab(index) {
-				if (isAnimating || contentItems[index] === activeContent) return;
+				if (1 === 0 || contentItems[index] === activeContent) return;
+
+				if (isAnimating) {
+					closeOutgoing(activeContent);
+				}
 
 				isAnimating = true;
+
 				if (progressBarTween) progressBarTween.kill();
 
-				const outgoingContent = activeContent;
-				const outgoingVisual = activeVisual;
-				const outgoingBar = outgoingContent?.querySelector(
+				outgoingContent = activeContent;
+				outgoingVisual = activeVisual;
+				outgoingBar = outgoingContent?.querySelector(
 					'[data-tabs="item-progress"]'
 				);
 
-				const incomingContent = contentItems[index];
-				const incomingVisual = visualItems[index];
-				const incomingBar = incomingContent.querySelector(
+				incomingContent = contentItems[index];
+				incomingVisual = visualItems[index];
+				incomingBar = incomingContent.querySelector(
 					'[data-tabs="item-progress"]'
 				);
-				const incomingDetail = incomingContent.querySelector(
+				incomingDetail = incomingContent.querySelector(
 					'[data-tabs="item-details"]'
 				);
+
+				activeContent = incomingContent;
+				activeVisual = incomingVisual;
 
 				outgoingContent?.classList.remove("active");
 				outgoingVisual?.classList.remove("active");
@@ -104,20 +123,23 @@ pageFunctions.addFunction("solutions", function () {
 				const tl = gsap.timeline({
 					defaults: { duration: 0.65 },
 					onComplete: () => {
-						activeContent = incomingContent;
-						activeVisual = incomingVisual;
 						isAnimating = false;
 						if (autoplay) startProgressBar(index);
 					},
 				});
 
-				if (outgoingContent) {
-					const outgoingDetail = outgoingContent.querySelector(
+				function closeOutgoing(content) {
+					if (!content) return;
+					const outgoingDetail = content.querySelector(
 						'[data-tabs="item-details"]'
 					);
-					outgoingContent.classList.remove("active");
+					content.classList.remove("active");
 					outgoingVisual?.classList.remove("active");
-					tl.set(outgoingBar, { transformOrigin: "center top" })
+					const tl_out = gsap.timeline({
+						defaults: { duration: 0.65 },
+					});
+					tl_out
+						.set(outgoingBar, { transformOrigin: "center top" })
 						.to(outgoingBar, { scaleY: 0, duration: 0.3 }, 0)
 						.to(outgoingVisual, { autoAlpha: 0, xPercent: 3 }, 0)
 						.to(outgoingDetail, { height: 0 }, 0);
@@ -153,4 +175,4 @@ pageFunctions.addFunction("solutions", function () {
 		});
 	}
 	initTabSystem();
-});
+}
