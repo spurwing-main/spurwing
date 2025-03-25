@@ -3,6 +3,7 @@ function main() {
 	const menuButton = document.querySelector(".header-bar_menu-btn");
 	const menu = document.querySelector(".menu-panel_inner");
 	const menuLinks = document.querySelectorAll(".nav-link");
+	const menuLinksList = document.querySelector(".menu-panel_menu-links");
 	const menuCTA = document.querySelector(".menu-panel_menu-cta");
 	const logoWrap = document.querySelector(".header-bar_logo-wrap");
 	const bar = document.querySelector(".header-bar_inner");
@@ -68,13 +69,13 @@ function main() {
 			console.log("open menu");
 			tl_nav.play();
 			menuButton.innerHTML = "Close";
-			disableScroll([bar, menu]);
+			disableScroll([bar, menuLinksList]);
 			menuOpen = true;
 		} else {
 			console.log("close menu");
 			tl_nav.reverse();
 			menuButton.innerHTML = "Menu";
-			enableScroll([bar, menu]);
+			enableScroll([bar, menuLinksList]);
 			menuOpen = false;
 		}
 	}
