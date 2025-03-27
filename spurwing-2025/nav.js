@@ -15,15 +15,15 @@ function main() {
 
 	function menuReveal(target) {
 		let menuForcedShown = false;
-		const hideThreshold = 100; // Distance to scroll before hiding is allowed
-		const showThreshold = 50; // Distance from the top where the menu is always shown
+		const hideThreshold = 20; // Distance to scroll before hiding is allowed
+		const showThreshold = 10; // Distance from the top where the menu is always shown
 
 		let menuRevealAnim = gsap
 			.from(target, {
 				yPercent: -100,
-				autoAlpha: 0,
+				//autoAlpha: 0,
 				paused: true,
-				duration: 0.5,
+				duration: 0.3,
 			})
 			.progress(1);
 
