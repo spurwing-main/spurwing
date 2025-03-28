@@ -1,0 +1,220 @@
+<style>
+	.button-blur-lift {
+		--elastic-ease: linear(
+			0,
+			0.2178 2.1%,
+			1.1144 8.49%,
+			1.2959 10.7%,
+			1.3463 11.81%,
+			1.3705 12.94%,
+			1.3726,
+			1.3643 14.48%,
+			1.3151 16.2%,
+			1.0317 21.81%,
+			0.941 24.01%,
+			0.8912 25.91%,
+			0.8694 27.84%,
+			0.8698 29.21%,
+			0.8824 30.71%,
+			1.0122 38.33%,
+			1.0357,
+			1.046 42.71%,
+			1.0416 45.7%,
+			0.9961 53.26%,
+			0.9839 57.54%,
+			0.9853 60.71%,
+			1.0012 68.14%,
+			1.0056 72.24%,
+			0.9981 86.66%,
+			1 100%
+		);
+		--elastic-ease-out: linear(
+			0,
+			0.5737 7.6%,
+			0.8382 11.87%,
+			0.9463 14.19%,
+			1.0292 16.54%,
+			1.0886 18.97%,
+			1.1258 21.53%,
+			1.137 22.97%,
+			1.1424 24.48%,
+			1.1423 26.1%,
+			1.1366 27.86%,
+			1.1165 31.01%,
+			1.0507 38.62%,
+			1.0219 42.57%,
+			0.9995 46.99%,
+			0.9872 51.63%,
+			0.9842 58.77%,
+			1.0011 81.26%,
+			1
+		);
+		--transform-ease: cubic-bezier(0.32, 0.72, 0, 1);
+		--opacity-ease: ease-out;
+
+		position: relative;
+		display: inline-block;
+		padding: 1rem 2rem;
+		font-family: sans-serif;
+		font-size: 1.5rem;
+		line-height: 1;
+		color: white;
+		background: #111;
+		border: none;
+		cursor: pointer;
+		overflow: hidden;
+		user-select: none;
+		text-align: center;
+		-webkit-tap-highlight-color: transparent;
+		transition: transform 10s var(--elastic-ease);
+	}
+
+	.button-blur-lift__container {
+		position: relative;
+		display: inline-grid;
+		grid-template-columns: 1fr;
+		grid-template-rows: 1fr;
+		place-items: center;
+		pointer-events: none;
+	}
+
+	.button-blur-lift__text,
+	.button-blur-lift__hover-text {
+		grid-area: 1 / 1;
+		display: flex;
+		gap: 0.05em;
+	}
+
+	.button-blur-lift__background {
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(
+			circle at center,
+			rgba(255, 255, 255, 0.05),
+			transparent
+		);
+		transition: transform 12s var(--elastic-ease-out);
+		z-index: 0;
+	}
+
+	.button-blur-lift__letter-outer,
+	.button-blur-lift__hover-letter-outer {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		position: relative;
+	}
+
+	.button-blur-lift__letter,
+	.button-blur-lift__hover-letter {
+		transition: transform 9s var(--transform-ease), opacity 4s ease-out;
+		transition-delay: calc(
+			(var(--index) * -0.014s) - (-0.04s * var(--index-outer))
+		);
+		position: absolute;
+	}
+
+	.button-blur-lift__letter,
+	.button-blur-lift__hover-letter {
+		position: absolute;
+		top: 50%;
+		left: 0;
+		transform: translateY(-50%);
+		/* animations will still override this on hover */
+	}
+
+	.button-blur-lift__hover-letter {
+		transition: transform 2s var(--elastic-ease-out), opacity 1s ease-out;
+		transition-delay: calc(
+			(var(--index) * 0.014s) + (0.04s * var(--index-outer))
+		);
+		transform: translate3d(var(--spread-factor), 1.25rem, 0)
+			rotate(var(--rotation));
+		opacity: 0;
+	}
+
+	.button-blur-lift__screen-reader-text {
+		grid-area: 1 / 1;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		margin: 0;
+		padding: 0;
+		width: 1px;
+		height: 1px;
+		border: 0;
+		position: absolute;
+	}
+
+	.button-blur-lift__letter:nth-child(2),
+	.button-blur-lift__letter:nth-child(3),
+	.button-blur-lift__hover-letter:nth-child(2),
+	.button-blur-lift__hover-letter:nth-child(3) {
+		-webkit-text-stroke: 0.125px var(--color, white);
+	}
+
+	.button-blur-lift__letter-outer {
+		--spread-factor: calc((var(--index-outer) - 4) * 0.125rem);
+		--rotation: calc((var(--index-outer) - 4) * 4deg);
+	}
+
+	.button-blur-lift__hover-letter-outer {
+		--spread-factor: calc((var(--index-outer) - 2.5) * 0.125rem);
+		--rotation: calc((var(--index-outer) - 2.5) * -4deg);
+	}
+
+	@media (hover: hover) and (pointer: fine) {
+		.button-blur-lift:hover .button-blur-lift__letter,
+		.button-blur-lift:focus-visible .button-blur-lift__letter {
+			transform: translate3d(var(--spread-factor), -1.25rem, 0)
+				rotate(var(--rotation));
+			opacity: 0;
+			transition-delay: calc(
+				(var(--index) * 0.014s) + (0.04s * var(--index-outer))
+			);
+		}
+
+		.button-blur-lift:hover .button-blur-lift__hover-letter,
+		.button-blur-lift:focus-visible .button-blur-lift__hover-letter {
+			transform: translate3d(0, 0, 0) rotate(0deg);
+			opacity: 1;
+			transition-delay: calc(
+				(var(--index) * -0.014s) - (-0.04s * var(--index-outer)) - (-0.2s)
+			);
+		}
+
+		.button-blur-lift:hover .button-blur-lift__background,
+		.button-blur-lift:focus-visible .button-blur-lift__background {
+			transform: scaleX(1.015) scaleY(1.034) translateZ(0);
+		}
+	}
+</style>
+<a href="#" class="button-blur-lift w-inline-block">
+	<span class="button-blur-lift__screen-reader-text">Blur-Lift. Call 🤙</span>
+	<span aria-hidden="true" class="button-blur-lift__container">
+		<span class="button-blur-lift__text">
+			<span style="--index-outer: 0" class="button-blur-lift__letter-outer">
+				<span style="--index: 2, color: red" class="button-blur-lift__letter"
+					>B</span
+				>
+				<span style="--index: 1, color: blue" class="button-blur-lift__letter"
+					>B</span
+				>
+				<span style="--index: 0, color: green" class="button-blur-lift__letter"
+					>B</span
+				>
+			</span>
+			<!-- repeat for each letter in "Blur-Lift" as before -->
+		</span>
+		<div class="button-blur-lift__hover-text">
+			<span
+				style="--index-outer: 0"
+				class="button-blur-lift__hover-letter-outer">
+				<span style="--index: 2" class="button-blur-lift__hover-letter">C</span>
+				<span style="--index: 1" class="button-blur-lift__hover-letter">C</span>
+				<span style="--index: 0" class="button-blur-lift__hover-letter">C</span>
+			</span>
+			<!-- repeat for each letter in "Call 🤙" -->
+		</div>
+	</span>
+	<span class="button-blur-lift__background"></span>
+</a>
