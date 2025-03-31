@@ -4,7 +4,9 @@ function main() {
 
 		const timescale = 1.2; // speed of animation
 
-		const splitType = "words"; // animate words or chars
+		const splitType = button.getAttribute("anim-split-type") || "chars";
+
+		// const splitType = "words"; // animate words or chars
 		const el_class_out = "button-anim-out"; // class added to animated word/char
 		const el_class_in = "button-anim-in"; // class added to animated word/char
 
