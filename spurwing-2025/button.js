@@ -1,35 +1,39 @@
 function main() {
 	document.querySelectorAll(".button").forEach((button) => {
 		// set params
+
+		const timescale = 0.75; // speed of animation
+
 		const splitType = "words"; // animate words or chars
 		const el_class_out = "button-anim-out"; // class added to animated word/char
 		const el_class_in = "button-anim-in"; // class added to animated word/char
 
-		const duration_out = 0.2; // duration of each
-		const duration_in = 0.2;
+		const duration_out = 0.5; // duration of each
+		const duration_in = 0.5;
 
-		const duration_opacity_out = 0.3;
-		const duration_opacity_in = 0.3;
+		const duration_opacity_out = 0.4;
+		const duration_opacity_in = 0.1;
 
-		const stagger_out = 0.05;
-		const stagger_in = 0.05;
+		const stagger_out = 0.02;
+		const stagger_in = 0.02;
 
-		const delay = 0.05;
+		const delay = 0.0;
 
-		const opacityStartOffset = duration_in - duration_opacity_in;
+		// const opacityStartOffset = duration_in - duration_opacity_in;
+		const opacityStartOffset = 0;
 
-		const fan_out = 0.1;
-		const fan_in = 0.1;
+		const fan_out = 1;
+		const fan_in = 1;
 
-		const rotation_out = 1;
-		const rotation_in = 1;
+		const rotation_out = 2;
+		const rotation_in = -2;
 
-		const y_out = 20;
-		const y_in = 20;
+		const y_out = 52;
+		const y_in = 52;
 
-		const ease_out = "power2.inOut";
-		const ease_in = "power2.inOut";
-		const ease_opacity_out = "power2.inOut";
+		const ease_out = "power3.out";
+		const ease_in = "elastic.out(1,2)";
+		const ease_opacity_out = "power1.out";
 		const ease_opacity_in = "power2.inOut";
 
 		const scale_out = 0.95;
@@ -70,15 +74,15 @@ function main() {
 			els_in = split_in.chars;
 		}
 
-		const center_out = (els_out.length - 1) / 2;
-		const center_in = (els_in.length - 1) / 2;
+		// const center_out = (els_out.length - 1) / 2;
+		// const center_in = (els_in.length - 1) / 2;
 
 		// 4. Initial state
 		gsap.set(els_in, {
 			opacity: 0,
-			x: (i) => (i - center_in) * fan_in,
+			x: (i) => (i - 1.5) * fan_in,
 			y: y_in,
-			rotation: (i) => (i - center_in) * rotation_in,
+			rotation: (i) => (i - 1.5) * rotation_in,
 			scale: scale_in,
 		});
 
@@ -91,8 +95,8 @@ function main() {
 			els_out,
 			{
 				y: -y_out,
-				x: (i) => (i - center_out) * fan_out,
-				rotation: (i) => (i - center_out) * rotation_out,
+				x: (i) => (i - 1.5) * fan_out,
+				rotation: (i) => (i - 1.5) * rotation_out,
 				scale: scale_out,
 				ease: ease_out,
 				duration: duration_out,
@@ -156,7 +160,7 @@ function main() {
 			0
 		);
 
-		tl.timeScale(1);
+		tl.timeScale(timescale);
 
 		// 6. Triggers
 		button.addEventListener("mouseenter", () => {
