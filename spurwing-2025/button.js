@@ -2,14 +2,14 @@ function main() {
 	document.querySelectorAll(".button").forEach((button) => {
 		// set params
 
-		const timescale = 0.75; // speed of animation
+		const timescale = 1.2; // speed of animation
 
 		const splitType = "words"; // animate words or chars
 		const el_class_out = "button-anim-out"; // class added to animated word/char
 		const el_class_in = "button-anim-in"; // class added to animated word/char
 
 		const duration_out = 0.5; // duration of each
-		const duration_in = 0.5;
+		const duration_in = 0.3;
 
 		const duration_opacity_out = 0.4;
 		const duration_opacity_in = 0.1;
