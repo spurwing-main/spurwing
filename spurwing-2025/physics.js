@@ -22,7 +22,7 @@ function main() {
 			opacity: 1,
 			spawnInterval: 100, // ms
 		},
-		gravity: { x: -0.1, y: 0.5, scale: 0.001 },
+		gravity: { x: -0.3, y: 0.5, scale: 0.001 },
 		mouse: { stiffness: 0.2 },
 		timing: {
 			svgCircleDelay: 2000,
@@ -295,7 +295,7 @@ function main() {
 
 			// Add SVG circle after delay
 			setTimeout(() => {
-				const radius = CONFIG.circles.radius * 1.2;
+				const radius = CONFIG.circles.radius * 1.5;
 				const svgCircle = Bodies.circle(radius + Math.random() * 100, -radius, radius, {
 					restitution: CONFIG.circles.restitution,
 					friction: CONFIG.circles.friction,
