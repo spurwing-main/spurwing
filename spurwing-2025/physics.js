@@ -13,14 +13,14 @@ function main() {
 	// Configuration object
 	const CONFIG = {
 		circles: {
-			count: 100,
-			radius: 20,
+			count: 30,
+			radius: 50,
 			restitution: 0.4,
 			friction: 0.2,
 			frictionAir: 0.0005,
 			fillStyle: "#8180e4",
 			opacity: 1,
-			spawnInterval: 30, // ms
+			spawnInterval: 100, // ms
 		},
 		gravity: { x: -0.1, y: 0.5, scale: 0.001 },
 		mouse: { stiffness: 0.2 },
@@ -35,7 +35,7 @@ function main() {
 		},
 		pusher: {
 			// the element controlled by hover
-			radius: 25,
+			radius: 50,
 			frictionAir: 0.1, // slows down between mouse moves
 			inertia: Infinity, // no rotation
 		},
@@ -113,6 +113,11 @@ function main() {
 		mouse.element.removeEventListener("DOMMouseScroll", mouse.mousewheel);
 		canvas.removeEventListener("wheel", mouse.mousewheel);
 
+		// disable touch events for now
+		mouse.element.removeEventListener("touchmove", mouseConstraint.mouse.mousemove);
+		mouse.element.removeEventListener("touchstart", mouseConstraint.mouse.mousedown);
+		mouse.element.removeEventListener("touchend", mouseConstraint.mouse.mouseup);
+
 		// Handle scroll and touch events
 		let scrollTimeout;
 		const handleScroll = () => {
@@ -125,21 +130,21 @@ function main() {
 
 		canvas.addEventListener("wheel", handleScroll);
 
-		// Touch handling
-		let touchStartY = 0;
-		canvas.addEventListener("touchstart", (event) => {
-			touchStartY = event.touches[0].clientY;
-		});
+		// // Touch handling
+		// let touchStartY = 0;
+		// canvas.addEventListener("touchstart", (event) => {
+		// 	touchStartY = event.touches[0].clientY;
+		// });
 
-		canvas.addEventListener("touchmove", (event) => {
-			if (Math.abs(event.touches[0].clientY - touchStartY) > CONFIG.thresholds.scrollSwipe) {
-				mouseConstraint.constraint.stiffness = 0;
-			}
-		});
+		// canvas.addEventListener("touchmove", (event) => {
+		// 	if (Math.abs(event.touches[0].clientY - touchStartY) > CONFIG.thresholds.scrollSwipe) {
+		// 		mouseConstraint.constraint.stiffness = 0;
+		// 	}
+		// });
 
-		canvas.addEventListener("touchend", () => {
-			mouseConstraint.constraint.stiffness = CONFIG.mouse.stiffness;
-		});
+		// canvas.addEventListener("touchend", () => {
+		// 	mouseConstraint.constraint.stiffness = CONFIG.mouse.stiffness;
+		// });
 
 		return mouseConstraint;
 	};
@@ -230,7 +235,7 @@ function main() {
 					height,
 					wallStyle
 				), // right
-				Bodies.rectangle(width / 2, -wallThickness / 2 + offset, width, wallThickness, wallStyle), // top
+				// Bodies.rectangle(width / 2, -wallThickness / 2 + offset, width, wallThickness, wallStyle), // top
 			];
 
 			// Create circles - old
@@ -250,14 +255,13 @@ function main() {
 					const radius = CONFIG.circles.radius;
 
 					// Cascade diagonally
-					const x = startX + (0 / 10) * 5 + Math.random() * 20; // gradually spreads right
-					const y = startY + (0 / 10) * 2 + Math.random() * 10; // gradually moves down
-
+					const x = startX + i * 5 + Math.random() * 10; // cascade right
+					const y = Math.min(startY + i * 2 + Math.random() * 5, -radius);
 					const circle = createCircle(x, y, radius);
 
 					// Give it a little motion down and to the right
 					Body.setVelocity(circle, {
-						x: Math.random() * 0.5 + 0.05,
+						x: Math.random() * 0 + 0.05,
 						y: Math.random() * 0.5 + 0.05,
 					});
 
@@ -291,7 +295,7 @@ function main() {
 
 			// Add SVG circle after delay
 			setTimeout(() => {
-				const radius = CONFIG.circles.radius;
+				const radius = CONFIG.circles.radius * 1.2;
 				const svgCircle = Bodies.circle(radius + Math.random() * 100, -radius, radius, {
 					restitution: CONFIG.circles.restitution,
 					friction: CONFIG.circles.friction,
@@ -344,7 +348,7 @@ function main() {
 							height,
 							wallStyle
 						), // right
-						Bodies.rectangle(width / 2, -wallThickness / 2, width, wallThickness, wallStyle), // top
+						// Bodies.rectangle(width / 2, -wallThickness / 2, width, wallThickness, wallStyle), // top
 					];
 
 					// Add new walls and store references
@@ -386,7 +390,7 @@ function main() {
 				const dx = targetX - pusher.position.x;
 				const dy = targetY - pusher.position.y;
 
-				const forceMultiplier = 0.005; // Tune this to get desired push strength
+				const forceMultiplier = 0.008; // Tune this to get desired push strength
 				const force = { x: dx * forceMultiplier, y: dy * forceMultiplier };
 
 				Body.applyForce(pusher, pusher.position, force);
