@@ -13,7 +13,7 @@ function main() {
 	// Configuration object
 	const CONFIG = {
 		circles: {
-			count: 60,
+			count: 100,
 			radius: 20,
 			restitution: 0.4,
 			friction: 0.2,
