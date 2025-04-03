@@ -16,7 +16,7 @@ function main() {
 			count: 30,
 			radius: 50,
 			restitution: 0.4,
-			friction: 0.2,
+			friction: 5,
 			frictionAir: 0.0005,
 			fillStyle: "#8180e4",
 			opacity: 1,
