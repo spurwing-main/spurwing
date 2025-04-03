@@ -22,7 +22,7 @@ function main() {
 			opacity: 1,
 			spawnInterval: 100, // ms
 		},
-		gravity: { x: -0.3, y: 0.5, scale: 0.001 },
+		gravity: { x: -0.2, y: 0.5, scale: 0.001 },
 		mouse: { stiffness: 0.2 },
 		timing: {
 			svgCircleDelay: 2000,
