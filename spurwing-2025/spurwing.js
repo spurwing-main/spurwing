@@ -7,10 +7,11 @@ function main() {
 
 		const tl = gsap.timeline({
 			scrollTrigger: {
-				trigger: ".s-clients",
-				start: `top+=200 bottom`,
+				trigger: ".clients_title",
+				// start: "top+=200 bottom",
+				start: "center center",
 				end: "bottom-=400 top",
-				toggleActions: "play reverse play reverse",
+				toggleActions: "play none none reverse",
 			},
 			defaults: {
 				duration: 1,
