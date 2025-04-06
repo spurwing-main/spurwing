@@ -28,7 +28,7 @@ function main() {
 		);
 
 		tl.to(
-			".clients_logo",
+			".clients_rich svg",
 			{
 				color: color_logo,
 			},
@@ -54,15 +54,20 @@ function main() {
 	}
 
 	function clientHover() {
+		const container = document.querySelector(".clients_grid");
+		if (!container) {
+			return;
+		}
 		const preview = document.querySelector(".clients_preview");
 		const previewImg = preview.querySelector("img");
 		let currentTarget = null;
 		let isVisible = false;
+		let isHovering = false;
 		let mouseX = 0,
 			mouseY = 0;
 
 		gsap.ticker.add(() => {
-			if (isVisible) {
+			if (isHovering) {
 				gsap.to(preview, {
 					x: mouseX,
 					y: mouseY,
@@ -72,25 +77,32 @@ function main() {
 			}
 		});
 
-		const container = document.querySelector(".clients_grid");
-
 		window.addEventListener("mousemove", (e) => {
 			const bounds = container.getBoundingClientRect();
 			mouseX = e.clientX - bounds.left;
 			mouseY = e.clientY - bounds.top;
 		});
 
+		// Hide preview on mouse leave of container
+		container.addEventListener("mouseenter", () => {
+			isHovering = true;
+		});
+		container.addEventListener("mouseleave", () => {
+			isHovering = false;
+			hidePreview();
+		});
+
 		document.querySelectorAll(".clients_block").forEach((block) => {
 			block.addEventListener("mouseenter", () => {
 				const imgEl = block.querySelector(".clients_block-img");
 
-				if (!imgEl || !imgEl.src) return; // No image found
+				if (!imgEl || !imgEl.src) {
+					hidePreview();
+					return;
+				}
 
 				const src = imgEl.src;
-				// console.log(src);
 
-				// Avoid reloading if already shown
-				// if (currentTarget !== block) {
 				previewImg.src = src;
 				console.log(previewImg.src);
 
@@ -114,7 +126,6 @@ function main() {
 				};
 
 				currentTarget = block;
-				// }
 			});
 
 			block.addEventListener("mouseleave", (e) => {
@@ -134,7 +145,7 @@ function main() {
 				duration: 0.3,
 				ease: "power2.out",
 				onComplete: () => {
-					preview.style.display = "none";
+					// preview.style.display = "none";
 				},
 			});
 			isVisible = false;
@@ -142,6 +153,113 @@ function main() {
 		}
 	}
 
+	function loadWorkItems(scope = document) {
+		const items = scope.querySelectorAll(".work_list-item"); // initially load items in doc
+
+		mm.add("(min-width: 768px)", () => {
+			// Animate in pairs
+			for (let i = 0; i < items.length; i += 2) {
+				const leftItem = items[i];
+				const rightItem = items[i + 1];
+
+				if (leftItem.dataset.animated) continue; // Skip if already animated
+
+				const tl = gsap.timeline({
+					scrollTrigger: {
+						trigger: leftItem,
+						start: "top 80%",
+						toggleActions: "play none none none",
+					},
+				});
+
+				tl.fromTo(
+					leftItem,
+					{
+						autoAlpha: 0,
+						y: 50,
+					},
+					{
+						autoAlpha: 1,
+						y: 0,
+						duration: 0.6,
+						ease: "power2.out",
+					}
+				);
+
+				if (rightItem) {
+					tl.fromTo(
+						rightItem,
+						{
+							autoAlpha: 0,
+							y: 50,
+						},
+						{
+							autoAlpha: 1,
+							y: 0,
+							duration: 0.6,
+							ease: "power2.out",
+						},
+						0.15
+					);
+				}
+
+				// Mark items as animated
+				leftItem.dataset.animated = true;
+				if (rightItem) rightItem.dataset.animated = true;
+			}
+		});
+
+		mm.add("(max-width: 767px)", () => {
+			items.forEach((item) => {
+				if (item.dataset.animatedMbl) return; // Skip if already animated. We separate mbl and dsk tracking to avoid conflicts when resizing
+
+				const tl = gsap.timeline({
+					scrollTrigger: {
+						trigger: item,
+						start: "top 80%",
+						toggleActions: "play none none none",
+					},
+				});
+
+				tl.fromTo(
+					item,
+					{
+						autoAlpha: 0,
+						y: 50,
+					},
+					{
+						autoAlpha: 1,
+						y: 0,
+						duration: 0.6,
+						ease: "power2.out",
+					}
+				);
+
+				item.dataset.animatedMbl = true; // Mark item as animated
+			});
+		});
+	}
+
+	function handleNewWorkItems() {
+		// Run after Finsweet loads more items
+		window.fsAttributes = window.fsAttributes || [];
+		window.fsAttributes.push([
+			"cmsload",
+			(listInstances) => {
+				listInstances.forEach((list) => {
+					list.on("renderitems", (renderedItems) => {
+						loadWorkItems(list.list); // Pass the container to scope the animation
+					});
+				});
+			},
+		]);
+	}
+
 	clientHover();
 	changeColors();
+
+	const mm = gsap.matchMedia();
+
+	loadWorkItems();
+	handleNewWorkItems();
 }
