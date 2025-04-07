@@ -77,7 +77,18 @@ function main() {
 			}
 		});
 
+		let mouseMovedSinceScroll = true;
+
+		window.addEventListener("scroll", () => {
+			mouseMovedSinceScroll = false;
+			if (isVisible) hidePreview();
+		});
+
 		window.addEventListener("mousemove", (e) => {
+			if (!mouseMovedSinceScroll) {
+				mouseMovedSinceScroll = true;
+				// don't need to do anything else here — hover handler will catch it
+			}
 			const bounds = container.getBoundingClientRect();
 			mouseX = e.clientX - bounds.left;
 			mouseY = e.clientY - bounds.top;
@@ -92,18 +103,10 @@ function main() {
 			hidePreview();
 		});
 
-		window.addEventListener(
-			"scroll",
-			() => {
-				if (isVisible) {
-					hidePreview();
-				}
-			},
-			{ passive: true }
-		);
-
 		document.querySelectorAll(".clients_block").forEach((block) => {
 			block.addEventListener("mouseenter", () => {
+				if (!mouseMovedSinceScroll) return;
+
 				const imgEl = block.querySelector(".clients_block-img");
 
 				if (!imgEl || !imgEl.src) {
