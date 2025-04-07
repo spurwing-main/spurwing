@@ -303,6 +303,12 @@ function main() {
 			},
 		};
 
+		// Override config for mobile (<= 767px)
+		if (window.innerWidth <= 767) {
+			CONFIG.circles.radius = 30; // or whatever value looks best
+			CONFIG.pusher.radius = 30; // keep interaction area in proportion
+		}
+
 		// Create physics engine
 		const engine = Engine.create({
 			gravity: CONFIG.gravity,
