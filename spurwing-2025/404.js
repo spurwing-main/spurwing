@@ -5,15 +5,18 @@ function main() {
 	const width = container.offsetWidth;
 	const height = width * 0.5; // 2:1 aspect ratio
 
-	const SVG_ASSETS = {
-		spw: `<svg width="112" height="112" viewBox="0 0 112 112" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="56" cy="56" r="56" fill="white"/>
-            <path d="M52.5438 84.2423C33.9131 84.2423 23.0706 76.7894 25.2849 65.4949H39.1816C38.4944 69.106 42.3885 72.8709 53.3837 73.0246C63.6153 73.1014 71.6327 71.7184 72.5489 66.9547C74.3815 56.5053 25.8958 68.7219 29.9426 45.6718C31.8515 34.6845 44.3738 28 61.2483 28C78.7337 28 89.3471 35.376 87.5146 46.7474H73.6179C74.3051 43.0594 70.9455 39.2946 60.2557 39.2177C51.0167 39.0641 44.0684 40.5239 43.2285 45.0571C41.4723 55.1223 89.8053 43.9814 85.8348 66.4937C83.8495 77.5577 70.5637 84.2423 52.5438 84.2423Z" fill="#0200C8"/>
-        </svg>`,
-		wf: `<svg width="112" height="112" viewBox="0 0 112 112" xmlns="http://www.w3.org/2000/svg">
-            <rect width="112" height="112" rx="10" fill="#FF6B6B"/>
-        </svg>`,
-	};
+	const SVG_PROJECTILES = [
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3e58c78696f7c1f4de688_spw.svg",
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3ec7a83fe3cc9ea00c7dd_webflow.svg",
+	];
+
+	const SVG_BLOCKS = [
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2577fb9db7d3f3569c_wordpress.svg",
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb25d1436cb92ef4d1fb_wix.svg",
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb250844d0f6b0977911_drupal.svg",
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2545e5fa241a582aff_joomla.svg",
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2570b120fd34900fad_squarespace.svg",
+	];
 
 	const {
 		Engine,
@@ -45,17 +48,17 @@ function main() {
 		},
 		platform: {
 			height: 0.01 * height,
-			width: 0.15 * width,
+			width: 0.25 * width,
 			x: width - 0.2 * width,
 			y: height - 0.2 * height,
-			fill: "#222",
+			fill: "white",
 		},
 		blocks: {
 			width: 0.04 * width,
 			height: 0.04 * width,
 			spacing: 0.005 * width,
-			rows: 4,
-			fill: "#888",
+			rows: 5,
+			fill: "white",
 		},
 		mouse: { stiffness: 0.2 },
 	};
@@ -92,22 +95,9 @@ function main() {
 		return body;
 	};
 
-	const loadSvgSprite = async (name) => {
-		const svgString = SVG_ASSETS[name];
-		if (!svgString) throw new Error(`SVG not found for key: ${name}`);
-
-		const dataUrl = "data:image/svg+xml;base64," + btoa(svgString);
-		const image = new Image();
-
-		return new Promise((resolve, reject) => {
-			image.onload = () => resolve(dataUrl);
-			image.onerror = () => reject(new Error(`Failed to load SVG for: ${name}`));
-			image.src = dataUrl;
-		});
-	};
-
 	const addSlingshot = () => {
-		projectile = createProjectile(svgDataUrl);
+		const spriteUrl = randomFrom(SVG_PROJECTILES);
+		projectile = createProjectile(spriteUrl);
 		elastic = Constraint.create({
 			pointA: CONFIG.slingshot.anchor,
 			bodyB: projectile,
@@ -121,22 +111,7 @@ function main() {
 				type: "line",
 			},
 		});
-
 		World.add(engine.world, [projectile, elastic]);
-	};
-
-	const loadSvgImage = (svgString) => {
-		return new Promise((resolve, reject) => {
-			try {
-				const svgDataUrl = "data:image/svg+xml;base64," + btoa(svgString);
-				const image = new Image();
-				image.onload = () => resolve(svgDataUrl);
-				image.onerror = () => reject(new Error("Failed to load SVG image"));
-				image.src = svgDataUrl;
-			} catch (error) {
-				reject(new Error(`SVG processing error: ${error.message}`));
-			}
-		});
 	};
 
 	const createBlock = (x, y, spriteUrl, size) => {
@@ -157,9 +132,6 @@ function main() {
 	};
 
 	const initSimulation = async () => {
-		const spwSprite = await loadSvgSprite("spw");
-		const wfSprite = await loadSvgSprite("wf");
-
 		render = Render.create({
 			element: container,
 			engine,
@@ -178,7 +150,7 @@ function main() {
 			CONFIG.ground.height,
 			{
 				isStatic: true,
-				render: { fillStyle: "#222" },
+				render: { fillStyle: "white" },
 			}
 		);
 
@@ -217,7 +189,8 @@ function main() {
 				const x = startX + j * (blockSize + spacing);
 				const y = startY - i * (blockSize + spacing);
 
-				const block = createBlock(x, y, wfSprite, blockSize);
+				const spriteUrl = randomFrom(SVG_BLOCKS);
+				const block = createBlock(x, y, spriteUrl, blockSize);
 
 				// Slight bounce upward and small horizontal nudge
 				Body.setVelocity(block, {
@@ -255,7 +228,7 @@ function main() {
 				}
 
 				// Release and immediately reattach elastic to new projectile
-				projectile = createProjectile(spwSprite);
+				projectile = createProjectile(randomFrom(SVG_PROJECTILES));
 				World.add(engine.world, projectile);
 				elastic.bodyB = projectile;
 			}
@@ -284,4 +257,8 @@ function main() {
 function randomColor() {
 	let color = Math.floor(Math.random() * 16777215).toString(16);
 	return "#" + color;
+}
+
+function randomFrom(array) {
+	return array[Math.floor(Math.random() * array.length)];
 }
