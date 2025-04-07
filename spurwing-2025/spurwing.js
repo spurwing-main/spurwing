@@ -92,6 +92,16 @@ function main() {
 			hidePreview();
 		});
 
+		window.addEventListener(
+			"scroll",
+			() => {
+				if (isVisible) {
+					hidePreview();
+				}
+			},
+			{ passive: true }
+		);
+
 		document.querySelectorAll(".clients_block").forEach((block) => {
 			block.addEventListener("mouseenter", () => {
 				const imgEl = block.querySelector(".clients_block-img");
@@ -104,7 +114,6 @@ function main() {
 				const src = imgEl.src;
 
 				previewImg.src = src;
-				console.log(previewImg.src);
 
 				// Wait for the image to load before showing preview
 				previewImg.onload = () => {
