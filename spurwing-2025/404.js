@@ -1,5 +1,5 @@
 function main() {
-	const container = document.querySelector(".slingshot_sim");
+	const container = document.querySelector("._404_matter");
 	if (!container) return;
 
 	const width = container.offsetWidth;
