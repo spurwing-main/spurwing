@@ -14,8 +14,8 @@ function main() {
 				toggleActions: "play none none reverse",
 			},
 			defaults: {
-				duration: 1,
-				ease: "circ.inOut",
+				duration: 0.35,
+				ease: "power1.inOut",
 			},
 		});
 
@@ -39,6 +39,7 @@ function main() {
 			[".s-bento", ".s-clients"],
 			{
 				backgroundColor: color_bg,
+				duration: 0.35,
 			},
 			0
 		);
