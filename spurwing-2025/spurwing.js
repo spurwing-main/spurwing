@@ -183,7 +183,7 @@ function main() {
 	}
 
 	function loadWorkItems(scope = document) {
-		const items = scope.querySelectorAll(".work_list-item"); // initially load items in doc
+		const items = scope.querySelectorAll(".home-work_col-item"); // initially load items in doc
 
 		mm.add("(min-width: 768px)", () => {
 			// Animate in pairs
