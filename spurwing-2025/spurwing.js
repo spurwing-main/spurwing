@@ -962,6 +962,12 @@ function main() {
 					render: { visible: false },
 				},
 			});
+
+			// Disable scroll capturing
+			mouse.element.removeEventListener("wheel", mouse.mousewheel);
+			mouse.element.removeEventListener("mousewheel", mouse.mousewheel);
+			mouse.element.removeEventListener("DOMMouseScroll", mouse.mousewheel);
+
 			World.add(engine.world, mouseConstraint);
 			render.mouse = mouse;
 
