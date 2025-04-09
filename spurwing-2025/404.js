@@ -1,74 +1,13 @@
-function main() {
+function game() {
+	// select container
 	const container = document.querySelector("._404_matter");
 	if (!container) return;
 
-	const width = container.offsetWidth;
-	const height = width * 0.5; // 2:1 aspect ratio
+	// declare top level vars
+	let engine, render;
+	let resizeObserver;
 
-	const SVG_PROJECTILES = [
-		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3e58c78696f7c1f4de688_spw.svg",
-		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3ec7a83fe3cc9ea00c7dd_webflow.svg",
-	];
-
-	const SVG_BLOCKS = [
-		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2577fb9db7d3f3569c_wordpress.svg",
-		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb25d1436cb92ef4d1fb_wix.svg",
-		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb250844d0f6b0977911_drupal.svg",
-		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2545e5fa241a582aff_joomla.svg",
-		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2570b120fd34900fad_squarespace.svg",
-	];
-
-	const {
-		Engine,
-		Render,
-		World,
-		Bodies,
-		Constraint,
-		Body,
-		Mouse,
-		MouseConstraint,
-		Events,
-		Composite,
-	} = Matter;
-
-	const CONFIG = {
-		gravity: { x: 0, y: 1, scale: 0.001 },
-		slingshot: {
-			anchor: { x: 0.2 * width, y: 0.8 * height },
-			stiffness: 0.05,
-			damping: 0.01,
-			maxSpeed: 45,
-			polygonSides: 1,
-			radius: 0.025 * width, // rel
-			density: 0.004,
-			constraintLength: 0.01,
-		},
-		ground: {
-			height: 0.01 * height,
-		},
-		platform: {
-			height: 0.01 * height,
-			width: 0.25 * width,
-			x: width - 0.2 * width,
-			y: height - 0.2 * height,
-			fill: "white",
-		},
-		blocks: {
-			width: 0.04 * width,
-			height: 0.04 * width,
-			spacing: 0.005 * width,
-			rows: 5,
-			fill: "white",
-		},
-		mouse: { stiffness: 0.2 },
-	};
-
-	const engine = Engine.create({ gravity: CONFIG.gravity });
-	let render, resizeObserver;
-	let projectile, elastic;
-
-	let svgDataUrl;
-
+	// declare top level fns
 	const createProjectile = (spriteUrl) => {
 		const body = Bodies.circle(
 			CONFIG.slingshot.anchor.x,
@@ -88,13 +27,8 @@ function main() {
 			}
 		);
 
-		// Give it a random spin
-		const randomSpin = (Math.random() - 0.5) * 0.1; // tweak this value for more/less spin
-		Body.setAngularVelocity(body, randomSpin);
-
 		return body;
 	};
-
 	const addSlingshot = () => {
 		const spriteUrl = randomFrom(SVG_PROJECTILES);
 		projectile = createProjectile(spriteUrl);
@@ -113,7 +47,6 @@ function main() {
 		});
 		World.add(engine.world, [projectile, elastic]);
 	};
-
 	const createBlock = (x, y, spriteUrl, size) => {
 		return Bodies.rectangle(x, y, size, size, {
 			restitution: 0.5,
@@ -130,8 +63,19 @@ function main() {
 				  },
 		});
 	};
+	const cleanup = () => {
+		if (render) {
+			Render.stop(render);
+			render.canvas.remove();
+		}
+		if (engine) {
+			Matter.World.clear(engine.world);
+			Matter.Engine.clear(engine);
+		}
+	};
 
-	const initSimulation = async () => {
+	// sim setup
+	const initSimulation = async (width, height, CONFIG) => {
 		render = Render.create({
 			element: container,
 			engine,
@@ -145,12 +89,45 @@ function main() {
 
 		const ground = Bodies.rectangle(
 			width / 2,
-			height - CONFIG.ground.height / 2,
+			height + CONFIG.ground.thickness / 2 - CONFIG.ground.visibleThickness,
 			width,
-			CONFIG.ground.height,
+			CONFIG.ground.thickness,
 			{
 				isStatic: true,
-				render: { fillStyle: "white" },
+				render: { fillStyle: CONFIG.ground.fillStyle },
+			}
+		);
+
+		const ceiling = Bodies.rectangle(
+			width / 2,
+			0 - CONFIG.ceiling.yOffset - CONFIG.ceiling.thickness / 2,
+			width,
+			CONFIG.ceiling.thickness,
+			{
+				isStatic: true,
+				render: { fillStyle: CONFIG.ceiling.fillStyle },
+			}
+		);
+
+		const leftWall = Bodies.rectangle(
+			0 - CONFIG.walls.thickness / 2 + CONFIG.walls.visibleThickness,
+			height / 2,
+			CONFIG.walls.thickness,
+			height + CONFIG.ceiling.yOffset,
+			{
+				isStatic: true,
+				render: { fillStyle: CONFIG.walls.fillStyle },
+			}
+		);
+
+		const rightWall = Bodies.rectangle(
+			width + CONFIG.walls.thickness / 2 - CONFIG.walls.visibleThickness,
+			height / 2,
+			CONFIG.walls.thickness,
+			height + CONFIG.ceiling.yOffset,
+			{
+				isStatic: true,
+				render: { fillStyle: CONFIG.walls.fillStyle },
 			}
 		);
 
@@ -164,14 +141,6 @@ function main() {
 				render: { fillStyle: CONFIG.platform.fill },
 			}
 		);
-
-		// // Prepare SVG circle
-		// const svgString = `<svg width="112" height="112" viewBox="0 0 112 112" fill="none" xmlns="http://www.w3.org/2000/svg">
-		//         <circle cx="56" cy="56" r="56" fill="white"/>
-		//         <path d="M52.5438 84.2423C33.9131 84.2423 23.0706 76.7894 25.2849 65.4949H39.1816C38.4944 69.106 42.3885 72.8709 53.3837 73.0246C63.6153 73.1014 71.6327 71.7184 72.5489 66.9547C74.3815 56.5053 25.8958 68.7219 29.9426 45.6718C31.8515 34.6845 44.3738 28 61.2483 28C78.7337 28 89.3471 35.376 87.5146 46.7474H73.6179C74.3051 43.0594 70.9455 39.2946 60.2557 39.2177C51.0167 39.0641 44.0684 40.5239 43.2285 45.0571C41.4723 55.1223 89.8053 43.9814 85.8348 66.4937C83.8495 77.5577 70.5637 84.2423 52.5438 84.2423Z" fill="#0200C8"/>
-		//   </svg>`;
-
-		// svgDataUrl = await loadSvgImage(svgString);
 
 		const blockSize = CONFIG.blocks.width;
 		const spacing = CONFIG.blocks.spacing;
@@ -202,7 +171,7 @@ function main() {
 		}
 
 		addSlingshot();
-		World.add(engine.world, [ground, targetPlatform, blocks]);
+		World.add(engine.world, [ground, ceiling, leftWall, rightWall, targetPlatform, blocks]);
 
 		const mouse = Mouse.create(render.canvas);
 		const mouseConstraint = MouseConstraint.create(engine, {
@@ -227,38 +196,120 @@ function main() {
 					Body.setSpeed(projectile, CONFIG.slingshot.maxSpeed);
 				}
 
-				// Release and immediately reattach elastic to new projectile
-				projectile = createProjectile(randomFrom(SVG_PROJECTILES));
-				World.add(engine.world, projectile);
-				elastic.bodyB = projectile;
+				// Apply spin to current projectile *before* releasing
+				const randomSpin = (Math.random() - 0.5) * 0.4;
+				Body.setAngularVelocity(projectile, randomSpin);
+
+				// Spawn and attach the next projectile
+				projectileNew = createProjectile(randomFrom(SVG_PROJECTILES));
+				World.add(engine.world, projectileNew);
+				elastic.bodyB = projectileNew;
+				projectile = projectileNew;
 			}
 		});
 
 		Render.run(render);
 		Matter.Runner.run(engine);
-
-		// // Resize handling (optional)
-		// resizeObserver = new ResizeObserver(() => {
-		// 	// rebuild walls, scale elastic, etc.
-		// });
-		// resizeObserver.observe(container);
 	};
 
-	// new IntersectionObserver(
-	// 	([entry]) => {
-	// 		if (entry.isIntersecting) initSimulation();
-	// 	},
-	// 	{ threshold: 0.1 }
-	// ).observe(container);
+	const resizeAwareInit = () => {
+		cleanup(); // 1. stop current sim
 
-	initSimulation();
-}
+		// 2. get new dimensions
+		const width = container.offsetWidth;
+		const height = container.offsetHeight;
+	};
 
-function randomColor() {
-	let color = Math.floor(Math.random() * 16777215).toString(16);
-	return "#" + color;
-}
+	const resizeAwareInit = () => {
+		cleanup(); // remove previous canvas + world
 
-function randomFrom(array) {
-	return array[Math.floor(Math.random() * array.length)];
+		// Read up-to-date size
+		const width = container.offsetWidth;
+		const height = container.offsetHeight;
+
+		// Rebuild the engine, render, and sim
+		engine = Engine.create({ gravity: CONFIG.gravity });
+		initSimulation(width, height); // pass size into init
+	};
+
+	const SVG_PROJECTILES = [
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3e58c78696f7c1f4de688_spw.svg",
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3ec7a83fe3cc9ea00c7dd_webflow.svg",
+	];
+
+	const SVG_BLOCKS = [
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2577fb9db7d3f3569c_wordpress.svg",
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb25d1436cb92ef4d1fb_wix.svg",
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb250844d0f6b0977911_drupal.svg",
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2545e5fa241a582aff_joomla.svg",
+		"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2570b120fd34900fad_squarespace.svg",
+	];
+
+	const {
+		Engine,
+		Render,
+		World,
+		Bodies,
+		Constraint,
+		Body,
+		Mouse,
+		MouseConstraint,
+		Events,
+		Composite,
+	} = Matter;
+
+	const CONFIG = {
+		gravity: { x: 0, y: 1, scale: 0.001 },
+		slingshot: {
+			anchor: { x: 0.2 * width, y: 0.6 * height },
+			stiffness: 0.05,
+			damping: 0.01,
+			maxSpeed: 45,
+			radius: 0.025 * width, // rel
+			density: 0.004,
+			constraintLength: 0.01,
+		},
+		ground: {
+			thickness: 100,
+			visibleThickness: 0,
+			fillStyle: "white",
+		},
+		ceiling: {
+			thickness: 100,
+			visibleThickness: 0,
+			yOffset: 0, // how much higher than top edge we want ceiling to be
+			fillStyle: "white",
+		},
+		walls: {
+			thickness: 100,
+			visibleThickness: 0,
+			fillStyle: "white",
+		},
+		platform: {
+			height: 0.01 * height,
+			width: 0.25 * width,
+			x: width - 0.2 * width,
+			y: height - 0.2 * height,
+			fill: "white",
+		},
+		blocks: {
+			width: 0.04 * width,
+			height: 0.04 * width,
+			spacing: 0.005 * width,
+			rows: 5,
+			fill: "white",
+		},
+		mouse: { stiffness: 0.2 },
+	};
+
+	const engine = Engine.create({ gravity: CONFIG.gravity });
+	let render, resizeObserver;
+	let projectile, elastic;
+
+	resizeAwareInit();
+
+	resizeObserver = new ResizeObserver(() => {
+		resizeAwareInit();
+	});
+	resizeObserver.observe(container);
 }
