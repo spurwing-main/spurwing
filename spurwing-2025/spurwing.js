@@ -3,12 +3,18 @@ function main() {
 		const color_logo = "white";
 		const color_text = "white";
 		const color_bg = "#0200c8";
+		const color_bg_dark = "#0300a3";
 		const color_border = "#e0e0e080";
+
+		/* set inital colors of Tabs section */
+		gsap.set([".s-tabs", ".tab-button__bg"], {
+			backgroundColor: color_text,
+			color: color_bg,
+		});
 
 		const tl = gsap.timeline({
 			scrollTrigger: {
 				trigger: ".clients_title",
-				// start: "top+=200 bottom",
 				start: "center center",
 				end: "bottom-=400 top",
 				toggleActions: "play none none reverse",
@@ -20,7 +26,10 @@ function main() {
 		});
 
 		tl.to(
-			[".clients_title", ".bento_head"],
+			[".clients_title", ".bento_head", ".s-tabs", ".tab-button__bg"],
+			{
+				color: color_logo,
+			},
 			{
 				color: color_text,
 			},
@@ -36,10 +45,17 @@ function main() {
 		);
 
 		tl.to(
-			[".s-bento", ".s-clients"],
+			[".s-bento", ".s-clients", ".s-tabs"],
 			{
 				backgroundColor: color_bg,
-				duration: 0.35,
+			},
+			0
+		);
+
+		tl.to(
+			[".tab-button__bg"],
+			{
+				backgroundColor: color_bg_dark,
 			},
 			0
 		);
@@ -706,7 +722,7 @@ function main() {
 		if (!container) return;
 
 		const width = container.offsetWidth;
-		const height = width * 0.5; // 2:1 aspect ratio
+		const height = container.offsetHeight;
 
 		const SVG_PROJECTILES = [
 			"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3e58c78696f7c1f4de688_spw.svg",
