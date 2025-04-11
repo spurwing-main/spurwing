@@ -673,6 +673,7 @@ function main() {
 				resizeObserver.observe(container);
 
 				const setupDeviceOrientation = () => {
+					const triggerSection = document.querySelector(".s-circles");
 					const handleOrientation = (event) => {
 						const gamma = event.gamma || 0;
 						const beta = event.beta || 0;
@@ -691,21 +692,21 @@ function main() {
 								const response = await DeviceOrientationEvent.requestPermission();
 								if (response === "granted") {
 									window.addEventListener("deviceorientation", handleOrientation);
-									container.removeEventListener("click", permissionPrompt);
+									triggerSection.removeEventListener("click", permissionPrompt);
 								} else {
 									alert("Motion access denied.");
 								}
 							} else {
 								// No permission required (Android / older iOS)
 								window.addEventListener("deviceorientation", handleOrientation);
-								container.removeEventListener("click", permissionPrompt);
+								triggerSection.removeEventListener("click", permissionPrompt);
 							}
 						} catch (e) {
 							console.error("Motion permission error:", e);
 						}
 					};
 
-					container.addEventListener("click", permissionPrompt);
+					triggerSection.addEventListener("click", permissionPrompt);
 				};
 
 				if (window.innerWidth <= 767 && window.DeviceOrientationEvent) {
