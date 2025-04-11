@@ -490,6 +490,7 @@ function main() {
 			}
 			World.clear(engine.world);
 			Engine.clear(engine);
+			hasInitialized = false; // Allow re-init
 		};
 
 		const initSimulation = async () => {
@@ -764,7 +765,11 @@ function main() {
 		try {
 			new IntersectionObserver(
 				([entry]) => {
-					if (entry.isIntersecting) initSimulation();
+					if (entry.isIntersecting) {
+						initSimulation(); // Start/restart
+					} else {
+						cleanup(); // Pause/kill when out of view
+					}
 				},
 				{ threshold: CONFIG.thresholds.intersectionObserver }
 			).observe(container);
