@@ -991,6 +991,7 @@ function main() {
 			const placedRects = [];
 			const platforms = [];
 			const allBlocks = [];
+			const groundContacts = new Map(); // body -> timeoutId
 
 			const generatePlatformWithBlocks = ({
 				minX,
@@ -1198,6 +1199,14 @@ function main() {
 					[bodyA, bodyB].forEach((body, index) => {
 						const other = index === 0 ? bodyB : bodyA;
 
+						if (other === ground && !body._fadingOut) {
+							body._fadingOut = true;
+							console.log("Block touched ground:", body.id);
+							setTimeout(() => {
+								fadeAndDestroy(body);
+							}, 3000);
+						}
+
 						if (body === ground && other.isTarget) {
 							shatterBlock(other);
 							// Optional: add score, particles, sound, etc.
@@ -1213,6 +1222,20 @@ function main() {
 					});
 				}
 			});
+
+			// Events.on(engine, "collisionEnd", (event) => {
+			// 	for (const pair of event.pairs) {
+			// 		const { bodyA, bodyB } = pair;
+
+			// 		[bodyA, bodyB].forEach((body) => {
+			// 			if (groundContacts.has(body)) {
+			// 				// Cancel the fade-out
+			// 				clearTimeout(groundContacts.get(body));
+			// 				groundContacts.delete(body);
+			// 			}
+			// 		});
+			// 	}
+			// });
 
 			const fadeAndDestroy = (block, duration = 300) => {
 				let opacity = 1;
