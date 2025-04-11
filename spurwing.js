@@ -1,4 +1,19 @@
 function main() {
+	function requestPermission() {
+		if (
+			typeof DeviceOrientationEvent !== "undefined" &&
+			typeof DeviceOrientationEvent.requestPermission === "function"
+		) {
+			DeviceOrientationEvent.requestPermission()
+				.then((permissionState) => {
+					if (permissionState === "granted") {
+						// Safe to listen to deviceorientation
+					}
+				})
+				.catch(console.error);
+		}
+	}
+
 	function changeColors() {
 		const color_logo = "white";
 		const color_text = "white";
@@ -1033,6 +1048,7 @@ function main() {
 
 	loadWorkItems();
 	handleNewWorkItems();
+	requestPermission();
 	physics();
 	game();
 }
