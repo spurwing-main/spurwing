@@ -682,8 +682,9 @@ function main() {
 						const gx = Math.min(Math.max(gamma / 90, -1), 1);
 						const gy = Math.min(Math.max(beta / 90, -1), 1);
 
-						engine.gravity.x = gx * CONFIG.gravity.scale * 100;
-						engine.gravity.y = gy * CONFIG.gravity.scale * 100;
+						const intensity = 3; // Try values between 2 and 5
+						engine.gravity.x = gx * intensity;
+						engine.gravity.y = gy * intensity;
 					};
 
 					const permissionPrompt = async () => {
