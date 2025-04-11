@@ -1,18 +1,18 @@
 function main() {
-	function requestPermission() {
-		if (
-			typeof DeviceOrientationEvent !== "undefined" &&
-			typeof DeviceOrientationEvent.requestPermission === "function"
-		) {
-			DeviceOrientationEvent.requestPermission()
-				.then((permissionState) => {
-					if (permissionState === "granted") {
-						// Safe to listen to deviceorientation
-					}
-				})
-				.catch(console.error);
-		}
-	}
+	// function requestPermission() {
+	// 	if (
+	// 		typeof DeviceOrientationEvent !== "undefined" &&
+	// 		typeof DeviceOrientationEvent.requestPermission === "function"
+	// 	) {
+	// 		DeviceOrientationEvent.requestPermission()
+	// 			.then((permissionState) => {
+	// 				if (permissionState === "granted") {
+	// 					// Safe to listen to deviceorientation
+	// 				}
+	// 			})
+	// 			.catch(console.error);
+	// 	}
+	// }
 
 	function changeColors() {
 		const color_logo = "white";
@@ -672,19 +672,44 @@ function main() {
 				resizeObserver = new ResizeObserver(debouncedUpdateSize);
 				resizeObserver.observe(container);
 
-				// Accelerometer-based gravity on mobile
-				if (window.DeviceOrientationEvent && window.innerWidth <= 767) {
-					window.addEventListener("deviceorientation", (event) => {
-						const gamma = event.gamma || 0; // left-to-right tilt in degrees
-						const beta = event.beta || 0; // front-to-back tilt in degrees
+				const setupDeviceOrientation = () => {
+					const handleOrientation = (event) => {
+						const gamma = event.gamma || 0;
+						const beta = event.beta || 0;
 
-						// Normalize to -1 to 1 range
-						const gx = Math.min(Math.max(gamma / 90, -1), 1); // gamma ranges approx from -90 to 90
-						const gy = Math.min(Math.max(beta / 90, -1), 1); // beta ranges approx from -180 to 180
+						// Normalize and scale
+						const gx = Math.min(Math.max(gamma / 90, -1), 1);
+						const gy = Math.min(Math.max(beta / 90, -1), 1);
 
-						engine.gravity.x = gx * CONFIG.gravity.scale * 100; // Amplify to match your CONFIG.gravity.scale
+						engine.gravity.x = gx * CONFIG.gravity.scale * 100;
 						engine.gravity.y = gy * CONFIG.gravity.scale * 100;
-					});
+					};
+
+					const permissionPrompt = async () => {
+						try {
+							if (typeof DeviceOrientationEvent.requestPermission === "function") {
+								const response = await DeviceOrientationEvent.requestPermission();
+								if (response === "granted") {
+									window.addEventListener("deviceorientation", handleOrientation);
+									container.removeEventListener("click", permissionPrompt);
+								} else {
+									alert("Motion access denied.");
+								}
+							} else {
+								// No permission required (Android / older iOS)
+								window.addEventListener("deviceorientation", handleOrientation);
+								container.removeEventListener("click", permissionPrompt);
+							}
+						} catch (e) {
+							console.error("Motion permission error:", e);
+						}
+					};
+
+					container.addEventListener("click", permissionPrompt);
+				};
+
+				if (window.innerWidth <= 767 && window.DeviceOrientationEvent) {
+					setupDeviceOrientation();
 				}
 
 				Events.on(engine, "beforeUpdate", () => {
@@ -1048,7 +1073,7 @@ function main() {
 
 	loadWorkItems();
 	handleNewWorkItems();
-	requestPermission();
+	// requestPermission();
 	physics();
 	game();
 }
