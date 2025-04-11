@@ -313,8 +313,9 @@ function main() {
 			return;
 		}
 
-		const { Engine, Render, World, Bodies, Body, Events, Mouse, MouseConstraint } = Matter;
+		const { Engine, Render, Runner, World, Bodies, Body, Events, Mouse, MouseConstraint } = Matter;
 		let currentMousePos, lastMousePos;
+		let runner;
 
 		// Configuration object
 		const CONFIG = {
@@ -490,6 +491,7 @@ function main() {
 			}
 			World.clear(engine.world);
 			Engine.clear(engine);
+			Runner.stop(runner);
 			hasInitialized = false; // Allow re-init
 		};
 
@@ -753,7 +755,7 @@ function main() {
 				});
 
 				// Start the simulation
-				Matter.Runner.run(engine);
+				runner = Matter.Runner.run(engine);
 				Render.run(render);
 			} catch (error) {
 				console.error(`Simulation failed: ${error.message}`);
