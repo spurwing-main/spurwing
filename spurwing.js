@@ -817,7 +817,7 @@ function main() {
 		const CONFIG = {
 			gravity: { x: 0, y: 1, scale: 0.001 },
 			slingshot: {
-				anchor: { x: 0.2 * width, y: 0.6 * height },
+				anchor: { x: 0.2 * width, y: 0.8 * height },
 				stiffness: 0.05,
 				damping: 0.01,
 				maxSpeed: 45,
@@ -841,19 +841,28 @@ function main() {
 				visibleThickness: 0,
 				fillStyle: "white",
 			},
-			platform: {
-				height: 0.01 * height,
-				width: 0.25 * width,
-				x: width - 0.2 * width,
-				y: height - 0.2 * height,
+			platforms: {
+				thickness: 2,
+				maxX: 0.95 * width, // max x position of platform
+				minX: 0.5 * width, // min x position of platform
+				maxY: 0.9 * height, // max y position of platform
+				minY: 0.1 * height, // min y position of platform
 				fill: "white",
+				maxCount: 3, // max number of platforms
+				maxWidth: 0.2 * width, // max width of platform
+				minWidth: 0.05 * width, // min width of platform
 			},
 			blocks: {
-				width: 0.04 * width,
-				height: 0.04 * width,
+				size: 0.04 * width,
 				spacing: 0.005 * width,
-				rows: 5,
+				maxRows: 4,
+				minRows: 1,
 				fill: "white",
+				targetPercentage: 0.35, // percentage of blocks that should be target blocks
+				targetFill: "#0200c8",
+				fallbackFill: "#ffffff", // non-target fallback color
+				strokeStyle: "#000000",
+				lineWidth: 2,
 			},
 			mouse: { stiffness: 0.2 },
 		};
@@ -880,6 +889,7 @@ function main() {
 					},
 				}
 			);
+			body.label = "projectile"; // for debugging
 
 			return body;
 		};
@@ -915,7 +925,9 @@ function main() {
 							},
 					  }
 					: {
-							fillStyle: randomColor(),
+							fillStyle: CONFIG.blocks.fallbackFill, // non-target fallback color
+							strokeStyle: CONFIG.blocks.strokeStyle,
+							lineWidth: CONFIG.blocks.lineWidth,
 					  },
 			});
 		};
@@ -976,47 +988,166 @@ function main() {
 				}
 			);
 
-			const targetPlatform = Bodies.rectangle(
-				CONFIG.platform.x,
-				CONFIG.platform.y,
-				CONFIG.platform.width,
-				CONFIG.platform.height,
-				{
-					isStatic: true,
-					render: { fillStyle: CONFIG.platform.fill },
+			const placedRects = [];
+			const platforms = [];
+			const allBlocks = [];
+
+			const generatePlatformWithBlocks = ({
+				minX,
+				maxX,
+				minY,
+				maxY,
+				minW,
+				maxW,
+				blockSize,
+				blockSpacing,
+				maxBlockRows,
+				minBlockRows,
+				platformThickness,
+				ceilingHeight = 0,
+				platformPadding = 10,
+				maxAttempts = 50,
+			}) => {
+				for (let attempt = 0; attempt < maxAttempts; attempt++) {
+					const platformWidth = Math.random() * (maxW - minW) + minW;
+					const platformX =
+						Math.random() * (maxX - platformWidth / 2 - (minX + platformWidth / 2)) +
+						(minX + platformWidth / 2);
+					const platformY = Math.random() * (maxY - minY) + minY;
+
+					// Calculate how much vertical room we have above the platform
+					const verticalSpace = platformY - platformThickness / 2 - ceilingHeight - platformPadding;
+
+					const maxRowsFit = Math.floor(verticalSpace / (blockSize + blockSpacing));
+
+					// Clamp between allowed min/max from config
+					const blockRows = Math.max(minBlockRows, Math.min(maxBlockRows, maxRowsFit));
+
+					// Skip if no space for even 1 row
+					if (blockRows < 1) continue;
+
+					const blockCols = Math.floor((platformWidth + blockSpacing) / (blockSize + blockSpacing));
+					const fullBlockHeight = blockRows * (blockSize + blockSpacing);
+
+					const bounds = {
+						minX: platformX - platformWidth / 2 - platformPadding,
+						maxX: platformX + platformWidth / 2 + platformPadding,
+						minY: platformY - platformThickness / 2 - fullBlockHeight - platformPadding,
+						maxY: platformY + platformThickness / 2 + platformPadding,
+					};
+
+					const overlaps = placedRects.some(
+						(rect) =>
+							!(
+								bounds.maxX < rect.minX ||
+								bounds.minX > rect.maxX ||
+								bounds.maxY < rect.minY ||
+								bounds.minY > rect.maxY
+							)
+					);
+
+					if (!overlaps) {
+						placedRects.push(bounds);
+
+						const platform = Bodies.rectangle(
+							platformX,
+							platformY,
+							platformWidth,
+							platformThickness,
+							{
+								isStatic: true,
+								render: { fillStyle: CONFIG.platforms.fill },
+							}
+						);
+
+						const blocks = Composite.create();
+						const startX =
+							platformX -
+							(blockCols / 2) * (blockSize + blockSpacing) +
+							(blockSize + blockSpacing) / 2;
+						const startY = platformY - platformThickness / 2 - blockSize / 2;
+
+						const allPositions = [];
+
+						for (let row = 0; row < blockRows; row++) {
+							for (let col = 0; col < blockCols; col++) {
+								const x = startX + col * (blockSize + blockSpacing);
+								const y = startY - row * (blockSize + blockSpacing);
+								allPositions.push({ x, y });
+							}
+						}
+
+						// Shuffle the positions
+						const shuffled = allPositions.sort(() => Math.random() - 0.5);
+
+						// Choose targets
+						const targetCount = Math.floor(shuffled.length * CONFIG.blocks.targetPercentage);
+						const targetPositions = shuffled.slice(0, targetCount);
+						const normalPositions = shuffled.slice(targetCount);
+
+						// Add target blocks
+						for (const pos of targetPositions) {
+							const spriteUrl = randomFrom(SVG_BLOCKS);
+							const block = createBlock(pos.x, pos.y, spriteUrl, blockSize);
+							block.isTarget = true; // tag it
+							Composite.add(blocks, block);
+						}
+
+						// Add normal blocks
+						for (const pos of normalPositions) {
+							const block = createBlock(pos.x, pos.y, null, blockSize); // no sprite
+							block.isTarget = false;
+							Composite.add(blocks, block);
+						}
+
+						return { platform, blocks };
+					}
 				}
-			);
 
-			const blockSize = CONFIG.blocks.width;
-			const spacing = CONFIG.blocks.spacing;
-			const blockRows = CONFIG.blocks.rows;
+				console.warn("Could not place platform/blocks without overlap.");
+				return null;
+			};
 
-			const blockCols = Math.floor((CONFIG.platform.width + spacing) / (blockSize + spacing));
+			const rows =
+				Math.floor(Math.random() * (CONFIG.blocks.maxRows - CONFIG.blocks.minRows + 1)) +
+				CONFIG.blocks.minRows;
 
-			const blocks = Composite.create();
-			const startX =
-				CONFIG.platform.x - (blockCols / 2) * (blockSize + spacing) + (blockSize + spacing) / 2;
-			const startY = CONFIG.platform.y - CONFIG.platform.height / 2 - blockSize / 2;
+			for (let i = 0; i < CONFIG.platforms.maxCount; i++) {
+				const result = generatePlatformWithBlocks({
+					minX: CONFIG.platforms.minX,
+					maxX: CONFIG.platforms.maxX,
+					minY: CONFIG.platforms.minY,
+					maxY: CONFIG.platforms.maxY,
+					minW: CONFIG.platforms.minWidth,
+					maxW: CONFIG.platforms.maxWidth,
+					blockSize: CONFIG.blocks.size,
+					blockSpacing: CONFIG.blocks.spacing,
+					maxBlockRows: CONFIG.blocks.maxRows,
+					minBlockRows: CONFIG.blocks.minRows,
+					platformThickness: CONFIG.platforms.thickness,
+					ceilingHeight: CONFIG.ceiling.thickness,
+				});
 
-			for (let i = 0; i < blockRows; i++) {
-				for (let j = 0; j < blockCols; j++) {
-					const x = startX + j * (blockSize + spacing);
-					const y = startY - i * (blockSize + spacing);
-
-					const spriteUrl = randomFrom(SVG_BLOCKS);
-					const block = createBlock(x, y, spriteUrl, blockSize);
-
-					// Slight bounce upward and small horizontal nudge
-					Body.setVelocity(block, {
-						x: (Math.random() - 0.5) * 0.5, // small side wiggle
-						y: -1.5 - Math.random() * 0.5, // upward kick
-					});
-					Composite.add(blocks, block);
+				if (result) {
+					platforms.push(result.platform);
+					allBlocks.push(result.blocks);
 				}
 			}
 
+			console.log(platforms, allBlocks);
+
 			addSlingshot();
-			World.add(engine.world, [ground, ceiling, leftWall, rightWall, targetPlatform, blocks]);
+
+			const allBlockBodies = allBlocks.flatMap((comp) => comp.bodies);
+
+			World.add(engine.world, [
+				ground,
+				ceiling,
+				leftWall,
+				rightWall,
+				...platforms,
+				...allBlockBodies,
+			]);
 
 			const mouse = Mouse.create(render.canvas);
 			const mouseConstraint = MouseConstraint.create(engine, {
@@ -1058,6 +1189,79 @@ function main() {
 					projectile = projectileNew;
 				}
 			});
+
+			Events.on(engine, "collisionStart", (event) => {
+				for (const pair of event.pairs) {
+					const { bodyA, bodyB } = pair;
+
+					// Check both combinations
+					[bodyA, bodyB].forEach((body, index) => {
+						const other = index === 0 ? bodyB : bodyA;
+
+						if (body === ground && other.isTarget) {
+							shatterBlock(other);
+							// Optional: add score, particles, sound, etc.
+						}
+
+						if (
+							(bodyA.isTarget && bodyB.label === "projectile") ||
+							(bodyB.isTarget && bodyA.label === "projectile")
+						) {
+							const target = bodyA.isTarget ? bodyA : bodyB;
+							shatterBlock(target);
+						}
+					});
+				}
+			});
+
+			const fadeAndDestroy = (block, duration = 300) => {
+				let opacity = 1;
+				const steps = 10;
+				const interval = duration / steps;
+
+				const fade = setInterval(() => {
+					opacity -= 1 / steps;
+					block.render.opacity = opacity;
+
+					if (opacity <= 0) {
+						clearInterval(fade);
+						World.remove(engine.world, block);
+					}
+				}, interval);
+			};
+
+			const shatterBlock = (block) => {
+				const { x, y } = block.position;
+				const size = block.bounds.max.x - block.bounds.min.x;
+				const pieceSize = size / 3;
+
+				World.remove(engine.world, block);
+
+				const pieces = [];
+
+				for (let i = 0; i < 9; i++) {
+					const px = x + (i % 2 === 0 ? -1 : 1) * (pieceSize / 2);
+					const py = y + (i < 2 ? -1 : 1) * (pieceSize / 2);
+
+					const piece = Bodies.rectangle(px, py, pieceSize, pieceSize, {
+						restitution: 0.5,
+						render: {
+							fillStyle: "#0200c8",
+						},
+					});
+
+					Body.setVelocity(piece, {
+						x: (Math.random() - 0.5) * 2,
+						y: (Math.random() - 0.5) * 2,
+					});
+					Body.setAngularVelocity(piece, (Math.random() - 0.5) * 0.2);
+
+					pieces.push(piece);
+					fadeAndDestroy(piece, 1000);
+				}
+
+				World.add(engine.world, pieces);
+			};
 
 			Render.run(render);
 			Matter.Runner.run(engine);
