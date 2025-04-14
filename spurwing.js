@@ -299,7 +299,7 @@ function main() {
 		]);
 	}
 
-	function physics() {
+	function matter_marbles() {
 		// Early dependency check
 		if (typeof Matter === "undefined") {
 			console.log("Matter.js not loaded");
@@ -781,7 +781,7 @@ function main() {
 		}
 	}
 
-	function game() {
+	function matter_404() {
 		const container = document.querySelector("._404_matter");
 		if (!container) return;
 
@@ -1293,11 +1293,6 @@ function main() {
 		initSimulation();
 	}
 
-	function randomColor() {
-		let color = Math.floor(Math.random() * 16777215).toString(16);
-		return "#" + color;
-	}
-
 	function randomFrom(array) {
 		return array[Math.floor(Math.random() * array.length)];
 	}
@@ -1309,7 +1304,6 @@ function main() {
 
 	loadWorkItems();
 	handleNewWorkItems();
-	// requestPermission();
-	physics();
-	game();
+	matter_marbles();
+	matter_404();
 }
