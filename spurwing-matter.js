@@ -510,10 +510,11 @@ function main() {
 
 		const button = addButton();
 
-		function enableButton(bool) {
+		function enableButton(bool, str) {
 			if (bool) {
 				container.style.pointerEvents = "none";
 				button.style.display = "flex";
+				button.innerHTML = str;
 			} else {
 				container.style.pointerEvents = "auto";
 				button.style.display = "none";
@@ -524,16 +525,22 @@ function main() {
 		const height = container.offsetHeight;
 
 		const SVG_PROJECTILES = [
-			"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3e58c78696f7c1f4de688_spw.svg",
-			"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3ec7a83fe3cc9ea00c7dd_webflow.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7e05c38a306d0c30ea60_spw.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7ddca8731615e20eff7e_webflow.svg",
 		];
 
 		const SVG_BLOCKS = [
-			"https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2577fb9db7d3f3569c_wordpress.svg",
-			// "https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb25d1436cb92ef4d1fb_wix.svg",
-			// "https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb250844d0f6b0977911_drupal.svg",
-			// "https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2545e5fa241a582aff_joomla.svg",
-			// "https://cdn.prod.website-files.com/67ef99f37a7ad65dba02007d/67f3eb2570b120fd34900fad_squarespace.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7daaf7506d703a4e0265_umbraco.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7daa7c8e3283e5f007bb_wix.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7daa514ad41d50002d48_contentful.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7da93dbc1a6c62898740_wordpress.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7da922003b105fd185c5_sitecore.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7da9c38a306d0c30a621_squarespace.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7da99b7fdf699ce51f8a_drupal.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7da969d1211b1766a5bc_storyblok.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7da9bd6d747e3b5c9a03_joomla.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7da993f9e4c1da8cdcb8_hubspot.svg",
+			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fe7da9631cced8e5f08dd5_framer.svg",
 		];
 		const emptyTarget =
 			"https://cdn.prod.website-files.com/67810ba8d6e06130a12d3be6/67fd16c9c7451c91b6bc2dc1_empty-target.svg";
@@ -551,6 +558,9 @@ function main() {
 			Composite,
 		} = Matter;
 
+		let gameStatus = "Game not started";
+		let gameResult = "";
+
 		// define collision filter categories.
 		const CATEGORY = {
 			MOUSE: 0x0001,
@@ -566,13 +576,13 @@ function main() {
 		const setCollisionForProjectile = (body, { launched = false } = {}) => {
 			body.collisionFilter.category = CATEGORY.PROJECTILE;
 			body.collisionFilter.mask = launched
-				? CATEGORY.TARGET | CATEGORY.TERRAIN | CATEGORY.PROJECTILE
+				? CATEGORY.TARGET | CATEGORY.TERRAIN | CATEGORY.PROJECTILE | CATEGORY.AMMO
 				: CATEGORY.MOUSE;
 		};
 
 		// ammo can collide with terrain and other ammo
 		const setCollisionForAmmo = (body) => {
-			body.collisionFilter.category = CATEGORY.TERRAIN;
+			body.collisionFilter.category = CATEGORY.AMMO;
 			body.collisionFilter.mask = CATEGORY.AMMO | CATEGORY.TERRAIN;
 		};
 
@@ -607,9 +617,9 @@ function main() {
 				},
 				target: {
 					x: width - 0.03 * width - 0.23 * width,
-					y: height * 0.9,
+					y: height * 0.8,
 					width: width * 0.46,
-					height: height * 0.25,
+					height: height * 0.45,
 					group: 1,
 				},
 			};
@@ -683,6 +693,8 @@ function main() {
 			};
 		})();
 
+		console.log(CONFIG.targets.position);
+
 		const engine = Engine.create({ gravity: CONFIG.gravity });
 		let render, resizeObserver;
 		let projectile, elastic;
@@ -723,7 +735,7 @@ function main() {
 				render: {
 					visible: true,
 					lineWidth: 1,
-					strokeStyle: "#0200c8",
+					strokeStyle: "#B3B3EE",
 					type: "line",
 				},
 			});
@@ -731,6 +743,8 @@ function main() {
 		};
 
 		let ammoBodies = [];
+		let allTargets = [];
+		let destroyedTargets = [];
 
 		const addAmmo = () => {
 			const count = CONFIG.ammo.count;
@@ -760,17 +774,21 @@ function main() {
 
 			rows.forEach((count, rowIndex) => {
 				const totalWidth = count * blockSize + (count - 1) * spacing;
-				const startX = centerX - totalWidth / 2;
+				const startX = centerX - totalWidth / 2 + blockSize / 2;
 				const y = baseY - rowIndex * (blockSize + spacing);
 
 				for (let i = 0; i < count; i++) {
 					const x = startX + i * (blockSize + spacing);
 
-					const block = createBlock(x, y, emptyTarget, blockSize);
+					const spriteUrl = randomFrom(SVG_BLOCKS);
+
+					const block = createBlock(x, y, spriteUrl, blockSize);
 					setCollisionForTarget(block);
 
 					block.isTarget = true;
 					Composite.add(blocks, block);
+
+					allTargets.push(block); // Track all target blocks
 				}
 			});
 			World.add(engine.world, blocks);
@@ -900,7 +918,7 @@ function main() {
 					const randomSpin = (Math.random() - 0.5) * 0.4;
 					Body.setAngularVelocity(projectile, randomSpin);
 
-					// update projectile collisions to behave like target
+					// update projectile collisions
 					setCollisionForProjectile(projectile, { launched: true });
 
 					// Take next from ammo
@@ -926,10 +944,8 @@ function main() {
 						Body.setVelocity(next, { x: 0, y: 0 });
 						Body.setAngularVelocity(next, 0);
 						next.render.opacity = 1;
-						next.collisionFilter = {
-							category: CATEGORY.PROJECTILE,
-							mask: CATEGORY.TARGET | CATEGORY.MOUSE,
-						};
+
+						setCollisionForProjectile(next, { launched: false });
 
 						elastic.bodyB = next;
 						projectile = next;
@@ -937,9 +953,24 @@ function main() {
 						elastic.bodyB = null;
 						projectile = null;
 						elastic.render.visible = false;
-
-						enableButton(true);
+						checkGameEnd();
 					}
+				}
+				if (gameStatus === "Game finished") return;
+				// check for fallen targets
+				allTargets.forEach((block) => {
+					if (block.position.y > height + 100) {
+						if (!destroyedTargets.includes(block)) {
+							destroyedTargets.push(block);
+							World.remove(engine.world, block);
+						}
+					}
+				});
+
+				// Check if all targets are destroyed
+				if (destroyedTargets.length === allTargets.length) {
+					gameEnd("win");
+					gameStatus = "Game finished";
 				}
 			});
 
@@ -975,6 +1006,23 @@ function main() {
 					});
 				}
 			});
+
+			function gameEnd(str) {
+				if (str === "win") {
+					enableButton(true, "You won! Reload");
+				}
+				if (str === "lose") {
+					enableButton(true, "You lost! Reload");
+				}
+			}
+
+			function checkGameEnd() {
+				if (destroyedTargets.length === allTargets.length) {
+					gameEnd("win");
+				} else {
+					gameEnd("lose");
+				}
+			}
 
 			// Events.on(engine, "collisionEnd", (event) => {
 			// 	for (const pair of event.pairs) {
