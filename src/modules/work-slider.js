@@ -1,4 +1,8 @@
-import EmblaCarousel from "https://cdn.jsdelivr.net/npm/embla-carousel@8.5.2/+esm";
+import { initializeOnce } from "./init-once.js";
+
+let EmblaCarousel;
+let emblaLoad;
+const initKey = Symbol("workSliderInit");
 
 const config = {
 	rootSelector: ".section_impact",
@@ -237,12 +241,39 @@ function initOne(root) {
 	syncArrows();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-	const roots = [...document.querySelectorAll(config.rootSelector)];
+function loadDefaultEmbla() {
+	return import("https://cdn.jsdelivr.net/npm/embla-carousel@8.5.2/+esm");
+}
 
-	if (!roots.length) {
-		throw new Error(`impact slider init failed: no "${config.rootSelector}" found`);
-	}
+async function loadEmbla(load) {
+	if (EmblaCarousel) return;
 
-	roots.forEach(initOne);
-});
+	emblaLoad ||= load()
+		.then((module) => {
+			EmblaCarousel = module.default;
+		})
+		.catch((error) => {
+			emblaLoad = null;
+			throw error;
+		});
+
+	await emblaLoad;
+}
+
+export async function initWorkSlider(root = document, load = loadDefaultEmbla) {
+	const roots = [...root.querySelectorAll(config.rootSelector)];
+	if (!roots.length) return;
+
+	await Promise.all(
+		roots.map((section) => {
+			if (section.dataset.workSliderReady === "true") return undefined;
+
+			return initializeOnce(section, initKey, async () => {
+				await loadEmbla(load);
+				if (section.dataset.workSliderReady === "true") return;
+				initOne(section);
+				section.dataset.workSliderReady = "true";
+			});
+		}),
+	);
+}

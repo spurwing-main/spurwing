@@ -1,9 +1,7 @@
-document.addEventListener("DOMContentLoaded", () => {
-	const root = document.querySelector(".section_work-archive");
+export function initWorkArchive(queryRoot = document) {
+	const root = queryRoot.querySelector(".section_work-archive");
 
-	if (!root) {
-		throw new Error('Work archive root ".section_work-archive" not found.');
-	}
+	if (!root || root.dataset.workArchiveReady === "true") return;
 
 	const filters = root.querySelector('[fs-list-element="filters"]');
 	const list = root.querySelector('[fs-list-element="list"]');
@@ -20,6 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	if (!clear) {
 		throw new Error('Finsweet clear element "[fs-list-element=clear]" not found.');
 	}
+	root.dataset.workArchiveReady = "true";
 
 	const fieldSelector = 'input[fs-list-field="sector"]';
 	const itemTagSelector = '.work-archive_card [fs-list-field="sector"].tag';
@@ -210,4 +209,4 @@ document.addEventListener("DOMContentLoaded", () => {
 		childList: true,
 		subtree: true,
 	});
-});
+}

@@ -7,10 +7,6 @@ const config = {
 	preloadEnabled: true,
 };
 
-const cssEscape = window.CSS?.escape || ((v) => v);
-
-const preload = config.preloadEnabled ? startFetchText(config.endpoint) : null;
-
 function startFetchText(url) {
 	const controller = new AbortController();
 	const promise = fetch(url, {
@@ -34,12 +30,13 @@ function parseDoc(htmlText) {
 
 function countDirectChildren(doc, key) {
 	if (!doc || !key) return null;
+	const cssEscape = window.CSS?.escape || ((value) => value);
 	const list = doc.querySelector(`[${config.sourceAttr}="${cssEscape(key)}"]`);
 	return list ? list.children.length : null;
 }
 
-async function hydrateCounts() {
-	const targets = [...document.querySelectorAll(config.targetSelector)];
+async function hydrateCounts(root, preload) {
+	const targets = [...root.querySelectorAll(config.targetSelector)];
 	if (!targets.length) return;
 
 	const htmlText = preload ? await preload.promise : await startFetchText(config.endpoint).promise;
@@ -61,17 +58,18 @@ async function hydrateCounts() {
 		}
 
 		if (didUpdate) {
-			document.documentElement.setAttribute(config.allOkAttr, "1");
+			root.documentElement?.setAttribute(config.allOkAttr, "1");
 		}
 	});
 }
 
-const run = () => {
-	hydrateCounts().catch(() => {});
-};
+export function initDataLoader(root = document) {
+	const targets = root.querySelectorAll(config.targetSelector);
+	if (!targets.length) return;
+	const scopeElement = root.documentElement || root;
+	if (scopeElement.dataset.cmsCountLoaderReady === "true") return;
+	scopeElement.dataset.cmsCountLoaderReady = "true";
 
-if (document.readyState === "loading") {
-	document.addEventListener("DOMContentLoaded", run, { once: true });
-} else {
-	run();
+	const preload = config.preloadEnabled ? startFetchText(config.endpoint) : null;
+	hydrateCounts(root, preload).catch(() => {});
 }

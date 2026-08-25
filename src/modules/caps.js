@@ -1,9 +1,14 @@
 const emblaUrl = "https://cdn.jsdelivr.net/npm/embla-carousel/embla-carousel.umd.js";
 const autoplayDelay = 4000;
 
-document.addEventListener("DOMContentLoaded", initEmblaSliders);
+export async function initCaps(root = document) {
+	const sliders = [...root.querySelectorAll(".embla")].filter((slider) => {
+		return slider.querySelector(".embla__container .embla__slide, .embla__slide") &&
+			slider.querySelector(".carousel-dots");
+	});
 
-async function initEmblaSliders() {
+	if (!sliders.length) return;
+
 	if (!window.EmblaCarousel) {
 		await import(emblaUrl);
 	}
@@ -12,10 +17,12 @@ async function initEmblaSliders() {
 		throw new Error("Embla Carousel failed to load.");
 	}
 
-	document.querySelectorAll(".embla").forEach(initSlider);
+	sliders.forEach(initSlider);
 }
 
 function initSlider(slider) {
+	if (slider.dataset.capsReady === "true") return;
+
 	const container = slider.querySelector(".embla__container");
 	const slides = slider.querySelectorAll(".embla__slide");
 	const dotsNode = slider.querySelector(".carousel-dots");
@@ -26,6 +33,8 @@ function initSlider(slider) {
 	if (!container || !slides.length || !dotsNode) {
 		return;
 	}
+
+	slider.dataset.capsReady = "true";
 
 	const emblaApi = window.EmblaCarousel(slider, {
 		loop: true,

@@ -1,13 +1,20 @@
-import { animate, stagger } from "https://cdn.jsdelivr.net/npm/motion@12.23.24/+esm";
+import { initializeOnce } from "./init-once.js";
 
-document.addEventListener("DOMContentLoaded", initBookingDetails);
+const motionUrl = "https://cdn.jsdelivr.net/npm/motion@12.23.24/+esm";
+const initKey = Symbol("bookingDetailsInit");
 
-function initBookingDetails() {
-	const section = document.querySelector(".section_booking-details");
+function loadDefaultMotion() {
+	return import(motionUrl);
+}
 
-	if (!section) {
-		throw new Error('Booking details section ".section_booking-details" not found.');
-	}
+export function initBookingDetails(root = document, loadMotion = loadDefaultMotion) {
+	const section = root.querySelector(".section_booking-details");
+	if (!section || section.dataset.bookingDetailsReady === "true") return;
+
+	return initializeOnce(section, initKey, () => setupBookingDetails(section, loadMotion));
+}
+
+async function setupBookingDetails(section, loadMotion) {
 
 	const rows = [...section.querySelectorAll(".booking-details_row")];
 
@@ -20,6 +27,7 @@ function initBookingDetails() {
 
 	if (!uid) {
 		section.hidden = true;
+		section.dataset.bookingDetailsReady = "true";
 		return;
 	}
 
@@ -35,6 +43,7 @@ function initBookingDetails() {
 
 	if (!hasVisibleValues) {
 		section.hidden = true;
+		section.dataset.bookingDetailsReady = "true";
 		return;
 	}
 
@@ -48,7 +57,9 @@ function initBookingDetails() {
 	section.hidden = false;
 	section.classList.add("is-ready");
 
-	animateBookingDetails(section);
+	const { animate, stagger } = await loadMotion();
+	animateBookingDetails(section, animate, stagger);
+	section.dataset.bookingDetailsReady = "true";
 }
 
 function setBookingValue(section, label, value) {
@@ -114,7 +125,7 @@ function updateLastVisibleRow(section) {
 	visibleRows.at(-1)?.classList.add("is-last");
 }
 
-function animateBookingDetails(section) {
+function animateBookingDetails(section, animate, stagger) {
 	const items = section.querySelectorAll(
 		".booking-details_head, .booking-details_row:not([hidden])",
 	);

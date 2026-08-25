@@ -1,24 +1,30 @@
+import { initializeOnce } from "./init-once.js";
+
 const emblaUrl = "https://cdn.jsdelivr.net/npm/embla-carousel/embla-carousel.umd.js";
 const sliderBreakpoint = 991;
+const initKey = Symbol("rightwayInit");
 
-document.addEventListener("DOMContentLoaded", initRightwaySlider);
+function loadDefaultEmbla() {
+	return import(emblaUrl);
+}
 
-async function initRightwaySlider() {
-	const slider = document.querySelector(".rightway_slider");
+export function initRightway(root = document, loadEmbla = loadDefaultEmbla) {
+	const slider = root.querySelector(".rightway_slider");
 
-	if (!slider) {
-		throw new Error('Rightway slider root ".rightway_slider" not found.');
-	}
+	if (!slider || slider.dataset.rightwayReady === "true") return;
 
-	if (!window.EmblaCarousel) {
-		await import(emblaUrl);
-	}
+	return initializeOnce(slider, initKey, async () => {
+		if (!window.EmblaCarousel) {
+			await loadEmbla();
+		}
 
-	if (!window.EmblaCarousel) {
-		throw new Error("Embla Carousel failed to load.");
-	}
+		if (!window.EmblaCarousel) {
+			throw new Error("Embla Carousel failed to load.");
+		}
 
-	createResponsiveSlider(slider);
+		createResponsiveSlider(slider);
+		slider.dataset.rightwayReady = "true";
+	});
 }
 
 function createResponsiveSlider(slider) {

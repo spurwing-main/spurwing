@@ -13,17 +13,13 @@ const workSlideConfig = {
 	readyValue: "swiper-fixed-v4",
 };
 
-document.addEventListener("DOMContentLoaded", initWorkSlideCarousels);
+export function initWorkSlide(root = document) {
+	const roots = Array.from(root.querySelectorAll(workSlideConfig.rootSelector));
 
-function initWorkSlideCarousels() {
+	if (!roots.length) return;
+
 	if (!window.Swiper) {
 		throw new Error("Swiper failed to load.");
-	}
-
-	const roots = Array.from(document.querySelectorAll(workSlideConfig.rootSelector));
-
-	if (!roots.length) {
-		throw new Error('Work slider init failed: no ".section_work-slide" found.');
 	}
 
 	roots.forEach(initSlider);

@@ -5,8 +5,8 @@ const namespace = document.documentElement.dataset.projectNamespace || "starter"
 const project = (window[namespace] = window[namespace] || {});
 project.modules = Object.fromEntries(modules.map((module) => [module.name, module.init]));
 
-function start() {
-  bootModules(modules);
+async function start() {
+  await bootModules(modules);
   if (typeof project.boot?.ready === "function") {
     project.boot.ready();
   } else {

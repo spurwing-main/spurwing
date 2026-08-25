@@ -28,17 +28,16 @@ const config = {
 	rootMargin: "0px 0px -5% 0px",
 };
 
-const canReduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+export function initWorkCardAnim(root = document) {
+	const scopeElement = root.documentElement || root;
+	const revealNodes = root.querySelectorAll(".work-item_component, .team_item");
+	if (!revealNodes.length || scopeElement.dataset.workCardAnimReady === "true") return;
 
-const onReady = (fn) => {
-	if (document.readyState === "loading")
-		document.addEventListener("DOMContentLoaded", fn, { once: true });
-	else fn();
-};
+	scopeElement.dataset.workCardAnimReady = "true";
+	const canReduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-onReady(() => {
 	if (canReduce) {
-		document.querySelectorAll(".work-item_component, .team_item").forEach((element) => {
+		revealNodes.forEach((element) => {
 			element.setAttribute(config.disabledAttr, "");
 		});
 
@@ -63,7 +62,7 @@ onReady(() => {
 
 	const applyStagger = () => {
 		for (const group of config.staggerGroups) {
-			const containers = document.querySelectorAll(group.containerSel);
+			const containers = root.querySelectorAll(group.containerSel);
 			for (const container of containers) {
 				const items = Array.from(container.querySelectorAll(group.itemSel)).filter(
 					(item) => !isDisabled(item),
@@ -121,7 +120,7 @@ onReady(() => {
 	const observeAllNow = () => {
 		applyStagger();
 		for (const sel of config.itemSelectors) {
-			for (const el of document.querySelectorAll(sel)) observeItem(el);
+			for (const el of root.querySelectorAll(sel)) observeItem(el);
 		}
 	};
 
@@ -132,4 +131,4 @@ onReady(() => {
 		cancelAnimationFrame(resizeRaf);
 		resizeRaf = requestAnimationFrame(applyStagger);
 	});
-});
+}

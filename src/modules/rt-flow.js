@@ -1,5 +1,5 @@
-function initRtflow() {
-	document.querySelectorAll('[data-rt-el="list"]').forEach((container) => {
+export function initRtFlow(root = document) {
+	root.querySelectorAll('[data-rt-el="list"]').forEach((container) => {
 		if (container.dataset.rtflowDone) return;
 
 		const source = container.querySelector('[data-rt-el="source"]');
@@ -134,6 +134,3 @@ function getRtflowPairs(sourceItems) {
 
 	return items;
 }
-
-document.addEventListener("DOMContentLoaded", initRtflow);
-window.addEventListener("load", initRtflow);

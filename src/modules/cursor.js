@@ -1,9 +1,8 @@
-import {
-	animate,
-	motionValue,
-	springValue,
-	styleEffect,
-} from "https://cdn.jsdelivr.net/npm/motion@12.34.0/+esm";
+const motionUrl = "https://cdn.jsdelivr.net/npm/motion@12.34.0/+esm";
+let animate;
+let motionValue;
+let springValue;
+let styleEffect;
 
 const config = {
 	rootSel: ".cursor-root",
@@ -30,10 +29,11 @@ const anchorOffsets = {
 	"bottom-right": [1, 1],
 };
 
-const pointer = {
-	x: motionValue(0),
-	y: motionValue(0),
-};
+let pointer;
+
+function loadDefaultMotion() {
+	return import(motionUrl);
+}
 
 function resolveAnchor(el) {
 	const key = (el.getAttribute(config.anchorAttr) || config.defaultAnchor).toLowerCase();
@@ -56,9 +56,10 @@ function clampedPosition(ax, ay, el) {
 	};
 }
 
-function createItem(el) {
+function createItem(el, queryRoot) {
 	const sel = el.getAttribute(config.targetAttr);
 	if (!sel) throw new Error(`${config.itemSel} missing ${config.targetAttr}`);
+	queryRoot.querySelector(sel); // Validate the selector without requiring an initial match.
 
 	const visual = el.querySelector(".cursor-item-visual");
 	if (!visual) throw new Error(".cursor-item needs a .cursor-item-visual child");
@@ -272,30 +273,38 @@ function createItem(el) {
 		show,
 		hide,
 		destroy,
-		targets: [...document.querySelectorAll(sel)],
+		selector: sel,
 	};
 }
 
-function init() {
-	const root = document.querySelector(config.rootSel);
-	if (!root) throw new Error(`cursor root "${config.rootSel}" not found`);
-	root.cursor?.destroy();
+export async function initCursor(root = document, loadMotion = loadDefaultMotion) {
+	const cursorRoot = root.querySelector(config.rootSel);
+	if (!cursorRoot) return;
+	cursorRoot.cursor?.destroy();
+	delete cursorRoot.cursor;
 
-	const items = [...root.querySelectorAll(config.itemSel)].map(createItem);
+	const canUseCursor =
+		typeof window.matchMedia !== "function" ||
+		window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+	if (!canUseCursor) return;
 
-	const targetMap = new Map();
-	for (const item of items) {
-		for (const target of item.targets) {
-			if (!targetMap.has(target)) targetMap.set(target, item);
-		}
-	}
+	const itemElements = [...cursorRoot.querySelectorAll(config.itemSel)];
+	if (!itemElements.length) return;
+
+	({ animate, motionValue, springValue, styleEffect } = await loadMotion());
+	pointer = {
+		x: motionValue(0),
+		y: motionValue(0),
+	};
+	const items = itemElements.map((item) => createItem(item, root));
 
 	function findMatch(node) {
 		let el = node instanceof Element ? node : null;
 
 		while (el) {
-			const item = targetMap.get(el);
-			if (item) return { item, target: el };
+			for (const item of items) {
+				if (el.matches(item.selector)) return { item, target: el };
+			}
 			el = el.parentElement;
 		}
 
@@ -389,7 +398,7 @@ function init() {
 		currentTarget = null;
 	});
 
-	root.cursor = {
+	cursorRoot.cursor = {
 		destroy() {
 			abort.abort();
 			clearTimeout(timer);
@@ -397,5 +406,3 @@ function init() {
 		},
 	};
 }
-
-init();

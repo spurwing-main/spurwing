@@ -1,4 +1,8 @@
-import EmblaCarousel from "https://cdn.jsdelivr.net/npm/embla-carousel@8.6.0/+esm";
+import { initializeOnce } from "./init-once.js";
+
+let EmblaCarousel;
+let emblaLoad;
+const initKey = Symbol("workRailInit");
 
 const config = {
 	sectionSelector: ".section_work-hero",
@@ -228,7 +232,7 @@ function syncCustomOverflowScrims(slides, featuredIndex, rail) {
 	});
 }
 
-function initWorkRail(section) {
+function createWorkRail(section) {
 	const rail = required(section, config.railSelector, "rail");
 	const viewport = required(rail, config.viewportSelector, "viewport");
 	const track = required(rail, config.trackSelector, "track");
@@ -704,8 +708,8 @@ function initWorkRail(section) {
 		});
 	};
 
-	mobileMq.addEventListener("change", scheduleApplyMode);
 	applyMode();
+	mobileMq.addEventListener("change", scheduleApplyMode);
 
 	return {
 		destroy() {
@@ -717,15 +721,38 @@ function initWorkRail(section) {
 	};
 }
 
-window.addEventListener(
-	"DOMContentLoaded",
-	() => {
-		const sections = Array.from(document.querySelectorAll(config.sectionSelector));
-		if (!sections.length) {
-			throw new Error(`work-rail: missing sections (${config.sectionSelector})`);
-		}
+function loadDefaultEmbla() {
+	return import("https://cdn.jsdelivr.net/npm/embla-carousel@8.6.0/+esm");
+}
 
-		sections.forEach(initWorkRail);
-	},
-	{ once: true },
-);
+async function loadEmbla(load) {
+	if (EmblaCarousel) return;
+
+	emblaLoad ||= load()
+		.then((module) => {
+			EmblaCarousel = module.default;
+		})
+		.catch((error) => {
+			emblaLoad = null;
+			throw error;
+		});
+
+	await emblaLoad;
+}
+
+export async function initWorkRail(root = document, load = loadDefaultEmbla) {
+	const sections = Array.from(root.querySelectorAll(config.sectionSelector));
+	if (!sections.length) return;
+
+	await Promise.all(
+		sections.map((section) => {
+			if (section.workRail) return undefined;
+
+			return initializeOnce(section, initKey, async () => {
+				await loadEmbla(load);
+				if (section.workRail) return;
+				section.workRail = createWorkRail(section);
+			});
+		}),
+	);
+}

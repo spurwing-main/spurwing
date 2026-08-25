@@ -1,6 +1,6 @@
-document.addEventListener("DOMContentLoaded", () => {
-	const nodes = document.querySelectorAll(".copy_component");
-	if (!nodes.length) throw new Error("copy init failed");
+export function initCopy(root = document) {
+	const nodes = root.querySelectorAll(".copy_component");
+	if (!nodes.length) return;
 
 	nodes.forEach((el) => {
 		if (el.dataset.copyWired === "1") return;
@@ -30,4 +30,4 @@ document.addEventListener("DOMContentLoaded", () => {
 			);
 		});
 	});
-});
+}

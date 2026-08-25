@@ -1,10 +1,11 @@
-document.addEventListener("DOMContentLoaded", function () {
+export function initStick(root = document) {
+	const layout = root.querySelector(".stick_layout");
+	if (!layout || layout.dataset.stickReady === "true") return;
 	const mq = window.matchMedia("(min-width: 768px)");
-	const layout = document.querySelector(".stick_layout");
-	if (!layout) return;
 
 	const items = Array.from(layout.querySelectorAll(".stick_list-item"));
 	if (!items.length) return;
+	layout.dataset.stickReady = "true";
 
 	const targets = items.map(function (item) {
 		return item.querySelector("h2, h3") || item;
@@ -96,4 +97,4 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	handleBreakpointChange();
-});
+}

@@ -1,14 +1,8 @@
-if (document.readyState === "loading") {
-	document.addEventListener("DOMContentLoaded", initToc, { once: true });
-} else {
-	initToc();
-}
-
 function qsa(root, selector) {
 	return Array.from(root.querySelectorAll(selector));
 }
 
-function initToc() {
+export function initInsightToc(root = document) {
 	/**
 	 * Insights table-of-contents indicator.
 	 *
@@ -91,5 +85,5 @@ function initToc() {
 
 		updateFromCurrent();
 	}
-	qsa(document, LIST_SELECTOR).forEach(setupInsightsToc);
+	qsa(root, LIST_SELECTOR).forEach(setupInsightsToc);
 }
