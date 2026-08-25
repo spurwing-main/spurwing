@@ -1,0 +1,79 @@
+<style>
+	:root {
+		--cursor-transition-ms: 180ms;
+		--cursor-ease: cubic-bezier(0.4, 0, 0.2, 1);
+		--cursor-scale-from: 0.875;
+		--cursor-blur-from: 4px;
+	}
+
+	.cursor-root {
+		position: fixed;
+		inset: 0;
+		z-index: 9999;
+		pointer-events: none;
+	}
+	.cursor-root * {
+		pointer-events: none !important;
+	}
+
+	.cursor-item {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: max-content;
+		height: max-content;
+	}
+
+	.cursor-item-visual {
+		visibility: hidden;
+		opacity: 0;
+		transform: scale(var(--cursor-scale-from));
+		filter: blur(var(--cursor-blur-from));
+		will-change: transform, opacity, filter;
+		transition:
+			opacity 140ms var(--cursor-ease),
+			transform var(--cursor-transition-ms) var(--cursor-ease),
+			filter 220ms var(--cursor-ease),
+			visibility 0s linear 220ms;
+	}
+
+	/* ── Transform-origin per anchor (static, no JS needed) ───────────────────
+  Anchor = where the item sits relative to the cursor.
+  The cursor touches the *opposite* corner → that's the origin.          */
+
+	/* default (bottom-right) → cursor at item's top-left */
+	.cursor-item .cursor-item-visual,
+	.cursor-item[data-cursor-anchor="bottom-right"] .cursor-item-visual {
+		transform-origin: top left;
+	}
+	.cursor-item[data-cursor-anchor="bottom-left"] .cursor-item-visual {
+		transform-origin: top right;
+	}
+	.cursor-item[data-cursor-anchor="top-right"] .cursor-item-visual {
+		transform-origin: bottom left;
+	}
+	.cursor-item[data-cursor-anchor="top-left"] .cursor-item-visual {
+		transform-origin: bottom right;
+	}
+	.cursor-item[data-cursor-anchor="center"] .cursor-item-visual {
+		transform-origin: center;
+	}
+
+	/* ── Show state (example — adjust selector for your markup) ───────────── */
+	body:has(.work-item_component:hover)
+		.cursor-item[data-cursor-target=".work-item_component"]
+		.cursor-item-visual,
+	body:has(.slider_feat-item:hover)
+		.cursor-item[data-cursor-target=".slider_feat-item"]
+		.cursor-item-visual {
+		visibility: visible;
+		opacity: 1;
+		transform: scale(1);
+		filter: blur(0px);
+		transition:
+			visibility 0s linear 0s,
+			opacity 140ms var(--cursor-ease),
+			transform var(--cursor-transition-ms) var(--cursor-ease),
+			filter 220ms var(--cursor-ease);
+	}
+</style>

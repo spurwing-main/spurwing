@@ -1,0 +1,280 @@
+<style>
+	.cursor-root {
+		position: fixed;
+		inset: 0;
+		z-index: 9999;
+		pointer-events: none;
+	}
+	.cursor-root * {
+		pointer-events: none !important;
+	}
+
+	.cursor-item {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: max-content;
+		height: max-content;
+		visibility: hidden;
+	}
+
+	.cursor-item-visual {
+		opacity: 0;
+		scale: 0.85;
+		will-change: transform, opacity;
+	}
+
+	.cursor-item .cursor-item-visual,
+	.cursor-item[data-cursor-anchor="bottom-right"] .cursor-item-visual {
+		transform-origin: top left;
+	}
+	.cursor-item[data-cursor-anchor="bottom-left"] .cursor-item-visual {
+		transform-origin: top right;
+	}
+	.cursor-item[data-cursor-anchor="top-right"] .cursor-item-visual {
+		transform-origin: bottom left;
+	}
+	.cursor-item[data-cursor-anchor="top-left"] .cursor-item-visual {
+		transform-origin: bottom right;
+	}
+	.cursor-item[data-cursor-anchor="center"] .cursor-item-visual {
+		transform-origin: center;
+	}
+</style>
+
+<script type="module">
+	import {
+		animate,
+		motionValue,
+		springValue,
+		styleEffect,
+	} from "https://cdn.jsdelivr.net/npm/motion@12.34.0/+esm";
+
+	const config = {
+		rootSel: ".cursor-root",
+		itemSel: ".cursor-item",
+		targetAttr: "data-cursor-target",
+		anchorAttr: "data-cursor-anchor",
+		defaultAnchor: "bottom-right",
+		padding: 16,
+		margin: 12,
+		handoffDelay: 80,
+		spring: { stiffness: 1800, damping: 80, mass: 0.1 },
+		fxSpring: { type: "spring", visualDuration: 0.35, bounce: 0 },
+	};
+
+	const anchorOffsets = {
+		center: [0, 0],
+		"top-left": [-1, -1],
+		"top-right": [1, -1],
+		"bottom-left": [-1, 1],
+		"bottom-right": [1, 1],
+	};
+
+	// --- pointer ---
+
+	const pointer = { x: motionValue(0), y: motionValue(0) };
+
+	// --- helpers ---
+
+	function resolveAnchor(el) {
+		const key = (el.getAttribute(config.anchorAttr) || config.defaultAnchor).toLowerCase();
+		return anchorOffsets[key] || anchorOffsets[config.defaultAnchor];
+	}
+
+	function clamp(value, min, max) {
+		return Math.min(Math.max(value, min), max);
+	}
+
+	function clampedPosition(ax, ay, el) {
+		const w = el.offsetWidth;
+		const h = el.offsetHeight;
+		const p = config.padding;
+		const m = config.margin;
+
+		return {
+			x: clamp(pointer.x.get() + ax * (w / 2 + m) - w / 2, p, innerWidth - p - w),
+			y: clamp(pointer.y.get() + ay * (h / 2 + m) - h / 2, p, innerHeight - p - h),
+		};
+	}
+
+	// --- item ---
+
+	function createItem(el) {
+		const sel = el.getAttribute(config.targetAttr);
+		if (!sel) throw new Error(`${config.itemSel} missing ${config.targetAttr}`);
+
+		const visual = el.querySelector(".cursor-item-visual");
+		if (!visual) throw new Error(".cursor-item needs a .cursor-item-visual child");
+
+		const [ax, ay] = resolveAnchor(el);
+
+		const srcX = motionValue(0);
+		const srcY = motionValue(0);
+		const x = springValue(srcX, config.spring);
+		const y = springValue(srcY, config.spring);
+		const stopStyle = styleEffect(el, { x, y });
+
+		el.style.visibility = "hidden";
+
+		let unsub = null;
+
+		function sync() {
+			const pos = clampedPosition(ax, ay, el);
+			srcX.set(pos.x);
+			srcY.set(pos.y);
+		}
+
+		function jump() {
+			const pos = clampedPosition(ax, ay, el);
+			srcX.jump(pos.x);
+			srcY.jump(pos.y);
+			x.jump(pos.x);
+			y.jump(pos.y);
+		}
+
+		function subscribe() {
+			if (unsub) return;
+			const unX = pointer.x.on("change", sync);
+			const unY = pointer.y.on("change", sync);
+			unsub = () => {
+				unX();
+				unY();
+				unsub = null;
+			};
+		}
+
+		function unsubscribe() {
+			unsub?.();
+		}
+
+		function show() {
+			el.style.visibility = "visible";
+			subscribe();
+			jump();
+			animate(visual, { opacity: 1, scale: 1 }, config.fxSpring);
+		}
+
+		function hide() {
+			animate(visual, { opacity: 0, scale: 0.85 }, config.fxSpring);
+			unsubscribe();
+		}
+
+		function destroy() {
+			unsubscribe();
+			stopStyle();
+			srcX.destroy();
+			srcY.destroy();
+			x.destroy();
+			y.destroy();
+		}
+
+		return {
+			show,
+			hide,
+			destroy,
+			targets: document.querySelectorAll(sel),
+		};
+	}
+
+	// --- init ---
+
+	function init() {
+		const root = document.querySelector(config.rootSel);
+		if (!root) throw new Error(`cursor root "${config.rootSel}" not found`);
+		root.cursor?.destroy();
+
+		const items = [...root.querySelectorAll(config.itemSel)].map(createItem);
+
+		const targetMap = new Map();
+		for (const item of items) {
+			for (const target of item.targets) {
+				if (!targetMap.has(target)) targetMap.set(target, item);
+			}
+		}
+
+		function findItem(node) {
+			let el = node instanceof Element ? node : null;
+			while (el) {
+				if (targetMap.has(el)) return targetMap.get(el);
+				el = el.parentElement;
+			}
+			return null;
+		}
+
+		let current = null;
+		let timer = 0;
+		const abort = new AbortController();
+
+		function on(target, event, fn, opts = {}) {
+			target.addEventListener(event, fn, { signal: abort.signal, ...opts });
+		}
+
+		function activate(next) {
+			clearTimeout(timer);
+			if (current === next) return;
+			current?.hide();
+			current = next;
+			current?.show();
+		}
+
+		on(
+			window,
+			"pointermove",
+			(e) => {
+				pointer.x.set(e.clientX);
+				pointer.y.set(e.clientY);
+			},
+			{ passive: true },
+		);
+
+		on(
+			document,
+			"pointerover",
+			(e) => {
+				const to = findItem(e.target);
+				const from = findItem(e.relatedTarget);
+				if (to && to !== from) activate(to);
+			},
+			{ capture: true },
+		);
+
+		on(
+			document,
+			"pointerout",
+			(e) => {
+				const from = findItem(e.target);
+				if (!from) return;
+
+				const to = findItem(e.relatedTarget);
+				if (to === from) return;
+
+				if (to) return activate(to);
+
+				if (current === from) {
+					timer = setTimeout(() => {
+						if (current !== from) return;
+						from.hide();
+						current = null;
+					}, config.handoffDelay);
+				}
+			},
+			{ capture: true },
+		);
+
+		on(window, "blur", () => {
+			current?.hide();
+			current = null;
+		});
+
+		root.cursor = {
+			destroy() {
+				abort.abort();
+				clearTimeout(timer);
+				items.forEach((item) => item.destroy());
+			},
+		};
+	}
+
+	init();
+</script>

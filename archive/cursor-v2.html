@@ -1,0 +1,590 @@
+<div class="cursor-root">
+	<div class="cursor-code w-embed w-script">
+		<style>
+			.cursor-root {
+				position: fixed;
+				inset: 0;
+				z-index: 9999;
+				pointer-events: none;
+			}
+
+			.cursor-root,
+			.cursor-root * {
+				pointer-events: none !important;
+				text-wrap: nowrap !important;
+			}
+
+			.cursor-item {
+				position: absolute;
+				left: 0;
+				top: 0;
+				width: max-content;
+				height: max-content;
+				visibility: hidden;
+				opacity: 0;
+				transform-origin: center;
+				will-change: transform, opacity;
+			}
+
+			.cursor-item-visual {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				overflow: hidden;
+				width: max-content;
+				height: max-content;
+				min-width: 0;
+				min-height: 0;
+				border-radius: 999px;
+				scale: 0.92;
+				filter: blur(10px);
+				will-change: width, height, transform, opacity, filter;
+				backdrop-filter: blur(18px);
+				-webkit-backdrop-filter: blur(18px);
+				box-shadow:
+					0 10px 30px rgba(0, 0, 0, 0.14),
+					inset 0 1px 0 rgba(255, 255, 255, 0.2);
+			}
+
+			.cursor-item-visual > * {
+				flex: 0 0 auto;
+			}
+
+			.cursor-item-text {
+				will-change: transform, opacity, filter;
+			}
+
+			.cursor-measure {
+				position: fixed;
+				left: -9999px;
+				top: -9999px;
+				visibility: hidden;
+				pointer-events: none;
+				width: max-content;
+				height: max-content;
+			}
+
+			@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+				.cursor-root {
+					display: none;
+				}
+			}
+		</style>
+
+		<script type="module">
+			import {
+				animate,
+				motionValue,
+				springValue,
+				styleEffect,
+			} from "https://cdn.jsdelivr.net/npm/motion@12.34.0/+esm";
+
+			const config = {
+				rootSel: ".cursor-root",
+				itemSel: ".cursor-item",
+				visualSel: ".cursor-item-visual",
+				targetAttr: "data-cursor-target",
+				textAttr: "data-cursor-text",
+				groupSel: "[data-cursor-group]",
+				defaultAnchor: "bottom-right",
+				viewportPadding: 12,
+				pointerMargin: 14,
+				warmDelay: 160,
+				textDelay: 55,
+				maxWidth: 280,
+				positionSpring: { stiffness: 1800, damping: 82, mass: 0.1 },
+				sizeSpring: { type: "spring", visualDuration: 0.42, bounce: 0.18 },
+				enterSpring: { type: "spring", visualDuration: 0.34, bounce: 0.16 },
+				textOut: { duration: 0.11, ease: "easeOut" },
+				textIn: { duration: 0.17, ease: "easeOut" },
+				exit: { duration: 0.16, ease: "easeOut" },
+			};
+
+			const anchorOffsets = {
+				center: [0, 0],
+				"top-left": [-1, -1],
+				"top-right": [1, -1],
+				"bottom-left": [-1, 1],
+				"bottom-right": [1, 1],
+			};
+
+			const canUseCursor =
+				matchMedia("(hover: hover) and (pointer: fine)").matches &&
+				!matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+			if (canUseCursor) {
+				initCursor();
+			}
+
+			function initCursor() {
+				const root = document.querySelector(config.rootSel);
+				if (!root) throw new Error(`Cursor root "${config.rootSel}" not found.`);
+
+				root.cursor?.destroy();
+
+				const templates = [...root.querySelectorAll(config.itemSel)].map(createTemplate);
+				if (!templates.length) throw new Error(`No "${config.itemSel}" found.`);
+
+				const live = templates[0];
+				const pointerX = motionValue(0);
+				const pointerY = motionValue(0);
+				const targetX = motionValue(0);
+				const targetY = motionValue(0);
+				const x = springValue(targetX, config.positionSpring);
+				const y = springValue(targetY, config.positionSpring);
+				const stopStyle = styleEffect(live.item, { x, y });
+				const abort = new AbortController();
+
+				let activeMatch = null;
+				let activeText = live.defaultText;
+				let isVisible = false;
+				let hideTimer = 0;
+				let textTimer = 0;
+				let textSwapId = 0;
+				let width = live.width;
+				let height = live.height;
+
+				for (const template of templates) {
+					template.item.style.visibility = "hidden";
+					template.item.style.opacity = "0";
+				}
+
+				live.item.style.opacity = "0";
+				live.item.style.visibility = "hidden";
+
+				function on(target, eventName, handler, options = {}) {
+					target.addEventListener(eventName, handler, {
+						signal: abort.signal,
+						...options,
+					});
+				}
+
+				function clamp(value, min, max) {
+					return Math.min(Math.max(value, min), max);
+				}
+
+				function getAnchor(template) {
+					const key = (
+						template.item.getAttribute("data-cursor-anchor") || config.defaultAnchor
+					).toLowerCase();
+
+					return anchorOffsets[key] || anchorOffsets[config.defaultAnchor];
+				}
+
+				function getPosition(template = live) {
+					const [ax, ay] = getAnchor(template);
+					const maxX = Math.max(
+						config.viewportPadding,
+						innerWidth - config.viewportPadding - width,
+					);
+					const maxY = Math.max(
+						config.viewportPadding,
+						innerHeight - config.viewportPadding - height,
+					);
+
+					return {
+						x: clamp(
+							pointerX.get() + ax * (width / 2 + config.pointerMargin) - width / 2,
+							config.viewportPadding,
+							maxX,
+						),
+						y: clamp(
+							pointerY.get() + ay * (height / 2 + config.pointerMargin) - height / 2,
+							config.viewportPadding,
+							maxY,
+						),
+					};
+				}
+
+				function syncPosition(template = live) {
+					const position = getPosition(template);
+					targetX.set(position.x);
+					targetY.set(position.y);
+				}
+
+				function jumpPosition(template = live) {
+					const position = getPosition(template);
+
+					targetX.jump(position.x);
+					targetY.jump(position.y);
+					x.jump(position.x);
+					y.jump(position.y);
+				}
+
+				function getText(match) {
+					const attrText = match.target.getAttribute(config.textAttr)?.trim();
+					return attrText || match.template.defaultText;
+				}
+
+				function measure(template, text) {
+					template.measureText.textContent = text;
+
+					const rect = template.measureVisual.getBoundingClientRect();
+
+					return {
+						width: Math.min(Math.ceil(rect.width), config.maxWidth),
+						height: Math.ceil(rect.height),
+					};
+				}
+
+				function copyTemplate(template, text) {
+					if (live.templateId === template.templateId) return;
+
+					live.visual.innerHTML = template.visual.innerHTML;
+					live.text = live.visual.querySelector("div");
+
+					if (!live.text) {
+						throw new Error(".cursor-item-visual needs a text div.");
+					}
+
+					live.text.classList.add("cursor-item-text");
+					live.templateId = template.templateId;
+					live.defaultText = template.defaultText;
+					live.measureVisual.innerHTML = template.measureVisual.innerHTML;
+					live.measureText = live.measureVisual.querySelector("div");
+
+					if (!live.measureText) {
+						throw new Error("Cursor measure visual needs a text div.");
+					}
+
+					live.text.textContent = text;
+					live.measureText.textContent = text;
+				}
+
+				function setSize(template, text, immediate = false) {
+					const size = measure(template, text);
+
+					width = size.width;
+					height = size.height;
+
+					syncPosition(template);
+
+					animate(
+						live.visual,
+						{
+							width: `${size.width}px`,
+							height: `${size.height}px`,
+							borderRadius: `${Math.ceil(size.height / 2)}px`,
+						},
+						immediate ? { duration: 0 } : config.sizeSpring,
+					);
+				}
+
+				function setText(match, immediate = false) {
+					const nextText = getText(match);
+					if (!nextText) return;
+
+					clearTimeout(textTimer);
+
+					if (immediate) {
+						textSwapId += 1;
+						activeText = nextText;
+						copyTemplate(match.template, nextText);
+						live.text.textContent = nextText;
+						setSize(match.template, nextText, true);
+						return;
+					}
+
+					if (nextText === activeText && live.templateId === match.template.templateId) {
+						return;
+					}
+
+					textTimer = setTimeout(() => {
+						if (nextText === activeText && live.templateId === match.template.templateId) {
+							return;
+						}
+
+						textSwapId += 1;
+						const swapId = textSwapId;
+						const templateChanged = live.templateId !== match.template.templateId;
+
+						setSize(match.template, nextText);
+
+						animate(
+							live.text,
+							{
+								opacity: [1, 0],
+								transform: ["translateY(0px)", "translateY(4px)"],
+								filter: ["blur(0px)", "blur(8px)"],
+							},
+							config.textOut,
+						).finished.then(() => {
+							if (swapId !== textSwapId) return;
+
+							if (templateChanged) {
+								copyTemplate(match.template, nextText);
+							}
+
+							activeText = nextText;
+							live.text.textContent = nextText;
+
+							animate(
+								live.text,
+								{
+									opacity: [0, 1],
+									transform: ["translateY(-4px)", "translateY(0px)"],
+									filter: ["blur(8px)", "blur(0px)"],
+								},
+								config.textIn,
+							);
+						});
+					}, config.textDelay);
+				}
+
+				function show(match) {
+					clearTimeout(hideTimer);
+
+					activeMatch = match;
+
+					if (!isVisible) {
+						setText(match, true);
+						live.item.style.visibility = "visible";
+						live.item.style.opacity = "1";
+						jumpPosition(match.template);
+						isVisible = true;
+
+						animate(
+							live.visual,
+							{
+								opacity: 1,
+								scale: [0.9, 1.035, 1],
+								filter: ["blur(10px)", "blur(0px)"],
+							},
+							config.enterSpring,
+						);
+
+						return;
+					}
+
+					setText(match);
+					syncPosition(match.template);
+				}
+
+				function hide() {
+					clearTimeout(hideTimer);
+					clearTimeout(textTimer);
+
+					if (!isVisible) return;
+
+					activeMatch = null;
+					isVisible = false;
+
+					animate(
+						live.visual,
+						{
+							opacity: 0,
+							scale: [1, 0.96, 0.9],
+							filter: ["blur(0px)", "blur(10px)"],
+						},
+						config.exit,
+					).finished.then(() => {
+						if (isVisible) return;
+
+						live.item.style.visibility = "hidden";
+						live.item.style.opacity = "0";
+					});
+				}
+
+				function queueHide() {
+					clearTimeout(hideTimer);
+					hideTimer = setTimeout(hide, config.warmDelay);
+				}
+
+				function findMatch(node) {
+					const element = node instanceof Element ? node : null;
+					if (!element) return null;
+
+					for (const template of templates) {
+						const target = element.closest(template.selector);
+
+						if (target) {
+							return { template, target };
+						}
+					}
+
+					return null;
+				}
+
+				function getGroup(node) {
+					const element = node instanceof Element ? node : null;
+					return element?.closest(config.groupSel) || null;
+				}
+
+				function validatePointer() {
+					if (activeMatch?.target && !activeMatch.target.isConnected) {
+						activeMatch = null;
+						queueHide();
+						return;
+					}
+
+					const element = document.elementFromPoint(pointerX.get(), pointerY.get());
+					const match = findMatch(element);
+
+					if (match) {
+						show(match);
+						return;
+					}
+
+					if (getGroup(element) && isVisible) {
+						clearTimeout(hideTimer);
+						syncPosition(activeMatch?.template || live);
+						return;
+					}
+
+					queueHide();
+				}
+
+				function onPointerMove(event) {
+					pointerX.set(event.clientX);
+					pointerY.set(event.clientY);
+					syncPosition(activeMatch?.template || live);
+
+					const match = findMatch(event.target);
+
+					if (match) {
+						show(match);
+					}
+				}
+
+				function onPointerOver(event) {
+					const match = findMatch(event.target);
+
+					if (match) {
+						show(match);
+					}
+				}
+
+				function onPointerOut(event) {
+					const from = findMatch(event.target);
+					if (!from) return;
+
+					const to = findMatch(event.relatedTarget);
+
+					if (to) {
+						show(to);
+						return;
+					}
+
+					const fromGroup = getGroup(event.target);
+					const toGroup = getGroup(event.relatedTarget);
+
+					if (fromGroup && fromGroup === toGroup) {
+						clearTimeout(hideTimer);
+						return;
+					}
+
+					queueHide();
+				}
+
+				function onScrollOrResize() {
+					syncPosition(activeMatch?.template || live);
+					validatePointer();
+				}
+
+				on(window, "pointermove", onPointerMove, { passive: true });
+				on(document, "pointerover", onPointerOver, { capture: true });
+				on(document, "pointerout", onPointerOut, { capture: true });
+				on(window, "scroll", onScrollOrResize, { passive: true });
+				on(window, "resize", onScrollOrResize, { passive: true });
+				on(window, "blur", hide);
+
+				root.cursor = {
+					destroy() {
+						abort.abort();
+						clearTimeout(hideTimer);
+						clearTimeout(textTimer);
+						stopStyle();
+
+						pointerX.destroy();
+						pointerY.destroy();
+						targetX.destroy();
+						targetY.destroy();
+						x.destroy();
+						y.destroy();
+
+						for (const template of templates) {
+							template.measure.remove();
+						}
+					},
+				};
+			}
+
+			function createTemplate(item, index) {
+				const selector = item.getAttribute(config.targetAttr);
+
+				if (!selector) {
+					throw new Error(`${config.itemSel} missing ${config.targetAttr}.`);
+				}
+
+				const visual = item.querySelector(config.visualSel);
+
+				if (!visual) {
+					throw new Error(`${config.itemSel} needs a ${config.visualSel} child.`);
+				}
+
+				const text = visual.querySelector("div");
+
+				if (!text) {
+					throw new Error(`${config.visualSel} needs a text div.`);
+				}
+
+				text.classList.add("cursor-item-text");
+
+				const defaultText = text.textContent.trim();
+				const measure = document.createElement("div");
+
+				measure.className = "cursor-measure";
+				measure.appendChild(visual.cloneNode(true));
+				document.body.appendChild(measure);
+
+				const measureVisual = measure.querySelector(config.visualSel);
+				const measureText = measureVisual?.querySelector("div");
+
+				if (!measureVisual || !measureText) {
+					throw new Error("Cursor measure clone failed.");
+				}
+
+				const rect = measureVisual.getBoundingClientRect();
+
+				visual.style.width = `${Math.ceil(rect.width)}px`;
+				visual.style.height = `${Math.ceil(rect.height)}px`;
+
+				return {
+					item,
+					visual,
+					text,
+					selector,
+					defaultText,
+					measure,
+					measureVisual,
+					measureText,
+					templateId: index,
+					width: Math.ceil(rect.width),
+					height: Math.ceil(rect.height),
+				};
+			}
+		</script>
+	</div>
+
+	<div
+		data-cursor-anchor="bottom-right"
+		data-cursor-target=".work-item_component"
+		class="cursor-item">
+		<div class="cursor-item-visual">
+			<a href="/work" class="button is-no-hover w-inline-block">
+				<div>View work</div>
+			</a>
+		</div>
+	</div>
+
+	<div
+		data-cursor-anchor="bottom-right"
+		data-cursor-target=".work-rail_featured-hitarea"
+		class="cursor-item">
+		<div class="cursor-item-visual">
+			<a href="/work" class="button is-no-hover w-inline-block">
+				<div>View work</div>
+			</a>
+		</div>
+	</div>
+</div>
