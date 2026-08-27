@@ -14,11 +14,10 @@ export function initInsightToc(root = document) {
 	 *   --insights-toc-h  rendered height of the active link
 	 *
 	 * Finsweet briefly removes `w--current` while a user scrolls between
-	 * sections. If no link is current, this module deliberately does nothing.
-	 * The last measured position, and our persistent
-	 * `data-insights-toc-current` state, stay in place until another link
-	 * becomes current. CSS should style the active link off that attribute,
-	 * not off Finsweet's transient class.
+	 * sections. The first link is the initial fallback; after that, the last
+	 * measured position and our persistent `data-insights-toc-current` state
+	 * stay in place until another link becomes current. CSS should style the
+	 * active link off that attribute, not off Finsweet's transient class.
 	 */
 
 	const LIST_SELECTOR = ".insights-item-sidebar_links";
@@ -58,9 +57,13 @@ export function initInsightToc(root = document) {
 				.reverse()
 				.map((record) => record.target)
 				.find((target) => target.matches?.(CURRENT_SELECTOR));
-			const current = changedCurrent || list.querySelector(CURRENT_SELECTOR);
+			const current =
+				changedCurrent ||
+				list.querySelector(CURRENT_SELECTOR) ||
+				lastActiveLink ||
+				list.querySelector(LINK_SELECTOR);
 
-			// Preserve the earlier custom-property values during Finsweet's gap.
+			// Default to the first link, then preserve the earlier values during gaps.
 			if (!current) return;
 			positionIndicator(current);
 		}
