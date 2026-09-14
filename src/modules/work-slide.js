@@ -10,6 +10,7 @@ const workSlideConfig = {
 	nextSelector: '[data-work-slide="next"]',
 	disabledClass: "swiper-button-disabled",
 	containerSelector: ".container",
+	revealOptOutAttr: "data-reveal-disabled",
 	dotClass: "caps_dot",
 	selectedDotClass: "caps_dot--selected",
 	grabbingClass: "is-grabbing",
@@ -127,6 +128,16 @@ function initSlider(section) {
 
 	slides.forEach(function (slide) {
 		slide.classList.add("swiper-slide");
+
+		// The site reveals work cards on scroll by watching .work_list-item, which
+		// a slide is not, so an unclaimed card would sit at opacity 0 forever.
+		// The reveal already ships an opt-out attribute; using it keeps the escape
+		// hatch in one place instead of a CSS override.
+		const card = slide.querySelector(workSlideConfig.cardSelector);
+
+		if (card) {
+			card.setAttribute(workSlideConfig.revealOptOutAttr, "");
+		}
 	});
 
 	let swiper = null;

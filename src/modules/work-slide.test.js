@@ -102,6 +102,18 @@ describe("initWorkSlide", () => {
 		expect(clicked).toHaveBeenCalledTimes(2);
 	});
 
+	it("opts each card out of the scroll reveal, which never observes a slide", () => {
+		document.body.innerHTML = section();
+
+		initWorkSlide();
+
+		expect(
+			Array.from(document.querySelectorAll(".work-item_component")).every((card) => {
+				return card.hasAttribute("data-reveal-disabled");
+			}),
+		).toBe(true);
+	});
+
 	it("starts a section that has no controls, and asks Swiper for no navigation", () => {
 		document.body.innerHTML = section({ arrows: false });
 
