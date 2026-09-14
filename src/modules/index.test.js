@@ -25,6 +25,7 @@ describe("module registry", () => {
 			"caps",
 			"rightway",
 			"work-slide",
+			"quote-fade",
 			"work-rail",
 			"work-card-anim",
 			"approach-hero",

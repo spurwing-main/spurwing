@@ -36,6 +36,10 @@ Provides the single-open FAQ accordion behavior, including accessible expanded s
 
 Tracks the current Finsweet table-of-contents link and writes its position and height to CSS custom properties for the sidebar indicator. It preserves the last active state during brief gaps where Finsweet removes its `w--current` class.
 
+### `quote-fade.js`
+
+Turns a testimonial Collection List into a cross-fading, auto-advancing quote using the globally loaded Swiper constructor. A list holding a single quote is left as static markup, and visitors who prefer reduced motion get an instant, non-autoplaying slider.
+
 ### `rightway.js`
 
 Turns the Rightway card grid into an Embla carousel at widths up to 991px and restores the static grid above that breakpoint. It creates responsive pagination dots and uses the globally exposed Embla UMD build loaded from jsDelivr.
@@ -66,7 +70,7 @@ Runs the featured-work rail with a custom looping desktop presentation and an Em
 
 ### `work-slide.js`
 
-Initializes the selected-work carousel with the globally loaded Swiper constructor. It calculates Webflow container offsets and equal slide widths, builds pagination dots, updates on resize, and prevents dragged links from being opened accidentally.
+Initializes the selected-work carousel with the globally loaded Swiper constructor. It calculates Webflow container offsets and equal slide widths, builds pagination dots, wires any `data-work-slide` previous/next controls, updates on resize, and prevents dragged links from being opened accidentally.
 
 ### `work-slider.js`
 

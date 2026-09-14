@@ -6,6 +6,7 @@ import { initCursor } from "./cursor.js";
 import { initDataLoader } from "./data-loader.js";
 import { initFaq } from "./faq.js";
 import { initInsightToc } from "./insight-toc.js";
+import { initQuoteFade } from "./quote-fade.js";
 import { initRightway } from "./rightway.js";
 import { initRtFlow } from "./rt-flow.js";
 import { initStick } from "./stick.js";
@@ -31,6 +32,7 @@ export const modules = [
 	{ name: "caps", init: initCaps },
 	{ name: "rightway", init: initRightway },
 	{ name: "work-slide", init: initWorkSlide },
+	{ name: "quote-fade", init: initQuoteFade },
 	{ name: "work-rail", init: initWorkRail },
 	{ name: "work-card-anim", init: initWorkCardAnim },
 	{ name: "approach-hero", init: initApproachHero },

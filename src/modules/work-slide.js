@@ -5,6 +5,9 @@ const workSlideConfig = {
 	slideSelector: ".work-slide_item",
 	cardSelector: ".work-item_component",
 	dotsSelector: ".caps_dots",
+	arrowSelector: "[data-work-slide]",
+	arrowAttr: "data-work-slide",
+	prevValue: "prev",
 	containerSelector: ".container",
 	dotClass: "caps_dot",
 	selectedDotClass: "caps_dot--selected",
@@ -172,6 +175,7 @@ function initSlider(section) {
 
 	wireGrabCursor(viewport);
 	protectSlideLinks(viewport);
+	wireArrows(section, swiper);
 
 	window.addEventListener("resize", scheduleUpdate);
 	window.addEventListener("load", scheduleUpdate, { once: true });
@@ -306,6 +310,33 @@ function initSlider(section) {
 			updateActiveDot(swiper);
 
 			updateFrame = null;
+		});
+	}
+
+	// Optional previous/next controls. The Designer markup marks them with
+	// data-work-slide="prev" or "next"; a section without them keeps its dots.
+	// They are divs with role="button", so Enter and Space need handling too.
+	function wireArrows(scope, instance) {
+		const arrows = Array.from(scope.querySelectorAll(workSlideConfig.arrowSelector));
+
+		arrows.forEach(function (arrow) {
+			function step(event) {
+				event.preventDefault();
+
+				if (arrow.getAttribute(workSlideConfig.arrowAttr) === workSlideConfig.prevValue) {
+					instance.slidePrev();
+					return;
+				}
+
+				instance.slideNext();
+			}
+
+			arrow.addEventListener("click", step);
+			arrow.addEventListener("keydown", function (event) {
+				if (event.key === "Enter" || event.key === " ") {
+					step(event);
+				}
+			});
 		});
 	}
 
