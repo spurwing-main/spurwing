@@ -73,16 +73,16 @@ describe("initWorkSlide", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("steps the slider from the previous and next controls", () => {
+	it("hands the controls to Swiper's navigation module, so they gain a disabled state", () => {
 		document.body.innerHTML = section();
 
 		initWorkSlide();
 
-		document.querySelector('[data-work-slide="next"]').click();
-		expect(instance.slideNext).toHaveBeenCalledTimes(1);
+		const options = window.Swiper.mock.calls[0][1];
 
-		document.querySelector('[data-work-slide="prev"]').click();
-		expect(instance.slidePrev).toHaveBeenCalledTimes(1);
+		expect(options.navigation.prevEl).toBe(document.querySelector('[data-work-slide="prev"]'));
+		expect(options.navigation.nextEl).toBe(document.querySelector('[data-work-slide="next"]'));
+		expect(options.navigation.disabledClass).toBe("swiper-button-disabled");
 	});
 
 	it("steps from the keyboard, because the controls are not native buttons", () => {
@@ -91,19 +91,23 @@ describe("initWorkSlide", () => {
 		initWorkSlide();
 
 		const next = document.querySelector('[data-work-slide="next"]');
+		const clicked = vi.fn();
+
+		next.addEventListener("click", clicked);
 
 		next.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		next.dispatchEvent(new window.KeyboardEvent("keydown", { key: " ", bubbles: true }));
 		next.dispatchEvent(new window.KeyboardEvent("keydown", { key: "a", bubbles: true }));
 
-		expect(instance.slideNext).toHaveBeenCalledTimes(2);
+		expect(clicked).toHaveBeenCalledTimes(2);
 	});
 
-	it("starts a section that has no controls", () => {
+	it("starts a section that has no controls, and asks Swiper for no navigation", () => {
 		document.body.innerHTML = section({ arrows: false });
 
 		expect(() => initWorkSlide()).not.toThrow();
 		expect(window.Swiper).toHaveBeenCalledTimes(1);
+		expect(window.Swiper.mock.calls[0][1].navigation).toBe(false);
 	});
 
 	it("does nothing when the page has no work slider", () => {

@@ -6,8 +6,9 @@ const workSlideConfig = {
 	cardSelector: ".work-item_component",
 	dotsSelector: ".caps_dots",
 	arrowSelector: "[data-work-slide]",
-	arrowAttr: "data-work-slide",
-	prevValue: "prev",
+	prevSelector: '[data-work-slide="prev"]',
+	nextSelector: '[data-work-slide="next"]',
+	disabledClass: "swiper-button-disabled",
 	containerSelector: ".container",
 	dotClass: "caps_dot",
 	selectedDotClass: "caps_dot--selected",
@@ -134,7 +135,22 @@ function initSlider(section) {
 
 	const initialMetrics = getSliderMetrics();
 
+	// The Designer marks optional controls with data-work-slide="prev" or "next".
+	// Handing them to Swiper's own navigation module — rather than stepping the
+	// slider by hand — is what gives them .swiper-button-disabled at each end,
+	// the class the site's shared slider-arrows CSS already styles.
+	const prevArrow = section.querySelector(workSlideConfig.prevSelector);
+	const nextArrow = section.querySelector(workSlideConfig.nextSelector);
+
 	swiper = new window.Swiper(viewport, {
+		navigation:
+			prevArrow || nextArrow
+				? {
+						prevEl: prevArrow,
+						nextEl: nextArrow,
+						disabledClass: workSlideConfig.disabledClass,
+					}
+				: false,
 		slidesPerView: "auto",
 		slidesPerGroup: 1,
 		spaceBetween: initialMetrics.gap,
@@ -175,7 +191,7 @@ function initSlider(section) {
 
 	wireGrabCursor(viewport);
 	protectSlideLinks(viewport);
-	wireArrows(section, swiper);
+	wireArrowKeys(section);
 
 	window.addEventListener("resize", scheduleUpdate);
 	window.addEventListener("load", scheduleUpdate, { once: true });
@@ -313,29 +329,20 @@ function initSlider(section) {
 		});
 	}
 
-	// Optional previous/next controls. The Designer markup marks them with
-	// data-work-slide="prev" or "next"; a section without them keeps its dots.
-	// They are divs with role="button", so Enter and Space need handling too.
-	function wireArrows(scope, instance) {
+	// The controls are divs with role="button", so Enter and Space do not
+	// activate them by themselves. Swiper owns the click; this only forwards the
+	// keys to it, and a disabled arrow stays inert because Swiper ignores it.
+	function wireArrowKeys(scope) {
 		const arrows = Array.from(scope.querySelectorAll(workSlideConfig.arrowSelector));
 
 		arrows.forEach(function (arrow) {
-			function step(event) {
-				event.preventDefault();
-
-				if (arrow.getAttribute(workSlideConfig.arrowAttr) === workSlideConfig.prevValue) {
-					instance.slidePrev();
+			arrow.addEventListener("keydown", function (event) {
+				if (event.key !== "Enter" && event.key !== " ") {
 					return;
 				}
 
-				instance.slideNext();
-			}
-
-			arrow.addEventListener("click", step);
-			arrow.addEventListener("keydown", function (event) {
-				if (event.key === "Enter" || event.key === " ") {
-					step(event);
-				}
+				event.preventDefault();
+				arrow.click();
 			});
 		});
 	}

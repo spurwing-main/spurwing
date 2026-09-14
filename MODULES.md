@@ -70,7 +70,7 @@ Runs the featured-work rail with a custom looping desktop presentation and an Em
 
 ### `work-slide.js`
 
-Initializes the selected-work carousel with the globally loaded Swiper constructor. It calculates Webflow container offsets and equal slide widths, builds pagination dots, wires any `data-work-slide` previous/next controls, updates on resize, and prevents dragged links from being opened accidentally.
+Initializes the selected-work carousel with the globally loaded Swiper constructor. It calculates Webflow container offsets and equal slide widths, builds pagination dots, hands any `data-work-slide` previous/next controls to Swiper's navigation module so they carry `swiper-button-disabled` at each end, forwards Enter and Space to them, updates on resize, and prevents dragged links from being opened accidentally.
 
 ### `work-slider.js`
 
