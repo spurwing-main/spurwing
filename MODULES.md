@@ -38,7 +38,7 @@ Tracks the current Finsweet table-of-contents link and writes its position and h
 
 ### `quote-fade.js`
 
-Turns a testimonial Collection List into a cross-fading, auto-advancing quote using the globally loaded Swiper constructor. A list holding a single quote is left as static markup, and visitors who prefer reduced motion get an instant, non-autoplaying slider.
+Turns a testimonial Collection List into a cross-fading, auto-advancing quote using the globally loaded Swiper constructor. It writes the autoplay's progress to a `--quote-progress` custom property for the rule drawn under the card. A list holding a single quote is left as static markup, and visitors who prefer reduced motion get an instant, non-autoplaying slider with no progress rule.
 
 ### `rightway.js`
 

@@ -2,6 +2,7 @@ const quoteFadeConfig = {
 	rootSelector: ".dc-quote",
 	wrapperSelector: ".w-dyn-items",
 	readyValue: "fade-v1",
+	progressVar: "--quote-progress",
 	delay: 5000,
 	speed: 600,
 };
@@ -49,6 +50,13 @@ function initQuote(quote) {
 
 	const reduced = prefersReducedMotion();
 
+	// The design draws a rule along the bottom of the card that fills as the
+	// autoplay runs. Swiper reports the time left as 1 down to 0, so the filled
+	// fraction is its complement; CSS turns the property into a width.
+	function setProgress(filled) {
+		quote.style.setProperty(quoteFadeConfig.progressVar, String(filled));
+	}
+
 	new window.Swiper(quote, {
 		slidesPerView: 1,
 		loop: true,
@@ -65,6 +73,16 @@ function initQuote(quote) {
 					delay: quoteFadeConfig.delay,
 					disableOnInteraction: false,
 					pauseOnMouseEnter: true,
+				},
+		on: reduced
+			? {}
+			: {
+					autoplayTimeLeft: function (instance, time, progress) {
+						setProgress(1 - progress);
+					},
+					slideChangeTransitionStart: function () {
+						setProgress(0);
+					},
 				},
 	});
 }

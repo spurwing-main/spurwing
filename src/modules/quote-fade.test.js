@@ -92,6 +92,31 @@ describe("initQuoteFade", () => {
 		expect(options.speed).toBe(0);
 	});
 
+
+	it("fills the progress rule as the autoplay runs and resets it on the change", () => {
+		document.body.innerHTML = quoteList(3);
+
+		initQuoteFade();
+
+		const quote = document.querySelector(".dc-quote");
+		const handlers = window.Swiper.mock.calls[0][1].on;
+
+		handlers.autoplayTimeLeft({}, 2500, 0.5);
+		expect(quote.style.getPropertyValue("--quote-progress")).toBe("0.5");
+
+		handlers.slideChangeTransitionStart();
+		expect(quote.style.getPropertyValue("--quote-progress")).toBe("0");
+	});
+
+	it("reports no progress for reduced motion, because nothing advances", () => {
+		stubReducedMotion(true);
+		document.body.innerHTML = quoteList(2);
+
+		initQuoteFade();
+
+		expect(window.Swiper.mock.calls[0][1].on).toEqual({});
+	});
+
 	it("does nothing when the page has no quote list", () => {
 		initQuoteFade();
 
