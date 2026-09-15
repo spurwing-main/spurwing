@@ -21,6 +21,12 @@ import { animate } from "motion";
 // State, the slider, the arrows and the staggered rows are all addressed by data
 // attribute, so the Designer keeps ownership of how it looks. The two exceptions
 // are noted where they are declared.
+//
+// Every static rule this behaviour needs lives in the Nav Component's own CSS
+// embed, next to the markup it styles. This file only toggles attributes and
+// animates the one property CSS cannot — height, while calc-size() is Chromium
+// only — so there is one owner per layer rather than a stylesheet injected from
+// script that then has to out-specify the Component's own.
 
 const navPanelConfig = {
 	navSelector: ".nav",
@@ -63,73 +69,6 @@ const navPanelConfig = {
 	scrimFade: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
 };
 
-const css = `
-.nav { --nav-panel-ease: cubic-bezier(0.16, 1, 0.3, 1); }
-.nav_item-panel { display: block; overflow: hidden; height: 0; visibility: hidden; }
-.nav_item-panel[${navPanelConfig.openAttr}],
-.nav_item-panel[${navPanelConfig.leavingAttr}] { visibility: visible; }
-/* One curve for every hover and state change in the panel, and it is the one
-   the nav already uses for its mobile links. */
-.nav_item .nav_item-chevron,
-.nav_card,
-.nav_card-arrow,
-[data-nav-arrow] { transition: transform 420ms var(--nav-panel-ease), background-color 240ms var(--nav-panel-ease), color 240ms var(--nav-panel-ease); }
-.nav_item[${navPanelConfig.openAttr}] .nav_item-chevron { transform: rotate(180deg); }
-.nav_card:hover .nav_card-arrow { transform: translateX(4px); }
-[data-nav-arrow]:not([aria-disabled="true"]):hover { background-color: var(--_color---grey-400); }
-
-/* The arrows carry their disabled look here rather than as a second Designer
-   class, because which one is disabled changes as the slider moves. */
-[data-nav-arrow][aria-disabled="true"] {
-	background-color: var(--_utils---white);
-	box-shadow: inset 0 0 0 1px var(--_color---grey-400);
-	color: var(--_color---grey-400);
-	cursor: default;
-}
-[data-nav-arrow][hidden] { display: none; }
-
-@media (min-width: 992px) {
-	/* The panel is a full-bleed surface under the whole bar, so the bar has to
-	   be what positions it. .nav is already fixed, and the two wrappers between
-	   it and the panel are only positioned for the hover pill — which is put
-	   back by centring it, rather than by measuring the panel's box in script.
-	   The isolation goes with it: it trapped the panel's z-index inside the link
-	   row, which left the scrim painting over the open panel. The pill and links
-	   sit at 0 and 1, so they keep their order without it. */
-	.nav .nav_links { position: static; isolation: auto; }
-	.nav .nav_links .nav_link-bg { top: 50%; transform: translateY(-50%); }
-
-	/* The pill keeps following the pointer as it always has. While a panel is
-	   open it holds under that item instead, a step darker, so "open" reads
-	   differently from "hovering". */
-	.nav_links:has(.nav_item[${navPanelConfig.openAttr}]) { --bg-color: var(--_color---grey-400); }
-	.nav_links:has(.nav_item[${navPanelConfig.openAttr}]):not(:has(.nav_link:hover)) .nav_item[${navPanelConfig.openAttr}] .nav_link { anchor-name: --navLinkBg; }
-	.nav_links:has(.nav_item[${navPanelConfig.openAttr}]) .nav_link-bg { opacity: 1; visibility: visible; }
-}
-
-@media (max-width: 991px) {
-	/* The mobile entrance stagger is written against the direct children of
-	   .nav_links. Work and About now sit inside a wrapper, so their delays are
-	   restated here by position rather than by element type. The rest of the
-	   mobile layout is Webflow's, on the medium breakpoint. */
-	.nav_links > :nth-child(2) .nav_link, .nav_links > a.nav_link:nth-child(2) { --stagger-delay: 0ms; }
-	.nav_links > :nth-child(3) .nav_link, .nav_links > a.nav_link:nth-child(3) { --stagger-delay: 24ms; }
-	.nav_links > :nth-child(4) .nav_link, .nav_links > a.nav_link:nth-child(4) { --stagger-delay: 48ms; }
-	.nav_links > :nth-child(5) .nav_link, .nav_links > a.nav_link:nth-child(5) { --stagger-delay: 72ms; }
-	.nav_links > :nth-child(6) .nav_link, .nav_links > a.nav_link:nth-child(6) { --stagger-delay: 96ms; }
-	.nav_links > :nth-child(7) .nav_link, .nav_links > a.nav_link:nth-child(7) { --stagger-delay: 120ms; }
-}
-`;
-
-let styleEl = null;
-
-function installStyles() {
-	if (styleEl?.isConnected) return;
-	styleEl = document.createElement("style");
-	styleEl.dataset.spwNavPanel = "";
-	styleEl.textContent = css;
-	document.head.appendChild(styleEl);
-}
 
 export function initNavPanel(root = document, { signal } = {}) {
 	const nav = root.querySelector(navPanelConfig.navSelector);
@@ -139,8 +78,6 @@ export function initNavPanel(root = document, { signal } = {}) {
 		item.querySelector(navPanelConfig.panel),
 	);
 	if (!items.length) return;
-
-	installStyles();
 
 	const list = nav.querySelector(navPanelConfig.listSelector);
 	const order = list ? [...list.children] : items;
