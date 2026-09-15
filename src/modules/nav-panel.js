@@ -33,7 +33,12 @@ const navPanelConfig = {
 	item: ".nav_item",
 	panel: ".nav_item-panel",
 	inner: ".nav_item-panel-inner",
-	row: "[data-nav-stagger]",
+	// Structural rather than attributed: Webflow silently drops custom
+	// attributes on these divs, and a row that quietly stops being a row is
+	// worse than one the markup defines. Every container's children, plus the
+	// work rail, which is a full-bleed sibling of the containers.
+	row: ".container > *, .work-slide_swiper",
+	arrow: ".nav_panel-arrow",
 	scrim: "[data-nav-scrim]",
 	linkSelector: "a",
 	openAttr: "data-nav-open",
@@ -217,6 +222,18 @@ export function initNavPanel(root = document, { signal } = {}) {
 	function on(target, event, fn, options) {
 		target.addEventListener(event, fn, { signal, ...options });
 	}
+
+	// Stamped here because Webflow drops them, and because nav-panel is
+	// registered before work-slide, which reads them.
+	items.forEach((item) => {
+		const arrows = [...item.querySelectorAll(navPanelConfig.arrow)];
+		arrows.forEach((arrow, index) => {
+			arrow.setAttribute("data-work-slide", index === 0 ? "prev" : "next");
+			arrow.setAttribute("role", "button");
+			arrow.setAttribute("tabindex", "0");
+			arrow.setAttribute("aria-label", index === 0 ? "Previous work" : "Next work");
+		});
+	});
 
 	items.forEach((item) => {
 		on(item, "pointerenter", () => {
