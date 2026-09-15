@@ -11,6 +11,7 @@ project/
 ├── src/
 │   ├── index.js             Starts the modules after the DOM is ready.
 │   ├── boot.js              Starts each module with a fresh AbortSignal, and again on each new page.
+│   ├── dom.js               A query that throws with the selector it wanted.
 │   └── modules/
 │       └── index.js         Lists the modules in their start order.
 ├── dist/
@@ -34,7 +35,7 @@ Do not commit project notes, reports, exports, or client data. Put these files i
 
 Each module starts in list order. A fault in one module does not stop the next module.
 
-Every module is called as `init(root, { signal })`. The signal is fresh on each run, and the previous run's signal is aborted first, so listeners, observers and timers cannot stack up when the page transition starts the modules again. A module that only reads the DOM can ignore it. Nothing else belongs in that second argument. Do not guard a module with a flag on `documentElement`: that flag survives a page transition and stops the next page ever starting.
+Every module is called as `init(root, { signal })`. The signal is fresh on each run, and the previous run's signal is aborted first, so listeners, observers and timers cannot stack up when the page transition starts the modules again. A module that only reads the DOM can ignore it. Nothing else belongs in that second argument. `boot.js` owns running each module once per page, so a module does not guard itself. Never guard one with a flag on `documentElement`: that flag survives a page transition and stops the next page ever starting.
 
 The page transition is not in the module list. It owns navigation for the whole session, so `src/index.js` starts it once.
 

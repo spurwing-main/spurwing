@@ -1,206 +1,227 @@
+import { requireElement } from "../dom.js";
+import { buildDots, grabCursor } from "./slider-controls.js";
+
 const workSlideConfig = {
-	rootSelector: ".section_work-slide",
+	sectionSelector: ".section_work-slide",
 	viewportSelector: ".work-slide_swiper",
 	wrapperSelector: ".work-slide_list",
 	slideSelector: ".work-slide_item",
 	cardSelector: ".work-item_component",
+	containerSelector: ".container",
 	dotsSelector: ".caps_dots",
 	arrowSelector: "[data-work-slide]",
-	prevSelector: '[data-work-slide="prev"]',
+	previousSelector: '[data-work-slide="prev"]',
 	nextSelector: '[data-work-slide="next"]',
-	disabledClass: "swiper-button-disabled",
-	containerSelector: ".container",
-	revealOptOutAttr: "data-reveal-disabled",
 	dotClass: "caps_dot",
 	selectedDotClass: "caps_dot--selected",
+	disabledArrowClass: "swiper-button-disabled",
 	grabbingClass: "is-grabbing",
+	revealOptOutAttr: "data-reveal-disabled",
 	gapVar: "--work-slide--gap",
-	readyValue: "swiper-fixed-v4",
+	widthVar: "--work-slide-item-width",
+	dragThreshold: 6,
+	speed: 450,
 };
 
 export function initWorkSlide(root = document, { signal } = {}) {
-	const roots = Array.from(root.querySelectorAll(workSlideConfig.rootSelector));
+	const sections = [...root.querySelectorAll(workSlideConfig.sectionSelector)];
 
-	if (!roots.length) return;
+	if (!sections.length) return;
 
-	if (!window.Swiper) {
-		throw new Error("Swiper failed to load.");
-	}
+	if (!window.Swiper) throw new Error("Swiper failed to load.");
 
-	roots.forEach((section) => initSlider(section, signal));
+	sections.forEach((section) => initSlider(section, signal));
 }
 
-function getRequired(scope, selector, label) {
-	const el = scope.querySelector(selector);
+// The CSS gap is authored in whatever unit suits the breakpoint, and Swiper
+// wants a number of pixels. A throwaway element is the only honest way to ask
+// the browser what the value resolves to in this section.
+function toPixels(scope, value) {
+	const length = String(value || "").trim();
 
-	if (!el) {
-		throw new Error("Missing " + label + ': expected "' + selector + '".');
-	}
-
-	return el;
-}
-
-function getNumber(value) {
-	const number = parseFloat(value);
-
-	if (Number.isNaN(number)) {
-		return 0;
-	}
-
-	return number;
-}
-
-function getCssLengthInPx(scope, value) {
-	const trimmedValue = String(value || "").trim();
-
-	if (!trimmedValue) {
-		return null;
-	}
+	if (!length) return 0;
 
 	const probe = document.createElement("div");
 
-	probe.style.position = "absolute";
-	probe.style.visibility = "hidden";
-	probe.style.pointerEvents = "none";
-	probe.style.width = trimmedValue;
-
-	scope.appendChild(probe);
+	probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;width:${length}`;
+	scope.append(probe);
 
 	const width = probe.getBoundingClientRect().width;
 
 	probe.remove();
 
-	if (!width && trimmedValue !== "0" && trimmedValue !== "0px") {
-		return null;
-	}
-
 	return width;
 }
 
 function initSlider(section, signal) {
-	const viewport = getRequired(section, workSlideConfig.viewportSelector, "work slider viewport");
-	const wrapper = getRequired(section, workSlideConfig.wrapperSelector, "work slider wrapper");
-	const dotsNode = getRequired(section, workSlideConfig.dotsSelector, "work slider dots");
-	const container = getRequired(
-		section,
-		workSlideConfig.containerSelector,
-		"work slider container",
-	);
-	const slides = Array.from(wrapper.querySelectorAll(workSlideConfig.slideSelector));
+	const viewport = requireElement(section, workSlideConfig.viewportSelector, "slider viewport");
+	const wrapper = requireElement(section, workSlideConfig.wrapperSelector, "slider list");
+	const dotsNode = requireElement(section, workSlideConfig.dotsSelector, "slider dots");
+	const container = requireElement(section, workSlideConfig.containerSelector, "slider container");
+	const slides = [...wrapper.querySelectorAll(workSlideConfig.slideSelector)];
 
-	if (!slides.length) {
-		throw new Error('Missing work slides: expected ".work-slide_item".');
-	}
+	if (!slides.length) throw new Error(`no slides: expected "${workSlideConfig.slideSelector}"`);
 
-	if (section.dataset.workSlideReady === workSlideConfig.readyValue) {
-		return;
-	}
+	// One Swiper per viewport, whoever calls this.
+	viewport.swiper?.destroy(true, true);
 
-	if (viewport.swiper) {
-		viewport.swiper.destroy(true, true);
-	}
+	wrapper.style.gap = "0px"; // Swiper spaces the slides itself, from spaceBetween
 
-	section.dataset.workSlideReady = workSlideConfig.readyValue;
-
-	viewport.classList.remove("embla", "keen-slider");
-	wrapper.classList.remove("embla__container", "keen-slider", "swiper-wrapper");
-
-	slides.forEach(function (slide) {
-		slide.classList.remove("embla__slide", "keen-slider__slide", "swiper-slide");
-		slide.style.marginLeft = "";
-		slide.style.marginRight = "";
-		slide.style.width = "";
-		slide.style.minWidth = "";
-		slide.style.maxWidth = "";
-		slide.style.flexBasis = "";
-	});
-
-	wrapper.style.gap = "0px";
-	wrapper.style.columnGap = "0px";
-	wrapper.style.rowGap = "0px";
-
-	setEqualSlideWidth();
-
-	viewport.classList.add("swiper");
-	wrapper.classList.add("swiper-wrapper");
-
-	slides.forEach(function (slide) {
-		slide.classList.add("swiper-slide");
-
+	slides.forEach((slide) => {
 		// The site reveals work cards on scroll by watching .work_list-item, which
 		// a slide is not, so an unclaimed card would sit at opacity 0 forever.
 		// The reveal already ships an opt-out attribute; using it keeps the escape
 		// hatch in one place instead of a CSS override.
-		const card = slide.querySelector(workSlideConfig.cardSelector);
-
-		if (card) {
-			card.setAttribute(workSlideConfig.revealOptOutAttr, "");
-		}
+		slide
+			.querySelector(workSlideConfig.cardSelector)
+			?.setAttribute(workSlideConfig.revealOptOutAttr, "");
 	});
 
-	let swiper = null;
-	let updateFrame = null;
-	let dotNodes = [];
+	// Every slide is as wide as the widest card, so the rhythm holds whatever the
+	// cards contain. Two things have to be out of the way to read a card's
+	// natural width: the variable this sets, and Swiper's own slide sizing — so
+	// the classes come off for the measurement and go back on after it.
+	function equaliseSlideWidth() {
+		const hadSwiperClasses = wrapper.classList.contains("swiper-wrapper");
 
-	const initialMetrics = getSliderMetrics();
+		if (hadSwiperClasses) {
+			wrapper.classList.remove("swiper-wrapper");
+			slides.forEach((slide) => slide.classList.remove("swiper-slide"));
+		}
+
+		section.style.setProperty(workSlideConfig.widthVar, "auto");
+
+		const widest = Math.max(
+			...slides.map((slide) => {
+				const card = slide.querySelector(workSlideConfig.cardSelector) || slide;
+
+				return card.getBoundingClientRect().width;
+			}),
+		);
+
+		if (!widest) throw new Error("slide width measured as 0");
+
+		section.style.setProperty(workSlideConfig.widthVar, `${widest}px`);
+
+		if (hadSwiperClasses) {
+			wrapper.classList.add("swiper-wrapper");
+			slides.forEach((slide) => slide.classList.add("swiper-slide"));
+		}
+	}
+
+	// The first and last slides line up with the page's text column while the
+	// track itself runs full-bleed, so the offsets are the distance from the
+	// viewport edge to the container's content box.
+	function metrics() {
+		const viewportBox = viewport.getBoundingClientRect();
+		const containerBox = container.getBoundingClientRect();
+		const styles = window.getComputedStyle(container);
+		const left = containerBox.left + parseFloat(styles.paddingLeft || 0);
+		const right = containerBox.right - parseFloat(styles.paddingRight || 0);
+
+		return {
+			before: Math.max(0, left - viewportBox.left),
+			after: Math.max(0, viewportBox.right - right),
+			gap: toPixels(section, window.getComputedStyle(section).getPropertyValue(workSlideConfig.gapVar)),
+		};
+	}
+
+	equaliseSlideWidth();
+
+	viewport.classList.add("swiper");
+	wrapper.classList.add("swiper-wrapper");
+	slides.forEach((slide) => slide.classList.add("swiper-slide"));
+
+	const first = metrics();
+	let dots = null;
+	let updateFrame = 0;
 
 	// The Designer marks optional controls with data-work-slide="prev" or "next".
 	// Handing them to Swiper's own navigation module — rather than stepping the
 	// slider by hand — is what gives them .swiper-button-disabled at each end,
 	// the class the site's shared slider-arrows CSS already styles.
-	const prevArrow = section.querySelector(workSlideConfig.prevSelector);
-	const nextArrow = section.querySelector(workSlideConfig.nextSelector);
+	const previous = section.querySelector(workSlideConfig.previousSelector);
+	const next = section.querySelector(workSlideConfig.nextSelector);
 
-	swiper = new window.Swiper(viewport, {
+	// Swiper reports activeIndex conservatively at the ends, where several
+	// slides are on screen at once, so the dots follow the edge instead.
+	const selectedIndex = (swiper) => {
+		if (swiper.isEnd) return slides.length - 1;
+		if (swiper.isBeginning) return 0;
+
+		return swiper.activeIndex;
+	};
+
+	const swiper = new window.Swiper(viewport, {
 		navigation:
-			prevArrow || nextArrow
-				? {
-						prevEl: prevArrow,
-						nextEl: nextArrow,
-						disabledClass: workSlideConfig.disabledClass,
-					}
+			previous || next
+				? { prevEl: previous, nextEl: next, disabledClass: workSlideConfig.disabledArrowClass }
 				: false,
 		slidesPerView: "auto",
 		slidesPerGroup: 1,
-		spaceBetween: initialMetrics.gap,
-		slidesOffsetBefore: initialMetrics.before,
-		slidesOffsetAfter: initialMetrics.after,
-		speed: 450,
+		spaceBetween: first.gap,
+		slidesOffsetBefore: first.before,
+		slidesOffsetAfter: first.after,
+		speed: workSlideConfig.speed,
 		resistance: false,
 		grabCursor: false,
 		watchOverflow: true,
-		normalizeSlideIndex: true,
-		slideToClickedSlide: false,
-		longSwipes: true,
-		shortSwipes: true,
-		followFinger: true,
-		threshold: 6,
-		preventClicks: false,
-		preventClicksPropagation: false,
+		threshold: workSlideConfig.dragThreshold,
 		on: {
-			init: function (instance) {
-				buildDots(instance);
-				updateActiveDot(instance);
+			init(instance) {
+				dots = buildDots(dotsNode, {
+					count: slides.length,
+					label: "Go to selected work slide",
+					dotClass: workSlideConfig.dotClass,
+					selectedClass: workSlideConfig.selectedDotClass,
+					onSelect: (index) => instance.slideTo(index),
+				});
+
+				dots.select(selectedIndex(instance));
 			},
-			slideChange: function (instance) {
-				updateActiveDot(instance);
-			},
-			transitionEnd: function (instance) {
-				updateActiveDot(instance);
-			},
-			reachEnd: function (instance) {
-				updateActiveDot(instance);
-			},
-			fromEdge: function (instance) {
-				updateActiveDot(instance);
-			},
-			resize: scheduleUpdate,
+			slideChange: (instance) => dots?.select(selectedIndex(instance)),
+			transitionEnd: (instance) => dots?.select(selectedIndex(instance)),
+			fromEdge: (instance) => dots?.select(selectedIndex(instance)),
+			resize: () => scheduleUpdate(),
 		},
 	});
 
-	wireGrabCursor(viewport);
-	protectSlideLinks(viewport);
-	wireArrowKeys(section);
+	function scheduleUpdate() {
+		cancelAnimationFrame(updateFrame);
+
+		updateFrame = requestAnimationFrame(() => {
+			if (swiper.destroyed) return;
+
+			equaliseSlideWidth();
+
+			const next = metrics();
+
+			swiper.params.spaceBetween = next.gap;
+			swiper.params.slidesOffsetBefore = next.before;
+			swiper.params.slidesOffsetAfter = next.after;
+			swiper.update();
+			dots?.select(selectedIndex(swiper));
+		});
+	}
+
+	grabCursor(viewport, workSlideConfig.grabbingClass, signal);
+	keepLinksFromFiringOnDrag(viewport, signal);
+
+	// The controls are divs with role="button", so Enter and Space do not
+	// activate them by themselves. Swiper owns the click; this only forwards the
+	// keys to it, and a disabled arrow stays inert because Swiper ignores it.
+	section.querySelectorAll(workSlideConfig.arrowSelector).forEach((arrow) => {
+		arrow.addEventListener(
+			"keydown",
+			(event) => {
+				if (event.key !== "Enter" && event.key !== " ") return;
+
+				event.preventDefault();
+				arrow.click();
+			},
+			{ signal },
+		);
+	});
 
 	window.addEventListener("resize", scheduleUpdate, { signal });
 	window.addEventListener("load", scheduleUpdate, { once: true, signal });
@@ -210,238 +231,57 @@ function initSlider(section, signal) {
 	resizeObserver.observe(viewport);
 	resizeObserver.observe(container);
 
-	signal?.addEventListener("abort", function () {
+	signal?.addEventListener("abort", () => {
+		cancelAnimationFrame(updateFrame);
 		resizeObserver.disconnect();
-		swiper?.destroy(true, true);
+		swiper.destroy(true, true);
 	});
+}
 
-	function getSlideGap() {
-		const styles = window.getComputedStyle(section);
-		const cssGap = getCssLengthInPx(section, styles.getPropertyValue(workSlideConfig.gapVar));
+// Each slide is a link, and a drag that starts on one would otherwise follow it
+// on release. Swallow the click when the pointer travelled.
+function keepLinksFromFiringOnDrag(viewport, signal) {
+	let start = null;
+	let dragged = false;
 
-		if (cssGap !== null) {
-			return cssGap;
-		}
+	viewport.addEventListener(
+		"pointerdown",
+		(event) => {
+			start = event.target.closest("a") ? { x: event.clientX, y: event.clientY } : null;
+			dragged = false;
+		},
+		{ signal },
+	);
 
-		return 0;
-	}
+	viewport.addEventListener(
+		"pointermove",
+		(event) => {
+			if (!start) return;
 
-	function setEqualSlideWidth() {
-		section.style.setProperty("--work-slide-item-width", "auto");
+			const moved =
+				Math.abs(event.clientX - start.x) > workSlideConfig.dragThreshold ||
+				Math.abs(event.clientY - start.y) > workSlideConfig.dragThreshold;
 
-		const widths = slides.map(function (slide) {
-			const card = slide.querySelector(workSlideConfig.cardSelector) || slide;
+			if (moved) dragged = true;
+		},
+		{ signal },
+	);
 
-			return card.getBoundingClientRect().width;
-		});
+	viewport.addEventListener(
+		"click",
+		(event) => {
+			if (dragged && event.target.closest("a")) event.preventDefault();
+		},
+		{ capture: true, signal },
+	);
 
-		const maxWidth = Math.max.apply(null, widths);
+	const end = () => {
+		start = null;
+		setTimeout(() => {
+			dragged = false;
+		}, 0);
+	};
 
-		if (!maxWidth) {
-			throw new Error("Work slider width failed: slide width measured as 0.");
-		}
-
-		section.style.setProperty("--work-slide-item-width", maxWidth + "px");
-	}
-
-	function getContainerContentRect() {
-		const rect = container.getBoundingClientRect();
-		const styles = window.getComputedStyle(container);
-		const paddingLeft = getNumber(styles.paddingLeft);
-		const paddingRight = getNumber(styles.paddingRight);
-
-		return {
-			left: rect.left + paddingLeft,
-			right: rect.right - paddingRight,
-		};
-	}
-
-	function getSliderMetrics() {
-		const viewportRect = viewport.getBoundingClientRect();
-		const contentRect = getContainerContentRect();
-		const gap = getSlideGap();
-
-		const before = Math.max(0, contentRect.left - viewportRect.left);
-		const after = Math.max(0, viewportRect.right - contentRect.right);
-
-		return {
-			before: before,
-			after: after,
-			gap: gap,
-		};
-	}
-
-	function applySliderMetrics() {
-		setEqualSlideWidth();
-
-		const metrics = getSliderMetrics();
-
-		swiper.params.spaceBetween = metrics.gap;
-		swiper.params.slidesOffsetBefore = metrics.before;
-		swiper.params.slidesOffsetAfter = metrics.after;
-	}
-
-	function buildDots(instance) {
-		dotsNode.innerHTML = slides
-			.map(function (_, index) {
-				return (
-					'<button class="' +
-					workSlideConfig.dotClass +
-					'" type="button" data-index="' +
-					index +
-					'" aria-label="Go to selected work slide ' +
-					(index + 1) +
-					'"></button>'
-				);
-			})
-			.join("");
-
-		dotNodes = Array.from(dotsNode.querySelectorAll("." + workSlideConfig.dotClass));
-
-		dotNodes.forEach(function (dot) {
-			dot.addEventListener("click", function () {
-				instance.slideTo(Number(dot.dataset.index));
-			});
-		});
-	}
-
-	function getSelectedIndex(instance) {
-		if (instance.isEnd) {
-			return slides.length - 1;
-		}
-
-		if (instance.isBeginning) {
-			return 0;
-		}
-
-		return instance.activeIndex;
-	}
-
-	function updateActiveDot(instance) {
-		const selectedIndex = getSelectedIndex(instance);
-
-		dotNodes.forEach(function (dot, index) {
-			dot.classList.toggle(workSlideConfig.selectedDotClass, index === selectedIndex);
-		});
-	}
-
-	function scheduleUpdate() {
-		if (updateFrame) {
-			window.cancelAnimationFrame(updateFrame);
-		}
-
-		updateFrame = window.requestAnimationFrame(function () {
-			if (!swiper || swiper.destroyed) {
-				throw new Error("Work slider update failed: Swiper instance is not available.");
-			}
-
-			applySliderMetrics();
-			swiper.update();
-			updateActiveDot(swiper);
-
-			updateFrame = null;
-		});
-	}
-
-	// The controls are divs with role="button", so Enter and Space do not
-	// activate them by themselves. Swiper owns the click; this only forwards the
-	// keys to it, and a disabled arrow stays inert because Swiper ignores it.
-	function wireArrowKeys(scope) {
-		const arrows = Array.from(scope.querySelectorAll(workSlideConfig.arrowSelector));
-
-		arrows.forEach(function (arrow) {
-			arrow.addEventListener("keydown", function (event) {
-				if (event.key !== "Enter" && event.key !== " ") {
-					return;
-				}
-
-				event.preventDefault();
-				arrow.click();
-			});
-		});
-	}
-
-	function protectSlideLinks(el) {
-		let pointerStart = null;
-		let didDrag = false;
-
-		function onPointerDown(event) {
-			const link = event.target.closest("a");
-
-			if (!link || !el.contains(link)) {
-				pointerStart = null;
-				didDrag = false;
-				return;
-			}
-
-			pointerStart = {
-				x: event.clientX,
-				y: event.clientY,
-			};
-
-			didDrag = false;
-		}
-
-		function onPointerMove(event) {
-			if (!pointerStart) {
-				return;
-			}
-
-			const deltaX = Math.abs(event.clientX - pointerStart.x);
-			const deltaY = Math.abs(event.clientY - pointerStart.y);
-
-			if (deltaX > 6 || deltaY > 6) {
-				didDrag = true;
-			}
-		}
-
-		function onClick(event) {
-			const link = event.target.closest("a");
-
-			if (!link || !el.contains(link)) {
-				return;
-			}
-
-			if (didDrag) {
-				event.preventDefault();
-			}
-		}
-
-		function onPointerEnd() {
-			pointerStart = null;
-
-			window.setTimeout(function () {
-				didDrag = false;
-			}, 0);
-		}
-
-		el.addEventListener("pointerdown", onPointerDown);
-		el.addEventListener("pointermove", onPointerMove);
-		el.addEventListener("click", onClick, true);
-		el.addEventListener("pointerup", onPointerEnd);
-		el.addEventListener("pointercancel", onPointerEnd);
-	}
-
-	function wireGrabCursor(el) {
-		function setGrabbing(on) {
-			el.classList.toggle(workSlideConfig.grabbingClass, on);
-		}
-
-		function onPointerDown(event) {
-			if (event.pointerType === "mouse" && event.button !== 0) {
-				return;
-			}
-
-			setGrabbing(true);
-		}
-
-		function onPointerUp() {
-			setGrabbing(false);
-		}
-
-		el.addEventListener("pointerdown", onPointerDown, { passive: true });
-		el.addEventListener("pointerup", onPointerUp, { passive: true });
-		el.addEventListener("pointercancel", onPointerUp, { passive: true });
-		window.addEventListener("blur", onPointerUp, { signal });
-	}
+	viewport.addEventListener("pointerup", end, { signal });
+	viewport.addEventListener("pointercancel", end, { signal });
 }

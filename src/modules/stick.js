@@ -1,98 +1,91 @@
+// The sticky list on /approach marks whichever item sits nearest the middle of
+// the viewport. Desktop only: below the breakpoint the list reads straight
+// through and nothing is highlighted.
+
+const stickConfig = {
+	layoutSelector: ".stick_layout",
+	itemSelector: ".stick_list-item",
+	headingSelector: "h2, h3",
+	activeClass: "is-active",
+	fromWidth: 768,
+};
+
 export function initStick(root = document, { signal } = {}) {
-	const layout = root.querySelector(".stick_layout");
-	if (!layout || layout.dataset.stickReady === "true") return;
-	const mq = window.matchMedia("(min-width: 768px)");
+	const layout = root.querySelector(stickConfig.layoutSelector);
 
-	const items = Array.from(layout.querySelectorAll(".stick_list-item"));
+	if (!layout) return;
+
+	const items = [...layout.querySelectorAll(stickConfig.itemSelector)];
+
 	if (!items.length) return;
-	layout.dataset.stickReady = "true";
 
-	const targets = items.map(function (item) {
-		return item.querySelector("h2, h3") || item;
-	});
+	// The heading is what the reader's eye tracks, so it is what is measured.
+	const headings = items.map((item) => item.querySelector(stickConfig.headingSelector) || item);
+	const isDesktop = window.matchMedia(`(min-width: ${stickConfig.fromWidth}px)`);
 
-	let idx = -1;
-	let io = null;
+	let activeIndex = -1;
+	let observer = null;
 
-	function setActive(next) {
-		if (next === idx) return;
-		if (idx >= 0 && items[idx]) items[idx].classList.remove("is-active");
-		idx = next;
-		if (idx >= 0 && items[idx]) items[idx].classList.add("is-active");
+	function setActive(index) {
+		if (index === activeIndex) return;
+
+		items[activeIndex]?.classList.remove(stickConfig.activeClass);
+		items[index]?.classList.add(stickConfig.activeClass);
+		activeIndex = index;
 	}
 
-	function clearActive() {
-		items.forEach(function (item) {
-			item.classList.remove("is-active");
-		});
-		idx = -1;
-	}
+	function activateNearestToMiddle() {
+		const middle = window.innerHeight / 2;
 
-	function pickClosestTo50vh() {
-		if (!mq.matches) return;
+		let nearest = 0;
+		let shortest = Infinity;
 
-		const triggerY = window.innerHeight * 0.5;
-		let best = 0;
-		let bestDist = Infinity;
+		headings.forEach((heading, index) => {
+			const distance = Math.abs(heading.getBoundingClientRect().top - middle);
 
-		for (let i = 0; i < targets.length; i++) {
-			const rect = targets[i].getBoundingClientRect();
-			const dist = Math.abs(rect.top - triggerY);
-
-			if (dist < bestDist) {
-				bestDist = dist;
-				best = i;
+			if (distance < shortest) {
+				shortest = distance;
+				nearest = index;
 			}
-		}
+		});
 
-		setActive(best);
+		setActive(nearest);
 	}
 
 	function enable() {
-		if (io) return;
+		if (observer) return;
 
-		io = new IntersectionObserver(
-			function () {
-				pickClosestTo50vh();
-			},
-			{
-				root: null,
-				threshold: 0,
-				rootMargin: "-50% 0px -50% 0px",
-			},
-		);
-
-		targets.forEach(function (target) {
-			io.observe(target);
+		// The observer only wakes the module up as headings cross the middle
+		// band; the measurement itself decides which one is nearest.
+		observer = new IntersectionObserver(activateNearestToMiddle, {
+			threshold: 0,
+			rootMargin: "-50% 0px -50% 0px",
 		});
 
-		window.addEventListener("resize", pickClosestTo50vh, { signal });
-		window.addEventListener("scroll", pickClosestTo50vh, { passive: true, signal });
-		pickClosestTo50vh();
+		headings.forEach((heading) => observer.observe(heading));
+		window.addEventListener("resize", activateNearestToMiddle, { signal });
+		window.addEventListener("scroll", activateNearestToMiddle, { passive: true, signal });
+
+		activateNearestToMiddle();
 	}
 
 	function disable() {
-		if (io) {
-			io.disconnect();
-			io = null;
-		}
+		observer?.disconnect();
+		observer = null;
 
-		window.removeEventListener("resize", pickClosestTo50vh);
-		window.removeEventListener("scroll", pickClosestTo50vh);
-		clearActive();
+		window.removeEventListener("resize", activateNearestToMiddle);
+		window.removeEventListener("scroll", activateNearestToMiddle);
+
+		items.forEach((item) => item.classList.remove(stickConfig.activeClass));
+		activeIndex = -1;
 	}
 
-	function handleBreakpointChange() {
-		if (mq.matches) {
-			enable();
-		} else {
-			disable();
-		}
-	}
+	const sync = () => (isDesktop.matches ? enable() : disable());
 
 	// A MediaQueryList is global, so without the signal every visit to this page
 	// left another handler behind holding a detached section.
-	mq.addEventListener("change", handleBreakpointChange, { signal });
+	isDesktop.addEventListener("change", sync, { signal });
+	signal?.addEventListener("abort", disable);
 
-	handleBreakpointChange();
+	sync();
 }

@@ -1,24 +1,17 @@
-export function initWorkArchive(queryRoot = document, { signal } = {}) {
-	const root = queryRoot.querySelector(".section_work-archive");
+import { requireElement } from "../dom.js";
 
-	if (!root || root.dataset.workArchiveReady === "true") return;
+// Finsweet owns the filtering. This adds the two things it does not do: a
+// second click on the active sector clears it, and the sector tag printed on
+// each card is itself a filter control.
 
-	const filters = root.querySelector('[fs-list-element="filters"]');
-	const list = root.querySelector('[fs-list-element="list"]');
-	const clear = filters?.querySelector('[fs-list-element="clear"]');
+export function initWorkArchive(root = document, { signal } = {}) {
+	const section = root.querySelector(".section_work-archive");
 
-	if (!filters) {
-		throw new Error('Finsweet filters element "[fs-list-element=filters]" not found.');
-	}
+	if (!section) return;
 
-	if (!list) {
-		throw new Error('Finsweet list element "[fs-list-element=list]" not found.');
-	}
-
-	if (!clear) {
-		throw new Error('Finsweet clear element "[fs-list-element=clear]" not found.');
-	}
-	root.dataset.workArchiveReady = "true";
+	const filters = requireElement(section, '[fs-list-element="filters"]', "Finsweet filters");
+	const list = requireElement(section, '[fs-list-element="list"]', "Finsweet list");
+	const clear = requireElement(filters, '[fs-list-element="clear"]', "Finsweet clear");
 
 	const fieldSelector = 'input[fs-list-field="sector"]';
 	const itemTagSelector = '.work-archive_card [fs-list-field="sector"].tag';
@@ -66,15 +59,15 @@ export function initWorkArchive(queryRoot = document, { signal } = {}) {
 	const lockSectionHeight = () => {
 		clearTimeout(releaseTimer);
 
-		const height = root.getBoundingClientRect().height;
-		root.style.minHeight = `${height}px`;
+		const height = section.getBoundingClientRect().height;
+		section.style.minHeight = `${height}px`;
 	};
 
 	const releaseSectionHeight = () => {
 		clearTimeout(releaseTimer);
 
 		releaseTimer = window.setTimeout(() => {
-			root.style.minHeight = "";
+			section.style.minHeight = "";
 		}, 900);
 	};
 

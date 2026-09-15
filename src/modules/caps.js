@@ -1,124 +1,99 @@
 import EmblaCarousel from "embla-carousel";
 
-const autoplayDelay = 4000;
+import { buildDots } from "./slider-controls.js";
 
-export async function initCaps(root = document, { signal } = {}) {
-	const sliders = [...root.querySelectorAll(".embla")].filter((slider) => {
-		return slider.querySelector(".embla__container .embla__slide, .embla__slide") &&
-			slider.querySelector(".carousel-dots");
+const capsConfig = {
+	sliderSelector: ".embla",
+	containerSelector: ".embla__container",
+	slideSelector: ".embla__slide",
+	dotsSelector: ".carousel-dots",
+	dotClass: "carousel-dot",
+	selectedDotClass: "is-selected",
+	autoplayDelay: 4000,
+	visibleThreshold: 0.3,
+};
+
+export function initCaps(root = document, { signal } = {}) {
+	root.querySelectorAll(capsConfig.sliderSelector).forEach((slider) => {
+		initSlider(slider, signal);
 	});
-
-	if (!sliders.length) return;
-
-
-	sliders.forEach((slider) => initSlider(slider, signal));
 }
 
 function initSlider(slider, signal) {
-	if (slider.dataset.capsReady === "true") return;
-
-	const container = slider.querySelector(".embla__container");
-	const slides = slider.querySelectorAll(".embla__slide");
-	const dotsNode = slider.querySelector(".carousel-dots");
+	const container = slider.querySelector(capsConfig.containerSelector);
+	const slides = slider.querySelectorAll(capsConfig.slideSelector);
+	const dotsNode = slider.querySelector(capsConfig.dotsSelector);
 
 	// Not a carousel instance: the "Capabilities slider" Component shows a single
 	// image when its slot is empty, so most .embla roots have no slides. Skip
-	// them; throwing here aborts the forEach and kills every later slider.
-	if (!container || !slides.length || !dotsNode) {
-		return;
-	}
+	// them; throwing here would abort the loop and kill every later slider.
+	if (!container || !slides.length || !dotsNode) return;
 
-	slider.dataset.capsReady = "true";
+	const embla = EmblaCarousel(slider, { loop: true, align: "start" });
 
-	const emblaApi = EmblaCarousel(slider, {
-		loop: true,
-		align: "start",
-	});
-
-	let dotNodes = [];
+	let dots = null;
 	let autoplayTimer = null;
 	let isVisible = false;
 
-	function buildDots() {
-		dotsNode.innerHTML = emblaApi
-			.scrollSnapList()
-			.map((_, index) => {
-				return `<button class="carousel-dot" type="button" data-index="${index}" aria-label="Go to slide ${index + 1}"></button>`;
-			})
-			.join("");
-
-		dotNodes = Array.from(dotsNode.querySelectorAll(".carousel-dot"));
-
-		dotNodes.forEach((dot) => {
-			dot.addEventListener("click", () => {
-				emblaApi.scrollTo(Number(dot.dataset.index));
-				restartAutoplay();
-			});
-		});
-	}
-
-	function updateActiveDot() {
-		const selectedIndex = emblaApi.selectedScrollSnap();
-
-		dotNodes.forEach((dot, index) => {
-			dot.classList.toggle("is-selected", index === selectedIndex);
-		});
-	}
-
-	function startAutoplay() {
+	function start() {
 		if (autoplayTimer || !isVisible) return;
 
-		autoplayTimer = window.setInterval(() => {
-			emblaApi.scrollNext();
-		}, autoplayDelay);
+		autoplayTimer = window.setInterval(() => embla.scrollNext(), capsConfig.autoplayDelay);
 	}
 
-	function stopAutoplay() {
-		if (!autoplayTimer) return;
-
+	function stop() {
 		window.clearInterval(autoplayTimer);
 		autoplayTimer = null;
 	}
 
-	function restartAutoplay() {
-		stopAutoplay();
-		startAutoplay();
+	function rebuildDots() {
+		dots = buildDots(dotsNode, {
+			count: embla.scrollSnapList().length,
+			label: "Go to slide",
+			dotClass: capsConfig.dotClass,
+			selectedClass: capsConfig.selectedDotClass,
+			onSelect(index) {
+				embla.scrollTo(index);
+				stop();
+				start();
+			},
+		});
+
+		selectDot();
+	}
+
+	function selectDot() {
+		dots?.select(embla.selectedScrollSnap());
 	}
 
 	const observer = new IntersectionObserver(
 		([entry]) => {
 			isVisible = entry.isIntersecting;
 
-			if (isVisible) {
-				startAutoplay();
-			} else {
-				stopAutoplay();
-			}
+			if (isVisible) start();
+			else stop();
 		},
-		{ threshold: 0.3 },
+		{ threshold: capsConfig.visibleThreshold },
 	);
 
-	slider.addEventListener("mouseenter", stopAutoplay, { signal });
-	slider.addEventListener("mouseleave", startAutoplay, { signal });
+	slider.addEventListener("mouseenter", stop, { signal });
+	slider.addEventListener("mouseleave", start, { signal });
 
-	emblaApi
-		.on("init", buildDots)
-		.on("reInit", buildDots)
-		.on("init", updateActiveDot)
-		.on("reInit", updateActiveDot)
-		.on("select", updateActiveDot)
-		.on("pointerDown", stopAutoplay)
-		.on("pointerUp", startAutoplay);
+	embla
+		.on("init", rebuildDots)
+		.on("reInit", rebuildDots)
+		.on("select", selectDot)
+		.on("pointerDown", stop)
+		.on("pointerUp", start);
 
-	buildDots();
-	updateActiveDot();
+	rebuildDots();
 	observer.observe(slider);
 
 	// The router swaps the DOM but leaves this observer and the autoplay timer
 	// watching a detached slider; each visit used to add another.
 	signal?.addEventListener("abort", () => {
 		observer.disconnect();
-		stopAutoplay();
-		emblaApi.destroy();
+		stop();
+		embla.destroy();
 	});
 }

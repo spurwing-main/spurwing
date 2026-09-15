@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bootModules, resetModules, restartModules } from "../boot.js";
-import { initDataLoader } from "./data-loader.js";
+import { initCmsCounts } from "./cms-counts.js";
 
-describe("initDataLoader", () => {
+describe("initCmsCounts", () => {
 	beforeEach(() => {
 		resetModules();
 	});
 
 	afterEach(() => {
 		document.body.innerHTML = "";
-		delete document.documentElement.dataset.cmsCountLoaderReady;
+		document.documentElement.removeAttribute("data-cms-count-ok");
 		vi.restoreAllMocks();
 	});
 
@@ -20,7 +20,7 @@ describe("initDataLoader", () => {
 		const next = vi.fn();
 
 		void bootModules([
-			{ name: "data-loader", init: initDataLoader },
+			{ name: "cms-counts", init: initCmsCounts },
 			{ name: "next", init: next },
 		]);
 		await Promise.resolve();
@@ -31,7 +31,7 @@ describe("initDataLoader", () => {
 	it("requests the count document once per page, not once per boot call", async () => {
 		document.body.innerHTML = '<span data-cms-count-target="work"></span>';
 		const fetch = vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
-		const modules = [{ name: "data-loader", init: initDataLoader }];
+		const modules = [{ name: "cms-counts", init: initCmsCounts }];
 
 		await bootModules(modules);
 		await bootModules(modules);
@@ -43,7 +43,7 @@ describe("initDataLoader", () => {
 		document.body.innerHTML = '<span data-cms-count-target="work"></span>';
 		const fetch = vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
 
-		await bootModules([{ name: "data-loader", init: initDataLoader }]);
+		await bootModules([{ name: "cms-counts", init: initCmsCounts }]);
 		restartModules();
 
 		expect(fetch).toHaveBeenCalledTimes(2);

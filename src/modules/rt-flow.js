@@ -1,17 +1,22 @@
+// An editor writes a list as one Rich Text block; this reshapes it into the
+// Designer's own item template, so the styling lives in Webflow rather than here.
+
 export function initRtFlow(root = document) {
 	root.querySelectorAll('[data-rt-el="list"]').forEach((container) => {
-		if (container.dataset.rtflowDone) return;
+		// Building consumes the source and the template, so a second run would
+		// read its own output.
+		if (container.dataset.rtFlowBuilt) return;
 
 		const source = container.querySelector('[data-rt-el="source"]');
 		const template = container.querySelector('[data-rt-el="item"]');
-		const maxItems = getRtflowMaxItems(container);
+		const maxItems = readMaxItems(container);
 
 		if (!source) {
-			throw new Error("Rtflow source not found.");
+			throw new Error('missing rich text source: expected [data-rt-el="source"]');
 		}
 
 		if (!template) {
-			throw new Error("Rtflow item template not found.");
+			throw new Error('missing item template: expected [data-rt-el="item"]');
 		}
 
 		const targets = Array.from(template.querySelectorAll("[data-rt-el]")).filter((target) => {
@@ -19,11 +24,11 @@ export function initRtFlow(root = document) {
 		});
 
 		if (!targets.length) {
-			throw new Error("Rtflow item template has no data-rt-el targets.");
+			throw new Error("item template has no [data-rt-el] targets");
 		}
 
 		const sourceItems = Array.from(source.childNodes)
-			.map((node) => getRtflowNodeData(node))
+			.map((node) => readNode(node))
 			.filter(Boolean);
 
 		const items =
@@ -31,7 +36,7 @@ export function initRtFlow(root = document) {
 				? sourceItems.map((item) => ({
 						[targets[0].getAttribute("data-rt-el")]: item.text,
 					}))
-				: getRtflowPairs(sourceItems);
+				: pairUp(sourceItems);
 
 		const limitedItems = maxItems ? items.slice(0, maxItems) : items;
 
@@ -60,11 +65,11 @@ export function initRtFlow(root = document) {
 		template.remove();
 		source.style.display = "none";
 		container.appendChild(fragment);
-		container.dataset.rtflowDone = "true";
+		container.dataset.rtFlowBuilt = "true";
 	});
 }
 
-function getRtflowMaxItems(container) {
+function readMaxItems(container) {
 	const value = container.getAttribute("data-rt-max");
 
 	if (!value) {
@@ -74,13 +79,13 @@ function getRtflowMaxItems(container) {
 	const maxItems = Number(value);
 
 	if (!Number.isInteger(maxItems) || maxItems < 1) {
-		throw new Error("Rtflow data-rt-max must be a positive whole number.");
+		throw new Error("data-rt-max must be a positive whole number");
 	}
 
 	return maxItems;
 }
 
-function getRtflowNodeData(node) {
+function readNode(node) {
 	if (node.nodeType === Node.TEXT_NODE) {
 		const text = node.textContent.trim();
 
@@ -110,7 +115,7 @@ function getRtflowNodeData(node) {
 	return { key: node.tagName.toLowerCase(), text };
 }
 
-function getRtflowPairs(sourceItems) {
+function pairUp(sourceItems) {
 	const items = [];
 	let currentItem = {};
 

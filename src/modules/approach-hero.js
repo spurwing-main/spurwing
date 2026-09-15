@@ -1,21 +1,14 @@
 import { animate, inView } from "motion";
 
-import { initializeOnce } from "./init-once.js";
-
-const initKey = Symbol("approachHeroInit");
+import { requireElement } from "../dom.js";
 
 export function initApproachHero(root = document, { signal } = {}) {
 	const section = root.querySelector(".section_caps");
-	if (!section || section.dataset.approachHeroReady === "true") return;
 
-	return initializeOnce(section, initKey, () => setupApproachHero(root, section, signal));
-}
+	if (!section) return;
 
-async function setupApproachHero(root, section, signal) {
-	const blur = root.querySelector(".progressive-blur[data-fade-out]");
-	if (!blur) throw new Error('blur not found: expected ".progressive-blur[data-fade-out]"');
+	const blur = requireElement(root, ".progressive-blur[data-fade-out]", "progressive blur");
 
-	section.dataset.approachHeroReady = "true";
 	blur.style.setProperty("--fade", "1");
 
 	let anim = null;

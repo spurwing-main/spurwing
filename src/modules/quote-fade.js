@@ -1,7 +1,7 @@
 const quoteFadeConfig = {
 	rootSelector: ".dc-quote",
 	wrapperSelector: ".w-dyn-items",
-	readyValue: "fade-v1",
+	builtAttr: "data-quote-fade-built",
 	progressVar: "--quote-progress",
 	delay: 5000,
 	speed: 600,
@@ -26,7 +26,9 @@ function prefersReducedMotion() {
 }
 
 function initQuote(quote) {
-	if (quote.dataset.quoteFadeReady === quoteFadeConfig.readyValue) return;
+	// Swiper takes the Collection List over in place, so a second run would put
+	// a second slider on the same element.
+	if (quote.hasAttribute(quoteFadeConfig.builtAttr)) return;
 
 	const wrapper = quote.querySelector(quoteFadeConfig.wrapperSelector);
 
@@ -39,8 +41,7 @@ function initQuote(quote) {
 	// keeps its own markup and styling intact.
 	if (slides.length < 2) return;
 
-	quote.dataset.quoteFadeReady = quoteFadeConfig.readyValue;
-
+	quote.setAttribute(quoteFadeConfig.builtAttr, "");
 	quote.classList.add("swiper");
 	wrapper.classList.add("swiper-wrapper");
 

@@ -13,15 +13,15 @@ const createEmbla = vi.hoisted(() =>
 
 vi.mock("embla-carousel", () => ({ default: createEmbla }));
 
-import { initWorkSlider } from "./work-slider.js";
+import { initImpactSlider } from "./impact-slider.js";
 
-describe("initWorkSlider", () => {
+describe("initImpactSlider", () => {
 	afterEach(() => {
 		document.body.innerHTML = "";
 		createEmbla.mockClear();
 	});
 
-	it("shares an in-flight initialization instead of wiring a slider twice", async () => {
+	it("builds its slides once, because building consumes the markup", async () => {
 		document.body.innerHTML = `
 			<section class="section_impact">
 				<div data-card="source"><h3>Title</h3><p>Body</p></div>
@@ -41,10 +41,10 @@ describe("initWorkSlider", () => {
 			</section>
 		`;
 
-		await expect(
-			Promise.all([initWorkSlider(document), initWorkSlider(document)]),
-		).resolves.toBeDefined();
+		initImpactSlider(document);
+		initImpactSlider(document);
 
 		expect(createEmbla).toHaveBeenCalledOnce();
+		expect(document.querySelectorAll(".embla__slide").length).toBe(1);
 	});
 });

@@ -1,17 +1,9 @@
 import { animate, stagger } from "motion";
 
-import { initializeOnce } from "./init-once.js";
-
-const initKey = Symbol("bookingDetailsInit");
-
 export function initBookingDetails(root = document) {
 	const section = root.querySelector(".section_booking-details");
-	if (!section || section.dataset.bookingDetailsReady === "true") return;
 
-	return initializeOnce(section, initKey, () => setupBookingDetails(section));
-}
-
-async function setupBookingDetails(section) {
+	if (!section) return;
 
 	const rows = [...section.querySelectorAll(".booking-details_row")];
 
@@ -24,7 +16,6 @@ async function setupBookingDetails(section) {
 
 	if (!uid) {
 		section.hidden = true;
-		section.dataset.bookingDetailsReady = "true";
 		return;
 	}
 
@@ -40,7 +31,6 @@ async function setupBookingDetails(section) {
 
 	if (!hasVisibleValues) {
 		section.hidden = true;
-		section.dataset.bookingDetailsReady = "true";
 		return;
 	}
 
@@ -54,8 +44,7 @@ async function setupBookingDetails(section) {
 	section.hidden = false;
 	section.classList.add("is-ready");
 
-	animateBookingDetails(section, animate, stagger);
-	section.dataset.bookingDetailsReady = "true";
+	revealRows(section);
 }
 
 function setBookingValue(section, label, value) {
@@ -121,7 +110,7 @@ function updateLastVisibleRow(section) {
 	visibleRows.at(-1)?.classList.add("is-last");
 }
 
-function animateBookingDetails(section, animate, stagger) {
+function revealRows(section) {
 	const items = section.querySelectorAll(
 		".booking-details_head, .booking-details_row:not([hidden])",
 	);

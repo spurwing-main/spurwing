@@ -1,111 +1,83 @@
 import EmblaCarousel from "embla-carousel";
-import { initializeOnce } from "./init-once.js";
 
-const sliderBreakpoint = 991;
-const initKey = Symbol("rightwayInit");
+import { requireElement } from "../dom.js";
+import { buildDots } from "./slider-controls.js";
+
+const rightwayConfig = {
+	sliderSelector: ".rightway_slider",
+	layoutSelector: ".rightway_layout",
+	containerSelector: ".rightway_grid",
+	cardSelector: ".rightway_card",
+	dotsSelector: ".rightway_dots.carousel-dots",
+	dotClass: "carousel-dot",
+	selectedDotClass: "is-selected",
+	// The grid is the design below this width; above it, the slider is off.
+	sliderUpTo: 991,
+};
 
 export function initRightway(root = document, { signal } = {}) {
-	const slider = root.querySelector(".rightway_slider");
+	const slider = root.querySelector(rightwayConfig.sliderSelector);
 
-	if (!slider || slider.dataset.rightwayReady === "true") return;
+	if (!slider) return;
 
-	return initializeOnce(slider, initKey, async () => {
+	const layout = slider.closest(rightwayConfig.layoutSelector);
 
-		createResponsiveSlider(slider, signal);
-		slider.dataset.rightwayReady = "true";
-	});
-}
-
-function createResponsiveSlider(slider, signal) {
-	const root = slider.closest(".rightway_layout");
-	const container = slider.querySelector(".rightway_grid");
-	const slides = slider.querySelectorAll(".rightway_card");
-	const dotsNode = root?.querySelector(".rightway_dots.carousel-dots");
-
-	if (!root) {
-		throw new Error('Rightway slider is missing parent ".rightway_layout".');
+	if (!layout) {
+		throw new Error(`missing rightway layout: expected "${rightwayConfig.layoutSelector}"`);
 	}
 
-	if (!container) {
-		throw new Error('Rightway slider is missing ".rightway_grid".');
-	}
+	requireElement(slider, rightwayConfig.containerSelector, "rightway grid");
+	requireElement(slider, rightwayConfig.cardSelector, "rightway card");
 
-	if (!slides.length) {
-		throw new Error('Rightway slider is missing ".rightway_card" items.');
-	}
+	const dotsNode = requireElement(layout, rightwayConfig.dotsSelector, "rightway dots");
+	const isNarrow = window.matchMedia(`(max-width: ${rightwayConfig.sliderUpTo}px)`);
 
-	if (!dotsNode) {
-		throw new Error('Rightway slider is missing ".rightway_dots.carousel-dots".');
-	}
+	let embla = null;
+	let dots = null;
 
-	const breakpoint = window.matchMedia(`(max-width: ${sliderBreakpoint}px)`);
-	let emblaApi = null;
-	let dotNodes = [];
-
-	function buildDots() {
-		dotsNode.innerHTML = emblaApi
-			.scrollSnapList()
-			.map((_, index) => {
-				return `<button class="carousel-dot" type="button" data-index="${index}" aria-label="Go to slide ${index + 1}"></button>`;
-			})
-			.join("");
-
-		dotNodes = Array.from(dotsNode.querySelectorAll(".carousel-dot"));
-
-		dotNodes.forEach((dot) => {
-			dot.addEventListener("click", () => {
-				emblaApi.scrollTo(Number(dot.dataset.index));
-			});
-		});
-	}
-
-	function updateActiveDot() {
-		const selectedIndex = emblaApi.selectedScrollSnap();
-
-		dotNodes.forEach((dot, index) => {
-			dot.classList.toggle("is-selected", index === selectedIndex);
-		});
-	}
-
-	function enableSlider() {
-		if (emblaApi) return;
-
-		emblaApi = EmblaCarousel(slider, {
-			loop: false,
-			align: "start",
-			containScroll: "trimSnaps",
+	function rebuildDots() {
+		dots = buildDots(dotsNode, {
+			count: embla.scrollSnapList().length,
+			label: "Go to slide",
+			dotClass: rightwayConfig.dotClass,
+			selectedClass: rightwayConfig.selectedDotClass,
+			onSelect: (index) => embla.scrollTo(index),
 		});
 
-		emblaApi
-			.on("init", buildDots)
-			.on("reInit", buildDots)
-			.on("init", updateActiveDot)
-			.on("reInit", updateActiveDot)
-			.on("select", updateActiveDot);
-
-		buildDots();
-		updateActiveDot();
+		selectDot();
 	}
 
-	function disableSlider() {
-		if (!emblaApi) return;
+	function selectDot() {
+		dots?.select(embla.selectedScrollSnap());
+	}
 
-		emblaApi.destroy();
-		emblaApi = null;
-		dotNodes = [];
+	function enable() {
+		if (embla) return;
+
+		embla = EmblaCarousel(slider, { loop: false, align: "start", containScroll: "trimSnaps" });
+		embla.on("init", rebuildDots).on("reInit", rebuildDots).on("select", selectDot);
+
+		rebuildDots();
+	}
+
+	function disable() {
+		if (!embla) return;
+
+		embla.destroy();
+		embla = null;
+		dots = null;
 		dotsNode.innerHTML = "";
 	}
 
-	function syncSlider() {
-		if (breakpoint.matches) {
-			enableSlider();
-		} else {
-			disableSlider();
-		}
+	function sync() {
+		if (isNarrow.matches) enable();
+		else disable();
 	}
 
 	// Without the signal this outlives the page it was built for: the router
 	// swaps the DOM but a MediaQueryList is global, so every visit added one.
-	breakpoint.addEventListener("change", syncSlider, { signal });
-	syncSlider();
+	isNarrow.addEventListener("change", sync, { signal });
+	signal?.addEventListener("abort", disable);
+
+	sync();
 }

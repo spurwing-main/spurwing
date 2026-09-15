@@ -1,8 +1,8 @@
 import { animate, motionValue, springValue, styleEffect } from "motion";
 
-const config = {
-	rootSel: ".cursor-root",
-	itemSel: ".cursor-item",
+const cursorConfig = {
+	rootSelector: ".cursor-root",
+	itemSelector: ".cursor-item",
 	targetAttr: "data-cursor-target",
 	anchorAttr: "data-cursor-anchor",
 	textAttr: "data-cursor-text",
@@ -28,8 +28,8 @@ const anchorOffsets = {
 let pointer;
 
 function resolveAnchor(el) {
-	const key = (el.getAttribute(config.anchorAttr) || config.defaultAnchor).toLowerCase();
-	return anchorOffsets[key] || anchorOffsets[config.defaultAnchor];
+	const key = (el.getAttribute(cursorConfig.anchorAttr) || cursorConfig.defaultAnchor).toLowerCase();
+	return anchorOffsets[key] || anchorOffsets[cursorConfig.defaultAnchor];
 }
 
 function clamp(value, min, max) {
@@ -39,8 +39,8 @@ function clamp(value, min, max) {
 function clampedPosition(ax, ay, el) {
 	const w = el.offsetWidth;
 	const h = el.offsetHeight;
-	const p = config.padding;
-	const m = config.margin;
+	const p = cursorConfig.padding;
+	const m = cursorConfig.margin;
 
 	return {
 		x: clamp(pointer.x.get() + ax * (w / 2 + m) - w / 2, p, innerWidth - p - w),
@@ -48,10 +48,10 @@ function clampedPosition(ax, ay, el) {
 	};
 }
 
-function createItem(el, queryRoot) {
-	const sel = el.getAttribute(config.targetAttr);
-	if (!sel) throw new Error(`${config.itemSel} missing ${config.targetAttr}`);
-	queryRoot.querySelector(sel); // Validate the selector without requiring an initial match.
+function createItem(el, root) {
+	const sel = el.getAttribute(cursorConfig.targetAttr);
+	if (!sel) throw new Error(`${cursorConfig.itemSelector} missing ${cursorConfig.targetAttr}`);
+	root.querySelector(sel); // Validate the selector without requiring an initial match.
 
 	const visual = el.querySelector(".cursor-item-visual");
 	if (!visual) throw new Error(".cursor-item needs a .cursor-item-visual child");
@@ -67,8 +67,8 @@ function createItem(el, queryRoot) {
 
 	const srcX = motionValue(0);
 	const srcY = motionValue(0);
-	const x = springValue(srcX, config.spring);
-	const y = springValue(srcY, config.spring);
+	const x = springValue(srcX, cursorConfig.spring);
+	const y = springValue(srcY, cursorConfig.spring);
 	const stopStyle = styleEffect(el, { x, y });
 
 	el.style.visibility = "hidden";
@@ -126,7 +126,7 @@ function createItem(el, queryRoot) {
 	function getTargetText(target) {
 		if (!target) return defaultText;
 
-		const attrText = target.getAttribute(config.textAttr);
+		const attrText = target.getAttribute(cursorConfig.textAttr);
 		if (typeof attrText !== "string") return defaultText;
 
 		const cleanText = attrText.trim();
@@ -158,7 +158,7 @@ function createItem(el, queryRoot) {
 				filter: immediate ? "blur(0px)" : ["blur(0px)", "blur(8px)", "blur(0px)"],
 				scale: immediate ? 1 : [1, 1.035, 1],
 			},
-			immediate ? { duration: 0 } : config.shellSpring,
+			immediate ? { duration: 0 } : cursorConfig.shellSpring,
 		);
 	}
 
@@ -184,7 +184,7 @@ function createItem(el, queryRoot) {
 				y: [0, 4],
 				filter: ["blur(0px)", "blur(10px)"],
 			},
-			config.fadeOut,
+			cursorConfig.fadeOut,
 		).finished.then(() => {
 			if (swapId !== textSwapId) return;
 			currentText = nextText;
@@ -197,7 +197,7 @@ function createItem(el, queryRoot) {
 					y: [-4, 0],
 					filter: ["blur(10px)", "blur(0px)"],
 				},
-				config.fadeIn,
+				cursorConfig.fadeIn,
 			);
 		});
 	}
@@ -223,7 +223,7 @@ function createItem(el, queryRoot) {
 				scale: [0.84, 1.04, 1],
 				filter: ["blur(10px)", "blur(0px)"],
 			},
-			config.fxSpring,
+			cursorConfig.fxSpring,
 		);
 
 		animate(
@@ -270,7 +270,7 @@ function createItem(el, queryRoot) {
 }
 
 export async function initCursor(root = document, { signal } = {}) {
-	const cursorRoot = root.querySelector(config.rootSel);
+	const cursorRoot = root.querySelector(cursorConfig.rootSelector);
 	if (!cursorRoot) return;
 	cursorRoot.cursor?.destroy();
 	delete cursorRoot.cursor;
@@ -280,7 +280,7 @@ export async function initCursor(root = document, { signal } = {}) {
 		window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 	if (!canUseCursor) return;
 
-	const itemElements = [...cursorRoot.querySelectorAll(config.itemSel)];
+	const itemElements = [...cursorRoot.querySelectorAll(cursorConfig.itemSelector)];
 	if (!itemElements.length) return;
 
 	pointer = {
@@ -382,7 +382,7 @@ export async function initCursor(root = document, { signal } = {}) {
 					currentItem.hide();
 					currentItem = null;
 					currentTarget = null;
-				}, config.handoffDelay);
+				}, cursorConfig.handoffDelay);
 			}
 		},
 		{ capture: true },

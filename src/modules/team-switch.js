@@ -1,49 +1,53 @@
-const config = {
-	rootSel: ".team_switch",
-	sectionSel: ".section_team",
-	pillSel: ".team_switch-pill",
+const teamSwitchConfig = {
+	switchSelector: ".team_switch",
+	sectionSelector: ".section_team",
+	pillSelector: ".team_switch-pill",
 	activeAttr: "data-active",
 };
 
-export function initTeamSwitch(queryRoot = document) {
-	const root = queryRoot.querySelector(config.rootSel);
-	if (!root || root.dataset.teamSwitchReady === "true") return;
+export function initTeamSwitch(root = document, { signal } = {}) {
+	const control = root.querySelector(teamSwitchConfig.switchSelector);
 
-	const section = queryRoot.querySelector(config.sectionSel);
-	if (!section) throw new Error(`team switch: missing section "${config.sectionSel}"`);
+	if (!control) return;
 
-	const pills = Array.from(root.querySelectorAll(config.pillSel));
-	if (pills.length < 2) throw new Error(`team switch: expected 2+ "${config.pillSel}"`);
-	root.dataset.teamSwitchReady = "true";
+	const section = root.querySelector(teamSwitchConfig.sectionSelector);
 
-	const canViewTransition = typeof document.startViewTransition === "function";
-
-	let active = clampIndex(Number(root.getAttribute(config.activeAttr) ?? 0));
-	applyActive(active);
-
-	root.addEventListener("click", (event) => {
-		const pill = event.target.closest(config.pillSel);
-		if (!pill || !root.contains(pill)) return;
-
-		const next = pills.indexOf(pill);
-		if (next === -1 || next === active) return;
-
-		const apply = () => {
-			active = next;
-			applyActive(active);
-		};
-
-		if (canViewTransition) document.startViewTransition(apply);
-		else apply();
-	});
-
-	function clampIndex(index) {
-		if (!Number.isFinite(index)) return 0;
-		return Math.min(Math.max(0, index), pills.length - 1);
+	if (!section) {
+		throw new Error(`missing team section: expected "${teamSwitchConfig.sectionSelector}"`);
 	}
 
-	function applyActive(index) {
-		root.setAttribute(config.activeAttr, String(index));
-		section.setAttribute(config.activeAttr, String(index));
+	const pills = [...control.querySelectorAll(teamSwitchConfig.pillSelector)];
+
+	if (pills.length < 2) {
+		throw new Error(`missing team pills: expected 2 or more "${teamSwitchConfig.pillSelector}"`);
 	}
+
+	// The control and the section both carry the index, so the switch and the
+	// content it filters can be styled from the same one number.
+	function show(index) {
+		control.setAttribute(teamSwitchConfig.activeAttr, String(index));
+		section.setAttribute(teamSwitchConfig.activeAttr, String(index));
+	}
+
+	const start = Number(control.getAttribute(teamSwitchConfig.activeAttr));
+	let active = Number.isInteger(start) && pills[start] ? start : 0;
+
+	show(active);
+
+	control.addEventListener(
+		"click",
+		(event) => {
+			const index = pills.indexOf(event.target.closest(teamSwitchConfig.pillSelector));
+
+			if (index === -1 || index === active) return;
+
+			active = index;
+
+			// A view transition cross-fades the two team lists for free where the
+			// browser has one; elsewhere the swap is instant, which is also fine.
+			if (document.startViewTransition) document.startViewTransition(() => show(active));
+			else show(active);
+		},
+		{ signal },
+	);
 }

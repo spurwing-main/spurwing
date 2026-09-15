@@ -7,11 +7,8 @@ export function initFaq(root = document, { signal } = {}) {
 	}
 	const { gsap } = window;
 
-	if (component.dataset.accordionBound === "true") return;
-	component.dataset.accordionBound = "true";
-
-	const FAQ_EASE = "expo.inOut";
-	const FAQ_DURATION = 0.8;
+	const ease = "expo.inOut";
+	const duration = 0.8;
 
 	const list = component.querySelector('[fs-list-element="list"]') || component;
 	const items = new WeakMap();
@@ -150,8 +147,8 @@ export function initFaq(root = document, { signal } = {}) {
 			entry.content,
 			{
 				height: targetHeight,
-				duration: FAQ_DURATION,
-				ease: FAQ_EASE,
+				duration,
+				ease,
 			},
 			0,
 		);
@@ -160,8 +157,8 @@ export function initFaq(root = document, { signal } = {}) {
 			entry.icon,
 			{
 				rotate: 180,
-				duration: FAQ_DURATION,
-				ease: FAQ_EASE,
+				duration,
+				ease,
 			},
 			0,
 		);
@@ -170,8 +167,8 @@ export function initFaq(root = document, { signal } = {}) {
 			entry.verticalLine,
 			{
 				opacity: 0,
-				duration: FAQ_DURATION,
-				ease: FAQ_EASE,
+				duration,
+				ease,
 			},
 			0,
 		);
@@ -211,8 +208,8 @@ export function initFaq(root = document, { signal } = {}) {
 			entry.content,
 			{
 				height: 0,
-				duration: FAQ_DURATION,
-				ease: FAQ_EASE,
+				duration,
+				ease,
 			},
 			0,
 		);
@@ -221,8 +218,8 @@ export function initFaq(root = document, { signal } = {}) {
 			entry.icon,
 			{
 				rotate: 0,
-				duration: FAQ_DURATION,
-				ease: FAQ_EASE,
+				duration,
+				ease,
 			},
 			0,
 		);
@@ -231,8 +228,8 @@ export function initFaq(root = document, { signal } = {}) {
 			entry.verticalLine,
 			{
 				opacity: 1,
-				duration: FAQ_DURATION,
-				ease: FAQ_EASE,
+				duration,
+				ease,
 			},
 			0,
 		);
