@@ -25,6 +25,10 @@ const pageTransitionConfig = {
 	wrapper: ".page-wrap",
 	nav: ".nav",
 
+	// A page can opt out of swapping from the Designer, for anything that turns
+	// out to own its DOM and cannot be told to re-read it.
+	noSwap: ["[data-pt-no-swap]"],
+
 	fetchTimeout: 6000,
 	cssTimeout: 4000,
 	readyTimeout: 800, // ceiling on waiting for fonts and above-the-fold images
@@ -401,6 +405,12 @@ export function initPageTransition(root = document) {
 				return;
 			}
 
+			if (doc.querySelector(pageTransitionConfig.noSwap.join(","))) {
+				log("incoming page opts out of swapping — full load");
+				location.href = url;
+				return;
+			}
+
 			await syncHead(doc);
 
 			if (push) {
@@ -443,6 +453,22 @@ export function initPageTransition(root = document) {
 				window.Webflow?.ready();
 			} catch (error) {
 				log("Webflow re-init skipped", error);
+			}
+
+			// Finsweet Attributes binds its list and table of contents to the DOM
+			// present when it loaded, so after a swap its filters point at elements
+			// that are no longer on screen — the work archive filtered nothing.
+			// restart() is destroy-then-load, and rebinds to the incoming page.
+			// Every loaded module is restarted rather than a named list, so a module
+			// added in the Designer later is covered without a release.
+			try {
+				const finsweet = window.FinsweetAttributes;
+
+				for (const name of Object.keys(finsweet?.modules || {})) {
+					finsweet.modules[name]?.restart?.();
+				}
+			} catch (error) {
+				log("Finsweet restart skipped", error);
 			}
 
 			await crossfade(current, next);
