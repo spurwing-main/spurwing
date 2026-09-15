@@ -3,30 +3,15 @@ import { animate } from "motion";
 
 // The Work and About dropdowns.
 //
-// Each nav item owns its own panel, so one piece of markup serves both
-// breakpoints: above the desktop breakpoint the panel is a full-bleed surface
-// under the bar, below it the same element is an in-flow accordion inside the
-// open menu. Nothing in the nav is authored twice.
+// One piece of markup serves both breakpoints: a full-bleed surface under the
+// bar on desktop, an in-flow accordion inside the open menu below it.
 //
-// The panels sit in the same place and overlap exactly, so moving from Work to
-// About animates both heights to the incoming panel's and crossfades the
-// contents. That reads as one surface growing rather than one panel leaving and
-// another arriving — the same lesson as the cursor: once something is already on
-// screen, never replay its entrance.
+// This file toggles attributes and animates height, which CSS cannot do while
+// calc-size() is Chromium only. Every static rule is in the Nav Component's own
+// CSS embed.
 //
-// The panel is positioned rather than promoted to the top layer. A popover would
-// escape the nav's own transform, and `nav-auto-hide.js` translates the nav out
-// of view on the way down, which would leave an open panel stranded mid-screen.
-//
-// State, the slider, the arrows and the staggered rows are all addressed by data
-// attribute, so the Designer keeps ownership of how it looks. The two exceptions
-// are noted where they are declared.
-//
-// Every static rule this behaviour needs lives in the Nav Component's own CSS
-// embed, next to the markup it styles. This file only toggles attributes and
-// animates the one property CSS cannot — height, while calc-size() is Chromium
-// only — so there is one owner per layer rather than a stylesheet injected from
-// script that then has to out-specify the Component's own.
+// Not a popover: the top layer escapes the nav's transform, and
+// nav-auto-hide.js translates the nav away on the way down.
 
 const navPanelConfig = {
 	navSelector: ".nav",
@@ -57,10 +42,8 @@ const navPanelConfig = {
 	contentIn: { duration: 0.26, delay: 0.04, ease: [0.2, 0.7, 0.2, 1] },
 	shift: 24,
 
-	// The nav's own vocabulary, borrowed rather than invented: the mobile menu
-	// already brings its links in on this curve, over this distance, with this
-	// much blur and this gap between them. The panel arriving the same way is
-	// what makes it feel like part of the nav instead of a new component.
+	// Borrowed from the mobile menu, which already brings its links in on this
+	// curve, distance, blur and gap. Shared so the nav moves as one thing.
 	rowsIn: { duration: 0.42, ease: [0.16, 1, 0.3, 1] },
 	rowGap: 0.024,
 	rowRise: 8,
@@ -91,9 +74,6 @@ export function initNavPanel(root = document, { signal } = {}) {
 
 	const sliders = new Map();
 
-	// Re-measured rather than hard-coded: the bar's height changes with the
-	// breakpoint and with the container padding.
-
 	let open = null;
 	let openTimer = 0;
 	let closeTimer = 0;
@@ -109,8 +89,7 @@ export function initNavPanel(root = document, { signal } = {}) {
 		panelOf(item).toggleAttribute(attribute, on);
 	}
 
-	// Measured on every open rather than cached: a font that lands late, a CMS
-	// item with a longer name, or a resize all change the answer.
+	// Never cached: a late font, a longer CMS name or a resize all change it.
 	function naturalHeight(item) {
 		const panel = panelOf(item);
 		const previous = panel.style.height;
@@ -129,11 +108,7 @@ export function initNavPanel(root = document, { signal } = {}) {
 		animate(panel, { height: `${height}px` }, navPanelConfig.heightSpring);
 	}
 
-	// Opening from closed is the only time the contents arrive; swapping between
-	// two open panels is a morph, and replaying an entrance there is exactly the
-	// flash this whole module exists to avoid.
-	// The page behind is dimmed while a panel is open, and the dim stays put
-	// through a swap: re-fading it every time the panel changes size flickers.
+	// Held through a swap: re-fading on every size change flickers.
 	function setScrim(on) {
 		if (!scrim || !desktop.matches) return;
 		if (reduceMotion) {
@@ -143,6 +118,8 @@ export function initNavPanel(root = document, { signal } = {}) {
 		animate(scrim, { opacity: on ? navPanelConfig.scrimOpacity : 0 }, navPanelConfig.scrimFade);
 	}
 
+	// Only when opening from closed. A swap is a morph, and replaying an
+	// entrance there is the flash this module exists to avoid.
 	function playRows(item) {
 		if (reduceMotion) return;
 		rowsOf(item).forEach((row, index) => {
@@ -165,8 +142,8 @@ export function initNavPanel(root = document, { signal } = {}) {
 		const previous = open;
 		open = item;
 
-		// The panel being replaced stays visible until its content has faded,
-		// otherwise the crossfade has nothing to fade from.
+		// Kept visible until its content has faded, or the crossfade has nothing
+		// to fade from.
 		if (previous) setState(previous, navPanelConfig.leavingAttr, true);
 		else setScrim(true);
 
@@ -191,8 +168,8 @@ export function initNavPanel(root = document, { signal } = {}) {
 			return;
 		}
 
-		// Both panels animate to the same height while the contents trade
-		// places, so the two surfaces read as one that grew or shrank.
+		// Both to the same height while the contents trade places, so the two
+		// surfaces read as one that grew or shrank.
 		setHeight(previous, height, false);
 		setHeight(item, height, false);
 
@@ -227,8 +204,7 @@ export function initNavPanel(root = document, { signal } = {}) {
 	function queueOpen(item) {
 		clearTimeout(closeTimer);
 		clearTimeout(openTimer);
-		// Already showing something: swap straight away, so the morph is the
-		// whole gesture rather than a close followed by an open.
+		// Already open: swap straight away, so the morph is the whole gesture.
 		if (open) {
 			show(item);
 			return;
@@ -246,8 +222,8 @@ export function initNavPanel(root = document, { signal } = {}) {
 		target.addEventListener(event, fn, { signal, ...options });
 	}
 
-	// The featured work rail. Embla owns the dragging and the arrow state; the
-	// panel is closed when this runs, so every open re-measures it.
+	// The featured work rail. The panel is closed when this runs, so show()
+	// re-measures it on every open.
 	items.forEach((item) => {
 		const sliderRoot = item.querySelector(navPanelConfig.slider);
 		const track = sliderRoot?.firstElementChild;
@@ -257,7 +233,7 @@ export function initNavPanel(root = document, { signal } = {}) {
 		const arrows = [...item.querySelectorAll(navPanelConfig.arrow)];
 
 		function syncArrows() {
-			// Nothing to page through: the controls are noise, not decoration.
+			// Nothing to page through: the controls are noise.
 			const idle = !embla.canScrollPrev() && !embla.canScrollNext();
 			arrows.forEach((arrow) => {
 				const can =
@@ -297,7 +273,7 @@ export function initNavPanel(root = document, { signal } = {}) {
 			if (desktop.matches) queueClose();
 		});
 
-		// Below the breakpoint the row is the accordion control, and the panel
+		// Below the breakpoint the row is the accordion control; the panel
 		// carries its own links through to the pages.
 		on(item, "click", (event) => {
 			if (desktop.matches) return;
@@ -328,8 +304,7 @@ export function initNavPanel(root = document, { signal } = {}) {
 		link?.focus();
 	});
 
-	// An open panel hangs off the nav, and the nav hides itself on the way
-	// down, so a scroll closes it rather than leaving it stranded.
+	// The nav hides itself on the way down; an open panel would be stranded.
 	on(window, "scroll", () => hide(), { passive: true });
 	on(document, "spw:leave", () => hide());
 
