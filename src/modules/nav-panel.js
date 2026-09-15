@@ -83,6 +83,10 @@ export function initNavPanel(root = document, { signal } = {}) {
 	const sliders = new Map();
 
 	let open = null;
+	// A panel that is retracting but still on screen. It is still the thing the
+	// reader can see, so opening another one morphs from it rather than racing
+	// a second entrance against its exit.
+	let closingItem = null;
 	let openTimer = 0;
 	let closeTimer = 0;
 
@@ -169,8 +173,9 @@ export function initNavPanel(root = document, { signal } = {}) {
 	function show(item, immediate = false) {
 		if (open === item) return;
 
-		const previous = open;
+		const previous = open || closingItem;
 		open = item;
+		closingItem = null;
 
 		// An interrupted close leaves the incoming panel mid-retract with a
 		// faded inner; stop that before anything new starts on it.
@@ -221,22 +226,28 @@ export function initNavPanel(root = document, { signal } = {}) {
 		const arriving = innerOf(item);
 
 		if (leaving) {
-			animate(leaving, { opacity: [1, 0], x: [0, -step] }, navPanelConfig.contentOut).finished.then(
-				() => {
+			track(previous, animate(leaving, { opacity: 0, x: -step }, navPanelConfig.contentOut))
+				.finished.then(() => {
+					// Swapped back to before this finished: it is the open panel
+					// now and owns its own styles.
+					if (open === previous) return;
 					setState(previous, navPanelConfig.leavingAttr, false);
 					leaving.style.opacity = "";
 					leaving.style.transform = "";
-					if (open !== previous) setHeight(previous, 0, true);
-				},
-			);
+					setHeight(previous, 0, true);
+				})
+				.catch(() => {});
 		}
-		if (arriving) animate(arriving, { opacity: [0, 1], x: [step, 0] }, navPanelConfig.contentIn);
+		if (arriving) {
+			track(item, animate(arriving, { opacity: [0, 1], x: [step, 0] }, navPanelConfig.contentIn));
+		}
 	}
 
 	function hide() {
 		if (!open) return;
 		const closing = open;
 		open = null;
+		closingItem = closing;
 
 		stopRunning(closing);
 		linkOf(closing)?.setAttribute("aria-expanded", "false");
@@ -271,7 +282,9 @@ export function initNavPanel(root = document, { signal } = {}) {
 		// it was reopened on the way down.
 		setHeight(closing, 0, false, navPanelConfig.exitSpring)
 			?.finished.then(() => {
-				if (open === closing) return;
+				// Adopted by a later open, which owns the clean-up now.
+				if (closingItem !== closing) return;
+				closingItem = null;
 				setState(closing, navPanelConfig.leavingAttr, false);
 				if (!inner) return;
 				inner.style.opacity = "";
@@ -283,8 +296,9 @@ export function initNavPanel(root = document, { signal } = {}) {
 	function queueOpen(item) {
 		clearTimeout(closeTimer);
 		clearTimeout(openTimer);
-		// Already open: swap straight away, so the morph is the whole gesture.
-		if (open) {
+		// Something is on screen, open or still retracting: swap straight away,
+		// so the morph is the whole gesture and there is no wait first.
+		if (open || closingItem) {
 			show(item);
 			return;
 		}
