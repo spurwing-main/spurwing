@@ -44,10 +44,13 @@ const navPanelConfig = {
 	// Long enough to cross the gap from the link down into the panel.
 	closeDelay: 180,
 
-	// Opening springs with a little life in it; closing does not. An overshoot
-	// on the way out reads as the panel bouncing off the top of the page.
-	openSpring: { type: "spring", visualDuration: 0.42, bounce: 0.2 },
-	closeSpring: { type: "spring", visualDuration: 0.34, bounce: 0 },
+	// Three distinct gestures, not one with the sign flipped. Arriving has some
+	// life in it. Morphing is a continuation of something already on screen, so
+	// it is quicker and steadier. Leaving has no bounce at all: an overshoot on
+	// the way out reads as the panel bouncing off the top of the page.
+	arriveSpring: { type: "spring", visualDuration: 0.42, bounce: 0.2 },
+	morphSpring: { type: "spring", visualDuration: 0.36, bounce: 0.12 },
+	leaveSpring: { type: "spring", visualDuration: 0.34, bounce: 0 },
 
 	// Borrowed from the mobile menu, which already brings its links in on this
 	// curve, distance, blur and gap. Shared so the nav moves as one thing.
@@ -106,8 +109,23 @@ export function initNavPanel(root = document, { signal } = {}) {
 		const arriving = Boolean(open) && !rendered;
 		const forward = rendered && open ? order.indexOf(open) > order.indexOf(rendered) : true;
 
+		// One height for the whole gesture. During a swap the outgoing panel
+		// holds the incoming one's height rather than collapsing, so the two
+		// stacked panels read as a single surface resizing while its contents
+		// trade places. Animating it to zero instead is what made a swap look
+		// like a close and an open happening at once.
+		const height = open ? heightOf(open) : 0;
+		const timing = !open
+			? navPanelConfig.leaveSpring
+			: arriving
+				? navPanelConfig.arriveSpring
+				: navPanelConfig.morphSpring;
+
 		items.forEach((item) => {
 			const isOpen = item === open;
+			// Only the two panels in play share the height. Anything else is
+			// closed and stays closed.
+			const inPlay = isOpen || item === rendered;
 
 			item.toggleAttribute(navPanelConfig.openAttr, isOpen);
 			panelOf(item).toggleAttribute(navPanelConfig.openAttr, isOpen);
@@ -119,16 +137,10 @@ export function initNavPanel(root = document, { signal } = {}) {
 			// Embla cannot measure a panel that had no height a frame ago.
 			if (isOpen) sliders.get(item)?.reInit();
 
-			const height = isOpen ? heightOf(item) : 0;
+			const to = inPlay ? height : 0;
 
-			if (reduceMotion) panelOf(item).style.height = `${height}px`;
-			else {
-				animate(
-					panelOf(item),
-					{ height: `${height}px` },
-					isOpen ? navPanelConfig.openSpring : navPanelConfig.closeSpring,
-				);
-			}
+			if (reduceMotion) panelOf(item).style.height = `${to}px`;
+			else animate(panelOf(item), { height: `${to}px` }, timing);
 
 			renderRows(item, { isOpen, arriving, forward });
 		});
