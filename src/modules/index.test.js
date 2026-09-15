@@ -12,6 +12,7 @@ afterEach(() => {
 describe("module registry", () => {
 	it("exposes every migrated behavior through the project module interface", () => {
 		expect(modules.map((module) => module.name)).toEqual([
+			"island-reveal",
 			"data-loader",
 			"menu-toggle",
 			"nav-auto-hide",

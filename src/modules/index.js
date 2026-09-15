@@ -6,6 +6,7 @@ import { initCursor } from "./cursor.js";
 import { initDataLoader } from "./data-loader.js";
 import { initFaq } from "./faq.js";
 import { initInsightToc } from "./insight-toc.js";
+import { initIslandReveal } from "./island-reveal.js";
 import { initMenuToggle } from "./menu-toggle.js";
 import { initNavAutoHide } from "./nav-auto-hide.js";
 import { initQuoteFade } from "./quote-fade.js";
@@ -20,6 +21,7 @@ import { initWorkSlider } from "./work-slider.js";
 
 // Keep DOM-building modules before the behaviors that measure or animate their output.
 export const modules = [
+	{ name: "island-reveal", init: initIslandReveal },
 	{ name: "data-loader", init: initDataLoader },
 	{ name: "menu-toggle", init: initMenuToggle },
 	{ name: "nav-auto-hide", init: initNavAutoHide },
