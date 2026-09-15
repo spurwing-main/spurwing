@@ -24,7 +24,6 @@ export function initStick(root = document, { signal } = {}) {
 	const isDesktop = window.matchMedia(`(min-width: ${stickConfig.fromWidth}px)`);
 
 	let activeIndex = -1;
-	let observer = null;
 
 	function setActive(index) {
 		if (index === activeIndex) return;
@@ -34,7 +33,12 @@ export function initStick(root = document, { signal } = {}) {
 		activeIndex = index;
 	}
 
+	// One measurement, on every scroll. An IntersectionObserver used to sit
+	// beside this watching the same headings, and decided nothing the
+	// measurement had not already decided.
 	function activateNearestToMiddle() {
+		if (!isDesktop.matches) return;
+
 		const middle = window.innerHeight / 2;
 
 		let nearest = 0;
@@ -52,40 +56,21 @@ export function initStick(root = document, { signal } = {}) {
 		setActive(nearest);
 	}
 
-	function enable() {
-		if (observer) return;
-
-		// The observer only wakes the module up as headings cross the middle
-		// band; the measurement itself decides which one is nearest.
-		observer = new IntersectionObserver(activateNearestToMiddle, {
-			threshold: 0,
-			rootMargin: "-50% 0px -50% 0px",
-		});
-
-		headings.forEach((heading) => observer.observe(heading));
-		window.addEventListener("resize", activateNearestToMiddle, { signal });
-		window.addEventListener("scroll", activateNearestToMiddle, { passive: true, signal });
-
-		activateNearestToMiddle();
-	}
-
-	function disable() {
-		observer?.disconnect();
-		observer = null;
-
-		window.removeEventListener("resize", activateNearestToMiddle);
-		window.removeEventListener("scroll", activateNearestToMiddle);
-
+	function clear() {
 		items.forEach((item) => item.classList.remove(stickConfig.activeClass));
 		activeIndex = -1;
 	}
 
-	const sync = () => (isDesktop.matches ? enable() : disable());
+	window.addEventListener("resize", activateNearestToMiddle, { signal });
+	window.addEventListener("scroll", activateNearestToMiddle, { passive: true, signal });
 
 	// A MediaQueryList is global, so without the signal every visit to this page
 	// left another handler behind holding a detached section.
-	isDesktop.addEventListener("change", sync, { signal });
-	signal?.addEventListener("abort", disable);
+	isDesktop.addEventListener(
+		"change",
+		() => (isDesktop.matches ? activateNearestToMiddle() : clear()),
+		{ signal },
+	);
 
-	sync();
+	activateNearestToMiddle();
 }

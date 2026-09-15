@@ -70,11 +70,10 @@ export function initCardReveal(root = document, { signal } = {}) {
 				items.forEach((item, index) => {
 					const target = group.appliesTo === ":self" ? item : item.querySelector(group.appliesTo);
 
-					if (!target) {
-						throw new Error(
-							`missing "${group.appliesTo}" inside an item in "${group.containerSelector}"`,
-						);
-					}
+					// Skip, never throw: the reveal CSS holds every card at opacity 0
+					// until this runs, so one malformed item used to take the whole
+					// grid down with it.
+					if (!target) return;
 
 					const delay = Math.min(index * cardRevealConfig.stepMs, cardRevealConfig.maxDelayMs);
 

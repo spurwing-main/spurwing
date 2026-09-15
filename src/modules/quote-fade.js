@@ -7,7 +7,7 @@ const quoteFadeConfig = {
 	speed: 600,
 };
 
-export function initQuoteFade(root = document) {
+export function initQuoteFade(root = document, { signal } = {}) {
 	const roots = Array.from(root.querySelectorAll(quoteFadeConfig.rootSelector));
 
 	if (!roots.length) return;
@@ -16,7 +16,7 @@ export function initQuoteFade(root = document) {
 		throw new Error("Swiper failed to load.");
 	}
 
-	roots.forEach(initQuote);
+	roots.forEach((quote) => initQuote(quote, signal));
 }
 
 function prefersReducedMotion() {
@@ -25,7 +25,7 @@ function prefersReducedMotion() {
 	return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function initQuote(quote) {
+function initQuote(quote, signal) {
 	// Swiper takes the Collection List over in place, so a second run would put
 	// a second slider on the same element.
 	if (quote.hasAttribute(quoteFadeConfig.builtAttr)) return;
@@ -58,7 +58,7 @@ function initQuote(quote) {
 		quote.style.setProperty(quoteFadeConfig.progressVar, String(filled));
 	}
 
-	new window.Swiper(quote, {
+	const swiper = new window.Swiper(quote, {
 		slidesPerView: 1,
 		loop: true,
 		autoHeight: true,
@@ -86,4 +86,10 @@ function initQuote(quote) {
 					},
 				},
 	});
+
+	// Swiper's autoplay is a timer loop with its own resize listener and
+	// observer, and the quote markup is swapped out from under it on every
+	// navigation. Without this each visit leaves one running against a detached
+	// list for the rest of the session.
+	signal?.addEventListener("abort", () => swiper.destroy(true, true));
 }

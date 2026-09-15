@@ -30,7 +30,7 @@ async function fillIn(targets) {
 
 	for (const target of targets) {
 		const key = target.getAttribute(cmsCountsConfig.targetAttr).trim();
-		const list = key && source.querySelector(`[${cmsCountsConfig.sourceAttr}="${escape(key)}"]`);
+		const list = key && source.querySelector(`[${cmsCountsConfig.sourceAttr}="${cssEscape(key)}"]`);
 
 		if (!list) continue;
 
@@ -57,6 +57,6 @@ async function fetchSource() {
 	}
 }
 
-function escape(value) {
+function cssEscape(value) {
 	return window.CSS?.escape ? window.CSS.escape(value) : value;
 }

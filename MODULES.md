@@ -2,11 +2,13 @@
 
 The bundle starts these through `src/modules/index.js` once the DOM is ready, and again after every page transition. Each one is scoped to its own Webflow markup and otherwise returns without touching the page.
 
-Every module is called as `init(root, { signal })`. The signal is fresh on each run and the previous run's is aborted first, so listeners, observers and timers cannot stack up across a transition; a module that only reads the DOM can ignore it. Nothing else goes in that second argument, and nothing goes beside it — a loader passed positionally is how three modules once received the options object where a function belonged, and `contract.test.js` reads the signatures to stop it recurring.
+Every module is called as `init(root, { signal })`. The signal is fresh on each run and the previous run's is aborted first. Anything that outlives the markup it was created for takes the signal: listeners on `window`, `document` or a `MediaQueryList`, observers, timers, and third-party instances with their own teardown. A listener bound to a node inside the swapped page does not need it, because the node goes and takes the listener with it — but nothing bound outside that page may omit it, which is how a slider once kept autoplaying against a list that had already been thrown away. Nothing else goes in that second argument, and nothing goes beside it — a loader passed positionally is how three modules once received the options object where a function belonged, and `contract.test.js` reads the signatures to stop it recurring.
 
 `boot.js` owns running each module once per page, so a module does not guard itself. The three that do — `impact-slider.js`, `quote-fade.js` and `rt-flow.js` — build by consuming the markup they build from, so a second run would read their own output. Each says so where it guards.
 
-Embla and Motion are ordinary npm imports, bundled by esbuild. Tests mock the package (`vi.mock("motion", …)`) rather than injecting a loader.
+Embla and Motion are ordinary npm imports, bundled by esbuild. Swiper and GSAP are globals that Webflow's own head loads. Tests mock the npm packages (`vi.mock("motion", …)`) rather than injecting a loader.
+
+Most modules have a test beside them; `booking-details`, `caps`, `card-reveal`, `copy-to-clipboard`, `nav-panel`, `rightway`, `rt-flow`, `stick`, `team-switch` and `work-archive` do not yet.
 
 ## Behaviour modules
 

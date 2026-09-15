@@ -39,8 +39,8 @@ export function initImpactSlider(root = document, { signal } = {}) {
 
 function textOf(element) {
 	return String(element?.textContent ?? "")
-		.replace(/[​-‍﻿]/g, "")
-		.replace(/ /g, " ")
+		.replace(/[\u200B-\u200D\uFEFF]/g, "")
+		.replace(/\u00A0/g, " ")
 		.trim();
 }
 
@@ -111,10 +111,9 @@ function buildSlides(section) {
 
 /* --- the slider --------------------------------------------------------- */
 
+// One fact, one attribute. The look and the pointer-events belong to the CSS
+// that already styles [aria-disabled] on the shared arrows.
 function setDisabled(arrow, isDisabled) {
-	arrow.classList.toggle(impactConfig.disabledClass, isDisabled);
-	arrow.style.pointerEvents = isDisabled ? "none" : "";
-	arrow.style.opacity = isDisabled ? "0.4" : "";
 	arrow.setAttribute("aria-disabled", String(isDisabled));
 	arrow.setAttribute("tabindex", isDisabled ? "-1" : "0");
 }

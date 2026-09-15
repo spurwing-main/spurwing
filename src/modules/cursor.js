@@ -269,11 +269,9 @@ function createItem(el, root) {
 	};
 }
 
-export async function initCursor(root = document, { signal } = {}) {
+export function initCursor(root = document, { signal } = {}) {
 	const cursorRoot = root.querySelector(cursorConfig.rootSelector);
 	if (!cursorRoot) return;
-	cursorRoot.cursor?.destroy();
-	delete cursorRoot.cursor;
 
 	const canUseCursor =
 		typeof window.matchMedia !== "function" ||
@@ -305,15 +303,19 @@ export async function initCursor(root = document, { signal } = {}) {
 	let currentItem = null;
 	let currentTarget = null;
 	let timer = 0;
-	const abort = new AbortController();
 
-	// boot.js aborts the previous run before the next, so the window and
-	// document listeners below go with it rather than waiting for the next
-	// initCursor to tear them down.
-	signal?.addEventListener("abort", () => abort.abort());
+	// One teardown, on the signal. The measure nodes each item appends to
+	// <body>, and its spring subscriptions, used to be cleaned up only by the
+	// next run finding the same .cursor-root — which holds while the root sits
+	// outside the swapped page, and leaks a node and four motion values per
+	// navigation the moment it does not.
+	signal?.addEventListener("abort", () => {
+		clearTimeout(timer);
+		items.forEach((item) => item.destroy());
+	});
 
 	function on(target, event, fn, opts = {}) {
-		target.addEventListener(event, fn, { signal: abort.signal, ...opts });
+		target.addEventListener(event, fn, { signal, ...opts });
 	}
 
 	function activate(match) {
@@ -394,11 +396,4 @@ export async function initCursor(root = document, { signal } = {}) {
 		currentTarget = null;
 	});
 
-	cursorRoot.cursor = {
-		destroy() {
-			abort.abort();
-			clearTimeout(timer);
-			items.forEach((item) => item.destroy());
-		},
-	};
 }

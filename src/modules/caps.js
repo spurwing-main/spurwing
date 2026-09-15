@@ -79,8 +79,9 @@ function initSlider(slider, signal) {
 	slider.addEventListener("mouseenter", stop, { signal });
 	slider.addEventListener("mouseleave", start, { signal });
 
+	// No .on("init"): Embla emits it asynchronously, after the explicit call
+	// below, so listening for it only builds the dots a second time.
 	embla
-		.on("init", rebuildDots)
 		.on("reInit", rebuildDots)
 		.on("select", selectDot)
 		.on("pointerDown", stop)

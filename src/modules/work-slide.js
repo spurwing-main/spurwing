@@ -62,10 +62,11 @@ function initSlider(section, signal) {
 	const container = requireElement(section, workSlideConfig.containerSelector, "slider container");
 	const slides = [...wrapper.querySelectorAll(workSlideConfig.slideSelector)];
 
-	if (!slides.length) throw new Error(`no slides: expected "${workSlideConfig.slideSelector}"`);
+	// Skip rather than throw, as caps.js does: these are instances in a loop, and
+	// a throw here stops every later slider on the page — including the page's
+	// own, since the nav's rail is found first.
+	if (!slides.length) return;
 
-	// One Swiper per viewport, whoever calls this.
-	viewport.swiper?.destroy(true, true);
 
 	wrapper.style.gap = "0px"; // Swiper spaces the slides itself, from spaceBetween
 
@@ -101,7 +102,9 @@ function initSlider(section, signal) {
 			}),
 		);
 
-		if (!widest) throw new Error("slide width measured as 0");
+		// A section inside a hidden ancestor measures 0. Leave the width alone
+		// and let the next resize settle it.
+		if (!widest) return;
 
 		section.style.setProperty(workSlideConfig.widthVar, `${widest}px`);
 
@@ -227,7 +230,8 @@ function initSlider(section, signal) {
 		);
 	});
 
-	window.addEventListener("resize", scheduleUpdate, { signal });
+	// The observer already fires on a window resize, because both boxes are
+	// laid out from it. `load` stays: late images change the widest card.
 	window.addEventListener("load", scheduleUpdate, { once: true, signal });
 
 	const resizeObserver = new ResizeObserver(scheduleUpdate);

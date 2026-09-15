@@ -19,7 +19,11 @@ export function initNavAutoHide(root = document, { signal } = {}) {
 		lastDecisionY: clampY(window.scrollY || 0),
 		focusInside: false,
 		ticking: false,
-		isHidden: nav.classList.contains(navAutoHideConfig.hiddenClass),
+		// Each run starts shown. A back navigation restores the scroll position
+		// with one positive-delta jump, which used to leave the nav hidden until
+		// the reader scrolled up — where a fresh load at the same position shows
+		// it.
+		isHidden: false,
 	};
 
 	function clampY(y) {
@@ -90,6 +94,8 @@ export function initNavAutoHide(root = document, { signal } = {}) {
 			decide(window.scrollY || 0);
 		});
 	}
+
+	nav.classList.remove(navAutoHideConfig.hiddenClass);
 
 	recomputeTopThreshold();
 

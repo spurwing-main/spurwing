@@ -30,9 +30,11 @@ import { animate } from "motion";
 
 const navPanelConfig = {
 	navSelector: ".nav",
-	// Webflow refuses a custom attribute on these two divs — the write reports
-	// success and reads back empty — so the wrapper and the panel are found by
-	// the classes the Designer publishes. State below is still attributes.
+	// These two divs reject every settings write — a custom attribute and a DOM
+	// id both read back empty, while a native Collection List beside them keeps
+	// one fine. Both were authored as WHTML rather than built in the Designer,
+	// which is the only difference found. So they are addressed by the classes
+	// the Designer publishes; state below is still attributes.
 	item: ".nav_item",
 	panel: ".nav_item-panel",
 	inner: ".nav_item-panel-inner",
@@ -228,8 +230,10 @@ export function initNavPanel(root = document, { signal } = {}) {
 		target.addEventListener(event, fn, { signal, ...options });
 	}
 
-	// Stamped here because Webflow drops them, and because nav-panel is
-	// registered before work-slide, which reads them.
+	// Stamped because these arrows reject a Designer attribute too, and because
+	// nav-panel is registered before work-slide, which reads them. If the arrows
+	// are ever rebuilt in the Designer rather than from WHTML, put the
+	// attributes there and delete this.
 	items.forEach((item) => {
 		const arrows = [...item.querySelectorAll(navPanelConfig.arrow)];
 		arrows.forEach((arrow, index) => {
@@ -281,7 +285,8 @@ export function initNavPanel(root = document, { signal } = {}) {
 	on(window, "scroll", () => setOpen(null), { passive: true });
 	on(document, "spw:leave", () => setOpen(null));
 
-	desktop.addEventListener?.("change", () => {
+	// Routed through on() like every other listener, or it outlives its page.
+	on(desktop, "change", () => {
 		clearTimeout(openTimer);
 		clearTimeout(closeTimer);
 		setOpen(null);

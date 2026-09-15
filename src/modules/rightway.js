@@ -55,7 +55,9 @@ export function initRightway(root = document, { signal } = {}) {
 		if (embla) return;
 
 		embla = EmblaCarousel(slider, { loop: false, align: "start", containScroll: "trimSnaps" });
-		embla.on("init", rebuildDots).on("reInit", rebuildDots).on("select", selectDot);
+		// No .on("init"): Embla emits it after the explicit build below, so
+		// listening for it only builds the dots twice.
+		embla.on("reInit", rebuildDots).on("select", selectDot);
 
 		rebuildDots();
 	}

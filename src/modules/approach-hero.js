@@ -27,7 +27,9 @@ export function initApproachHero(root = document, { signal } = {}) {
 		anim = animate(
 			blur,
 			{ "--fade": to },
-			{ duration: to === 0 ? 0.6 : 0.45, easing: [0.215, 0.61, 0.355, 1] },
+			// `ease`, not `easing`: Motion reads the former and silently ignores the
+			// latter, which left this fading on the default curve.
+			{ duration: to === 0 ? 0.6 : 0.45, ease: [0.215, 0.61, 0.355, 1] },
 		);
 	};
 

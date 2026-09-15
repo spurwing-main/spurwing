@@ -566,16 +566,14 @@ export function initPageTransition(root = document) {
 			if (!busy) go(location.href, { push: false, targetY: event.state?.y || 0 });
 		});
 
-		let timer;
-
-		window.addEventListener(
-			"scroll",
-			() => {
-				clearTimeout(timer);
-				timer = setTimeout(rememberScroll, 120);
-			},
-			{ passive: true },
-		);
+		// Not on every scroll stop: Safari throws after 100 replaceState calls in
+		// 30 seconds, and the catch inside rememberScroll would swallow it, so
+		// fast flicking used to silently lose scroll memory for the rest of the
+		// window. Leaving the page is the only moment the value is needed.
+		window.addEventListener("pagehide", rememberScroll);
+		window.addEventListener("visibilitychange", () => {
+			if (document.visibilityState === "hidden") rememberScroll();
+		});
 
 		// A page restored from the back-forward cache returns with the DOM it had
 		// when the reader left. Mid-transition that is a half-faded container, or
@@ -614,10 +612,15 @@ export function initPageTransition(root = document) {
 
 	if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
+	// Taking scroll restoration off the browser means giving it back by hand.
+	// rememberScroll() below overwrites the stored y with the current one, which
+	// on a reload is 0, so the position has to be read first.
+	const restored = history.state?.y;
+
+	if (restored) jumpTo(restored);
+
 	rememberScroll();
 	listen();
-
-	window.SPW = { navigate: (url) => go(new URL(url, location.href).href) };
 
 	log("ready");
 }

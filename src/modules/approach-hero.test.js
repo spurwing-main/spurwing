@@ -12,6 +12,8 @@ describe("initApproachHero", () => {
 
 		await initApproachHero();
 
-		expect(document.querySelector(".progressive-blur").dataset.approachHeroReady).toBeUndefined();
+		// The module only claims a blur inside .section_caps; with no section it
+		// must leave --fade alone rather than pin it to 1.
+		expect(document.querySelector(".progressive-blur").style.getPropertyValue("--fade")).toBe("");
 	});
 });

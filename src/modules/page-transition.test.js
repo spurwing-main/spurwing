@@ -123,7 +123,7 @@ describe("initPageTransition", () => {
 		initPageTransition();
 
 		expect(document.querySelector("[data-pt-style]")).not.toBeNull();
-		expect(window.SPW?.navigate).toBeTypeOf("function");
+		expect(document.querySelector("[aria-live='polite']")).not.toBeNull();
 	});
 
 	it("stays out of the way on a page with nothing to swap", () => {
