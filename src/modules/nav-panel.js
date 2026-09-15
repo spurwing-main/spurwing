@@ -48,8 +48,16 @@ const navPanelConfig = {
 	rowGap: 0.024,
 	rowRise: 8,
 	rowBlur: 1.25,
+	// Closing is not the entrance reversed. The contents leave first and the
+	// surface retracts after them, on a spring with no bounce — an overshoot on
+	// the way out reads as a bounce off the top of the page.
+	exitSpring: { type: "spring", visualDuration: 0.34, bounce: 0 },
+	exitContent: { duration: 0.16, ease: [0.4, 0, 1, 1] },
+	exitRise: 6,
+
 	scrimOpacity: 0.2,
 	scrimFade: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
+	scrimFadeOut: { duration: 0.32, ease: [0.4, 0, 0.2, 1] },
 };
 
 
@@ -99,23 +107,46 @@ export function initNavPanel(root = document, { signal } = {}) {
 		return height;
 	}
 
-	function setHeight(item, height, immediate) {
+	function setHeight(item, height, immediate, options = navPanelConfig.heightSpring) {
 		const panel = panelOf(item);
 		if (immediate || reduceMotion) {
 			panel.style.height = `${height}px`;
-			return;
+			return null;
 		}
-		animate(panel, { height: `${height}px` }, navPanelConfig.heightSpring);
+		// Motion retargets a running animation on the same value rather than
+		// restarting it, so an interrupted open or close keeps its velocity.
+		return track(item, animate(panel, { height: `${height}px` }, options));
 	}
 
-	// Held through a swap: re-fading on every size change flickers.
+	// Every animation started for an item, so an interruption can stop the last
+	// gesture instead of letting two fight over the same properties.
+	const running = new Map();
+
+	function track(item, animation) {
+		const list = running.get(item) || [];
+		list.push(animation);
+		running.set(item, list);
+		return animation;
+	}
+
+	function stopRunning(item) {
+		running.get(item)?.forEach((animation) => animation.stop?.());
+		running.set(item, []);
+	}
+
+	// Held through a swap: re-fading on every size change flickers. It leaves a
+	// little slower than it arrives, so the page comes back rather than snaps.
 	function setScrim(on) {
 		if (!scrim || !desktop.matches) return;
 		if (reduceMotion) {
 			scrim.style.opacity = on ? String(navPanelConfig.scrimOpacity) : "0";
 			return;
 		}
-		animate(scrim, { opacity: on ? navPanelConfig.scrimOpacity : 0 }, navPanelConfig.scrimFade);
+		animate(
+			scrim,
+			{ opacity: on ? navPanelConfig.scrimOpacity : 0 },
+			on ? navPanelConfig.scrimFade : navPanelConfig.scrimFadeOut,
+		);
 	}
 
 	// Only when opening from closed. A swap is a morph, and replaying an
@@ -123,16 +154,15 @@ export function initNavPanel(root = document, { signal } = {}) {
 	function playRows(item) {
 		if (reduceMotion) return;
 		rowsOf(item).forEach((row, index) => {
-			animate(
-				row,
-				{
-					opacity: [0, 1],
-					y: [navPanelConfig.rowRise, 0],
-					scale: [0.985, 1],
-					filter: [`blur(${navPanelConfig.rowBlur}px)`, "blur(0px)"],
-				},
-				{ ...navPanelConfig.rowsIn, delay: index * navPanelConfig.rowGap },
-			);
+			const from = {
+				opacity: [0, 1],
+				y: [navPanelConfig.rowRise, 0],
+				scale: [0.985, 1],
+				filter: [`blur(${navPanelConfig.rowBlur}px)`, "blur(0px)"],
+			};
+			const timing = { ...navPanelConfig.rowsIn, delay: index * navPanelConfig.rowGap };
+
+			track(item, animate(row, from, timing));
 		});
 	}
 
@@ -141,6 +171,16 @@ export function initNavPanel(root = document, { signal } = {}) {
 
 		const previous = open;
 		open = item;
+
+		// An interrupted close leaves the incoming panel mid-retract with a
+		// faded inner; stop that before anything new starts on it.
+		stopRunning(item);
+		const inner = innerOf(item);
+		if (inner) {
+			inner.style.opacity = "";
+			inner.style.transform = "";
+		}
+		setState(item, navPanelConfig.leavingAttr, false);
 
 		// Kept visible until its content has faded, or the crossfade has nothing
 		// to fade from.
@@ -167,6 +207,9 @@ export function initNavPanel(root = document, { signal } = {}) {
 			}
 			return;
 		}
+
+		// Whatever the outgoing panel was still doing, this replaces it.
+		stopRunning(previous);
 
 		// Both to the same height while the contents trade places, so the two
 		// surfaces read as one that grew or shrank.
@@ -195,10 +238,46 @@ export function initNavPanel(root = document, { signal } = {}) {
 		const closing = open;
 		open = null;
 
-		setState(closing, navPanelConfig.openAttr, false);
+		stopRunning(closing);
 		linkOf(closing)?.setAttribute("aria-expanded", "false");
-		setHeight(closing, 0, false);
 		setScrim(false);
+
+		// The panel stays visible for its own exit. Dropping data-nav-open here
+		// and nothing else is what made closing flash: the CSS hides it on that
+		// attribute, so the height was animating on an invisible element.
+		setState(closing, navPanelConfig.openAttr, false);
+		setState(closing, navPanelConfig.leavingAttr, true);
+
+		if (reduceMotion) {
+			setHeight(closing, 0, true);
+			setState(closing, navPanelConfig.leavingAttr, false);
+			return;
+		}
+
+		// Contents leave first, the surface retracts after them.
+		const inner = innerOf(closing);
+		if (inner) {
+			track(
+				closing,
+				animate(
+					inner,
+					{ opacity: 0, y: -navPanelConfig.exitRise },
+					navPanelConfig.exitContent,
+				),
+			);
+		}
+
+		// Hidden only once it has actually finished retracting, and not at all if
+		// it was reopened on the way down.
+		setHeight(closing, 0, false, navPanelConfig.exitSpring)
+			?.finished.then(() => {
+				if (open === closing) return;
+				setState(closing, navPanelConfig.leavingAttr, false);
+				if (!inner) return;
+				inner.style.opacity = "";
+				inner.style.transform = "";
+			})
+			.catch(() => {});
 	}
 
 	function queueOpen(item) {
