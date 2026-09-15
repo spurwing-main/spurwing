@@ -18,16 +18,19 @@ import { animate } from "motion";
 // escape the nav's own transform, and `nav-auto-hide.js` translates the nav out
 // of view on the way down, which would leave an open panel stranded mid-screen.
 //
-// Everything this module reaches for is a data attribute. Classes stay with the
-// Designer, which owns how it looks; renaming one there cannot silently break
-// the behaviour here.
+// State, the slider, the arrows and the staggered rows are all addressed by data
+// attribute, so the Designer keeps ownership of how it looks. The two exceptions
+// are noted where they are declared.
 
 const navPanelConfig = {
 	navSelector: ".nav",
 	listSelector: ".nav_links",
-	item: "[data-nav-item]",
-	panel: "[data-nav-panel]",
-	inner: "[data-nav-panel-inner]",
+	// Webflow refuses a custom attribute on these two divs — the write reports
+	// success and reads back empty — so the wrapper and the panel are found by
+	// the classes the Designer publishes. State below is still attributes.
+	item: ".nav_item",
+	panel: ".nav_item-panel",
+	inner: ".nav_item-panel-inner",
 	slider: "[data-nav-slider]",
 	arrow: "[data-nav-arrow]",
 	stagger: "[data-nav-stagger]",
@@ -62,16 +65,16 @@ const navPanelConfig = {
 
 const css = `
 .nav { --nav-panel-ease: cubic-bezier(0.16, 1, 0.3, 1); }
-[data-nav-panel] { display: block; overflow: hidden; height: 0; visibility: hidden; }
-[data-nav-panel][${navPanelConfig.openAttr}],
-[data-nav-panel][${navPanelConfig.leavingAttr}] { visibility: visible; }
+.nav_item-panel { display: block; overflow: hidden; height: 0; visibility: hidden; }
+.nav_item-panel[${navPanelConfig.openAttr}],
+.nav_item-panel[${navPanelConfig.leavingAttr}] { visibility: visible; }
 /* One curve for every hover and state change in the panel, and it is the one
    the nav already uses for its mobile links. */
-[data-nav-item] .nav_item-chevron,
+.nav_item .nav_item-chevron,
 .nav_card,
 .nav_card-arrow,
 [data-nav-arrow] { transition: transform 420ms var(--nav-panel-ease), background-color 240ms var(--nav-panel-ease), color 240ms var(--nav-panel-ease); }
-[data-nav-item][${navPanelConfig.openAttr}] .nav_item-chevron { transform: rotate(180deg); }
+.nav_item[${navPanelConfig.openAttr}] .nav_item-chevron { transform: rotate(180deg); }
 .nav_card:hover .nav_card-arrow { transform: translateX(4px); }
 [data-nav-arrow]:not([aria-disabled="true"]):hover { background-color: var(--_color---grey-400); }
 
@@ -96,9 +99,9 @@ const css = `
 	/* The pill keeps following the pointer as it always has. While a panel is
 	   open it holds under that item instead, a step darker, so "open" reads
 	   differently from "hovering". */
-	.nav_links:has([data-nav-item][${navPanelConfig.openAttr}]) { --bg-color: var(--_color---grey-400); }
-	.nav_links:has([data-nav-item][${navPanelConfig.openAttr}]):not(:has(.nav_link:hover)) [data-nav-item][${navPanelConfig.openAttr}] .nav_link { anchor-name: --navLinkBg; }
-	.nav_links:has([data-nav-item][${navPanelConfig.openAttr}]) .nav_link-bg { opacity: 1; visibility: visible; }
+	.nav_links:has(.nav_item[${navPanelConfig.openAttr}]) { --bg-color: var(--_color---grey-400); }
+	.nav_links:has(.nav_item[${navPanelConfig.openAttr}]):not(:has(.nav_link:hover)) .nav_item[${navPanelConfig.openAttr}] .nav_link { anchor-name: --navLinkBg; }
+	.nav_links:has(.nav_item[${navPanelConfig.openAttr}]) .nav_link-bg { opacity: 1; visibility: visible; }
 }
 
 @media (max-width: 991px) {
