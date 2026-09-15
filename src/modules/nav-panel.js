@@ -6,9 +6,17 @@ import { animate } from "motion";
 // One piece of markup serves both breakpoints: a full-bleed surface under the
 // bar on desktop, an in-flow accordion inside the open menu below it.
 //
-// This file toggles attributes and animates height, which CSS cannot do while
-// calc-size() is Chromium only. Every static rule is in the Nav Component's own
-// CSS embed.
+// There is one piece of state — which item is open, or none — and one render
+// that drives every panel from it. Events only set that and call render; nothing
+// else writes to the DOM, and no animation callback changes state. render can
+// run at any moment, including mid-animation: Motion retargets a running
+// animation on the same value rather than restarting it, so interrupting a
+// gesture is the ordinary case rather than something to detect and unpick.
+//
+// A closed panel is zero-height and clipped, so it is invisible by construction
+// rather than by a visibility flag timed against the animation. That is what
+// makes closing calm: there is no moment where the panel is hidden but still
+// collapsing, and nothing to clean up when a close is interrupted.
 //
 // Not a popover: the top layer escapes the nav's transform, and
 // nav-auto-hide.js translates the nav away on the way down.
@@ -24,11 +32,10 @@ const navPanelConfig = {
 	inner: ".nav_item-panel-inner",
 	slider: "[data-nav-slider]",
 	arrow: "[data-nav-arrow]",
-	stagger: "[data-nav-stagger]",
+	row: "[data-nav-stagger]",
 	scrim: "[data-nav-scrim]",
 	linkSelector: "a",
 	openAttr: "data-nav-open",
-	leavingAttr: "data-nav-leaving",
 	desktopQuery: "(min-width: 992px)",
 
 	// Long enough that a pointer crossing Work on its way to Insights never
@@ -37,29 +44,24 @@ const navPanelConfig = {
 	// Long enough to cross the gap from the link down into the panel.
 	closeDelay: 180,
 
-	heightSpring: { type: "spring", visualDuration: 0.42, bounce: 0.2 },
-	contentOut: { duration: 0.18, ease: [0.4, 0, 0.2, 1] },
-	contentIn: { duration: 0.26, delay: 0.04, ease: [0.2, 0.7, 0.2, 1] },
-	shift: 24,
+	// Opening springs with a little life in it; closing does not. An overshoot
+	// on the way out reads as the panel bouncing off the top of the page.
+	openSpring: { type: "spring", visualDuration: 0.42, bounce: 0.2 },
+	closeSpring: { type: "spring", visualDuration: 0.34, bounce: 0 },
 
 	// Borrowed from the mobile menu, which already brings its links in on this
 	// curve, distance, blur and gap. Shared so the nav moves as one thing.
-	rowsIn: { duration: 0.42, ease: [0.16, 1, 0.3, 1] },
-	rowGap: 0.024,
+	rowIn: { duration: 0.42, ease: [0.16, 1, 0.3, 1] },
+	rowOut: { duration: 0.16, ease: [0.4, 0, 1, 1] },
+	rowStagger: 0.024,
 	rowRise: 8,
+	rowShift: 24,
 	rowBlur: 1.25,
-	// Closing is not the entrance reversed. The contents leave first and the
-	// surface retracts after them, on a spring with no bounce — an overshoot on
-	// the way out reads as a bounce off the top of the page.
-	exitSpring: { type: "spring", visualDuration: 0.34, bounce: 0 },
-	exitContent: { duration: 0.16, ease: [0.4, 0, 1, 1] },
-	exitRise: 6,
 
 	scrimOpacity: 0.2,
-	scrimFade: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
-	scrimFadeOut: { duration: 0.32, ease: [0.4, 0, 0.2, 1] },
+	scrimIn: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
+	scrimOut: { duration: 0.32, ease: [0.4, 0, 0.2, 1] },
 };
-
 
 export function initNavPanel(root = document, { signal } = {}) {
 	const nav = root.querySelector(navPanelConfig.navSelector);
@@ -72,6 +74,7 @@ export function initNavPanel(root = document, { signal } = {}) {
 
 	const list = nav.querySelector(navPanelConfig.listSelector);
 	const order = list ? [...list.children] : items;
+	const scrim = nav.querySelector(navPanelConfig.scrim);
 	const reduceMotion =
 		typeof window.matchMedia === "function" &&
 		window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -80,242 +83,134 @@ export function initNavPanel(root = document, { signal } = {}) {
 			? window.matchMedia(navPanelConfig.desktopQuery)
 			: { matches: true, addEventListener() {} };
 
+	const panelOf = (item) => item.querySelector(navPanelConfig.panel);
+	const innerOf = (item) => item.querySelector(navPanelConfig.inner);
+	const linkOf = (item) => item.querySelector(navPanelConfig.linkSelector);
+	const rowsOf = (item) => [...panelOf(item).querySelectorAll(navPanelConfig.row)];
+
 	const sliders = new Map();
 
+	// The only state. `rendered` is last frame's, kept solely to tell an arrival
+	// from a swap and to give the contents a direction to travel.
 	let open = null;
-	// A panel that is retracting but still on screen. It is still the thing the
-	// reader can see, so opening another one morphs from it rather than racing
-	// a second entrance against its exit.
-	let closingItem = null;
+	let rendered = null;
 	let openTimer = 0;
 	let closeTimer = 0;
 
-	const scrim = nav.querySelector(navPanelConfig.scrim);
-	const panelOf = (item) => item.querySelector(navPanelConfig.panel);
-	const rowsOf = (item) => [...panelOf(item).querySelectorAll(navPanelConfig.stagger)];
-	const innerOf = (item) => item.querySelector(navPanelConfig.inner);
-	const linkOf = (item) => item.querySelector(navPanelConfig.linkSelector);
+	// The inner is never height-constrained, so its own box is the panel's
+	// natural height whatever the panel is currently doing. Nothing has to be
+	// measured mid-animation, and nothing has to be put back afterwards.
+	const heightOf = (item) => innerOf(item)?.getBoundingClientRect().height ?? 0;
 
-	function setState(item, attribute, on) {
-		item.toggleAttribute(attribute, on);
-		panelOf(item).toggleAttribute(attribute, on);
-	}
+	function render() {
+		const arriving = Boolean(open) && !rendered;
+		const forward = rendered && open ? order.indexOf(open) > order.indexOf(rendered) : true;
 
-	// Never cached: a late font, a longer CMS name or a resize all change it.
-	function naturalHeight(item) {
-		const panel = panelOf(item);
-		const previous = panel.style.height;
-		panel.style.height = "auto";
-		const height = panel.getBoundingClientRect().height;
-		panel.style.height = previous;
-		return height;
-	}
+		items.forEach((item) => {
+			const isOpen = item === open;
 
-	function setHeight(item, height, immediate, options = navPanelConfig.heightSpring) {
-		const panel = panelOf(item);
-		if (immediate || reduceMotion) {
-			panel.style.height = `${height}px`;
-			return null;
-		}
-		// Motion retargets a running animation on the same value rather than
-		// restarting it, so an interrupted open or close keeps its velocity.
-		return track(item, animate(panel, { height: `${height}px` }, options));
-	}
+			item.toggleAttribute(navPanelConfig.openAttr, isOpen);
+			panelOf(item).toggleAttribute(navPanelConfig.openAttr, isOpen);
+			// Clipped to nothing is invisible but still tabbable, so a closed
+			// panel's links have to be taken out of reach explicitly.
+			panelOf(item).toggleAttribute("inert", !isOpen);
+			linkOf(item)?.setAttribute("aria-expanded", isOpen ? "true" : "false");
 
-	// Every animation started for an item, so an interruption can stop the last
-	// gesture instead of letting two fight over the same properties.
-	const running = new Map();
+			// Embla cannot measure a panel that had no height a frame ago.
+			if (isOpen) sliders.get(item)?.reInit();
 
-	function track(item, animation) {
-		const list = running.get(item) || [];
-		list.push(animation);
-		running.set(item, list);
-		return animation;
-	}
+			const height = isOpen ? heightOf(item) : 0;
 
-	function stopRunning(item) {
-		running.get(item)?.forEach((animation) => animation.stop?.());
-		running.set(item, []);
-	}
-
-	// Held through a swap: re-fading on every size change flickers. It leaves a
-	// little slower than it arrives, so the page comes back rather than snaps.
-	function setScrim(on) {
-		if (!scrim || !desktop.matches) return;
-		if (reduceMotion) {
-			scrim.style.opacity = on ? String(navPanelConfig.scrimOpacity) : "0";
-			return;
-		}
-		animate(
-			scrim,
-			{ opacity: on ? navPanelConfig.scrimOpacity : 0 },
-			on ? navPanelConfig.scrimFade : navPanelConfig.scrimFadeOut,
-		);
-	}
-
-	// Only when opening from closed. A swap is a morph, and replaying an
-	// entrance there is the flash this module exists to avoid.
-	function playRows(item) {
-		if (reduceMotion) return;
-		rowsOf(item).forEach((row, index) => {
-			const from = {
-				opacity: [0, 1],
-				y: [navPanelConfig.rowRise, 0],
-				scale: [0.985, 1],
-				filter: [`blur(${navPanelConfig.rowBlur}px)`, "blur(0px)"],
-			};
-			const timing = { ...navPanelConfig.rowsIn, delay: index * navPanelConfig.rowGap };
-
-			track(item, animate(row, from, timing));
-		});
-	}
-
-	function show(item, immediate = false) {
-		if (open === item) return;
-
-		const previous = open || closingItem;
-		open = item;
-		closingItem = null;
-
-		// An interrupted close leaves the incoming panel mid-retract with a
-		// faded inner; stop that before anything new starts on it.
-		stopRunning(item);
-		const inner = innerOf(item);
-		if (inner) {
-			inner.style.opacity = "";
-			inner.style.transform = "";
-		}
-		setState(item, navPanelConfig.leavingAttr, false);
-
-		// Kept visible until its content has faded, or the crossfade has nothing
-		// to fade from.
-		if (previous) setState(previous, navPanelConfig.leavingAttr, true);
-		else setScrim(true);
-
-		items.forEach((candidate) => {
-			const isOpen = candidate === item;
-			setState(candidate, navPanelConfig.openAttr, isOpen);
-			linkOf(candidate)?.setAttribute("aria-expanded", isOpen ? "true" : "false");
-		});
-
-		// Embla cannot measure a panel that was display-none a frame ago.
-		sliders.get(item)?.reInit();
-
-		const height = naturalHeight(item);
-
-		if (!previous || immediate || reduceMotion) {
-			setHeight(item, height, immediate);
-			if (!immediate) playRows(item);
-			if (previous) {
-				setHeight(previous, 0, true);
-				setState(previous, navPanelConfig.leavingAttr, false);
-			}
-			return;
-		}
-
-		// Whatever the outgoing panel was still doing, this replaces it.
-		stopRunning(previous);
-
-		// Both to the same height while the contents trade places, so the two
-		// surfaces read as one that grew or shrank.
-		setHeight(previous, height, false);
-		setHeight(item, height, false);
-
-		const step = (order.indexOf(item) > order.indexOf(previous) ? 1 : -1) * navPanelConfig.shift;
-		const leaving = innerOf(previous);
-		const arriving = innerOf(item);
-
-		if (leaving) {
-			track(previous, animate(leaving, { opacity: 0, x: -step }, navPanelConfig.contentOut))
-				.finished.then(() => {
-					// Swapped back to before this finished: it is the open panel
-					// now and owns its own styles.
-					if (open === previous) return;
-					setState(previous, navPanelConfig.leavingAttr, false);
-					leaving.style.opacity = "";
-					leaving.style.transform = "";
-					setHeight(previous, 0, true);
-				})
-				.catch(() => {});
-		}
-		if (arriving) {
-			track(item, animate(arriving, { opacity: [0, 1], x: [step, 0] }, navPanelConfig.contentIn));
-		}
-	}
-
-	function hide() {
-		if (!open) return;
-		const closing = open;
-		open = null;
-		closingItem = closing;
-
-		stopRunning(closing);
-		linkOf(closing)?.setAttribute("aria-expanded", "false");
-		setScrim(false);
-
-		// The panel stays visible for its own exit. Dropping data-nav-open here
-		// and nothing else is what made closing flash: the CSS hides it on that
-		// attribute, so the height was animating on an invisible element.
-		setState(closing, navPanelConfig.openAttr, false);
-		setState(closing, navPanelConfig.leavingAttr, true);
-
-		if (reduceMotion) {
-			setHeight(closing, 0, true);
-			setState(closing, navPanelConfig.leavingAttr, false);
-			return;
-		}
-
-		// Contents leave first, the surface retracts after them.
-		const inner = innerOf(closing);
-		if (inner) {
-			track(
-				closing,
+			if (reduceMotion) panelOf(item).style.height = `${height}px`;
+			else {
 				animate(
-					inner,
-					{ opacity: 0, y: -navPanelConfig.exitRise },
-					navPanelConfig.exitContent,
-				),
-			);
+					panelOf(item),
+					{ height: `${height}px` },
+					isOpen ? navPanelConfig.openSpring : navPanelConfig.closeSpring,
+				);
+			}
+
+			renderRows(item, { isOpen, arriving, forward });
+		});
+
+		if (scrim && desktop.matches) {
+			const opacity = open ? navPanelConfig.scrimOpacity : 0;
+			if (reduceMotion) scrim.style.opacity = String(opacity);
+			else animate(scrim, { opacity }, open ? navPanelConfig.scrimIn : navPanelConfig.scrimOut);
 		}
 
-		// Hidden only once it has actually finished retracting, and not at all if
-		// it was reopened on the way down.
-		setHeight(closing, 0, false, navPanelConfig.exitSpring)
-			?.finished.then(() => {
-				// Adopted by a later open, which owns the clean-up now.
-				if (closingItem !== closing) return;
-				closingItem = null;
-				setState(closing, navPanelConfig.leavingAttr, false);
-				if (!inner) return;
-				inner.style.opacity = "";
-				inner.style.transform = "";
-			})
-			.catch(() => {});
+		rendered = open;
+	}
+
+	function renderRows(item, { isOpen, arriving, forward }) {
+		if (reduceMotion) return;
+
+		const step = forward ? navPanelConfig.rowShift : -navPanelConfig.rowShift;
+
+		rowsOf(item).forEach((row, index) => {
+			if (isOpen) {
+				// Arriving at a closed nav: rise and stagger, like the mobile
+				// links. Replacing another panel: slide across, together, so the
+				// surface reads as one thing turning over.
+				const from = arriving
+					? { y: [navPanelConfig.rowRise, 0], x: 0 }
+					: { x: [step, 0], y: 0 };
+
+				animate(
+					row,
+					{
+						opacity: [0, 1],
+						scale: [0.985, 1],
+						filter: [`blur(${navPanelConfig.rowBlur}px)`, "blur(0px)"],
+						...from,
+					},
+					{
+						...navPanelConfig.rowIn,
+						delay: arriving ? index * navPanelConfig.rowStagger : 0,
+					},
+				);
+				return;
+			}
+
+			// Leaving. No from-values: it goes from wherever it currently is,
+			// which is the whole point when a gesture is interrupted.
+			animate(
+				row,
+				{ opacity: 0, x: -step, y: 0, scale: 1, filter: `blur(${navPanelConfig.rowBlur}px)` },
+				navPanelConfig.rowOut,
+			);
+		});
+	}
+
+	function setOpen(next) {
+		if (open === next) return;
+		open = next;
+		render();
 	}
 
 	function queueOpen(item) {
 		clearTimeout(closeTimer);
 		clearTimeout(openTimer);
-		// Something is on screen, open or still retracting: swap straight away,
-		// so the morph is the whole gesture and there is no wait first.
-		if (open || closingItem) {
-			show(item);
+		// Something is already on screen: change it now. The intent delay is for
+		// arriving at a closed nav, not for changing your mind about an open one.
+		if (open) {
+			setOpen(item);
 			return;
 		}
-		openTimer = setTimeout(() => show(item), navPanelConfig.openDelay);
+		openTimer = setTimeout(() => setOpen(item), navPanelConfig.openDelay);
 	}
 
 	function queueClose() {
 		clearTimeout(openTimer);
 		clearTimeout(closeTimer);
-		closeTimer = setTimeout(hide, navPanelConfig.closeDelay);
+		closeTimer = setTimeout(() => setOpen(null), navPanelConfig.closeDelay);
 	}
 
 	function on(target, event, fn, options) {
 		target.addEventListener(event, fn, { signal, ...options });
 	}
 
-	// The featured work rail. The panel is closed when this runs, so show()
+	// The featured work rail. The panel is closed when this runs, so render
 	// re-measures it on every open.
 	items.forEach((item) => {
 		const sliderRoot = item.querySelector(navPanelConfig.slider);
@@ -357,8 +252,6 @@ export function initNavPanel(root = document, { signal } = {}) {
 	});
 
 	items.forEach((item) => {
-		linkOf(item)?.setAttribute("aria-expanded", "false");
-
 		on(item, "pointerenter", () => {
 			if (desktop.matches) queueOpen(item);
 		});
@@ -373,8 +266,7 @@ export function initNavPanel(root = document, { signal } = {}) {
 			if (event.target.closest(navPanelConfig.panel)) return;
 			if (!event.target.closest(navPanelConfig.linkSelector)) return;
 			event.preventDefault();
-			if (open === item) hide();
-			else show(item);
+			setOpen(open === item ? null : item);
 		});
 
 		// Keyboard reaches the panel by focus, so it opens the same way.
@@ -389,30 +281,25 @@ export function initNavPanel(root = document, { signal } = {}) {
 		});
 	});
 
-
 	on(document, "keydown", (event) => {
 		if (event.key !== "Escape" || !open) return;
 		const link = linkOf(open);
-		hide();
+		setOpen(null);
 		link?.focus();
 	});
 
 	// The nav hides itself on the way down; an open panel would be stranded.
-	on(window, "scroll", () => hide(), { passive: true });
-	on(document, "spw:leave", () => hide());
+	on(window, "scroll", () => setOpen(null), { passive: true });
+	on(document, "spw:leave", () => setOpen(null));
 
 	desktop.addEventListener?.("change", () => {
 		clearTimeout(openTimer);
 		clearTimeout(closeTimer);
-		setScrim(false);
-		items.forEach((item) => {
-			setState(item, navPanelConfig.openAttr, false);
-			setState(item, navPanelConfig.leavingAttr, false);
-			panelOf(item).style.height = "";
-			sliders.get(item)?.reInit();
-		});
-		open = null;
+		setOpen(null);
+		items.forEach((item) => sliders.get(item)?.reInit());
 	});
+
+	render();
 
 	signal?.addEventListener("abort", () => {
 		clearTimeout(openTimer);
