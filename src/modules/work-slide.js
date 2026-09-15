@@ -56,7 +56,9 @@ function toPixels(scope, value) {
 function initSlider(section, signal) {
 	const viewport = requireElement(section, workSlideConfig.viewportSelector, "slider viewport");
 	const wrapper = requireElement(section, workSlideConfig.wrapperSelector, "slider list");
-	const dotsNode = requireElement(section, workSlideConfig.dotsSelector, "slider dots");
+	// Optional, like the arrows below it: the nav panel's rail is paged by its
+	// arrows alone and has no room for dots.
+	const dotsNode = section.querySelector(workSlideConfig.dotsSelector);
 	const container = requireElement(section, workSlideConfig.containerSelector, "slider container");
 	const slides = [...wrapper.querySelectorAll(workSlideConfig.slideSelector)];
 
@@ -169,6 +171,8 @@ function initSlider(section, signal) {
 		threshold: workSlideConfig.dragThreshold,
 		on: {
 			init(instance) {
+				if (!dotsNode) return;
+
 				dots = buildDots(dotsNode, {
 					count: slides.length,
 					label: "Go to selected work slide",

@@ -1,4 +1,3 @@
-import EmblaCarousel from "embla-carousel";
 import { animate } from "motion";
 
 // The Work and About dropdowns.
@@ -18,6 +17,10 @@ import { animate } from "motion";
 // makes closing calm: there is no moment where the panel is hidden but still
 // collapsing, and nothing to clean up when a close is interrupted.
 //
+// The featured work rail is the site's own slider: the panel holds a
+// .section_work-slide, so work-slide.js finds and drives it like the one on the
+// discovery pages, and this file does not touch it.
+//
 // Not a popover: the top layer escapes the nav's transform, and
 // nav-auto-hide.js translates the nav away on the way down.
 
@@ -30,8 +33,6 @@ const navPanelConfig = {
 	item: ".nav_item",
 	panel: ".nav_item-panel",
 	inner: ".nav_item-panel-inner",
-	slider: "[data-nav-slider]",
-	arrow: "[data-nav-arrow]",
 	row: "[data-nav-stagger]",
 	scrim: "[data-nav-scrim]",
 	linkSelector: "a",
@@ -91,8 +92,6 @@ export function initNavPanel(root = document, { signal } = {}) {
 	const linkOf = (item) => item.querySelector(navPanelConfig.linkSelector);
 	const rowsOf = (item) => [...panelOf(item).querySelectorAll(navPanelConfig.row)];
 
-	const sliders = new Map();
-
 	// The only state. `rendered` is last frame's, kept solely to tell an arrival
 	// from a swap and to give the contents a direction to travel.
 	let open = null;
@@ -133,9 +132,6 @@ export function initNavPanel(root = document, { signal } = {}) {
 			// panel's links have to be taken out of reach explicitly.
 			panelOf(item).toggleAttribute("inert", !isOpen);
 			linkOf(item)?.setAttribute("aria-expanded", isOpen ? "true" : "false");
-
-			// Embla cannot measure a panel that had no height a frame ago.
-			if (isOpen) sliders.get(item)?.reInit();
 
 			const to = inPlay ? height : 0;
 
@@ -222,47 +218,6 @@ export function initNavPanel(root = document, { signal } = {}) {
 		target.addEventListener(event, fn, { signal, ...options });
 	}
 
-	// The featured work rail. The panel is closed when this runs, so render
-	// re-measures it on every open.
-	items.forEach((item) => {
-		const sliderRoot = item.querySelector(navPanelConfig.slider);
-		const track = sliderRoot?.firstElementChild;
-		if (!track?.children.length) return;
-
-		const embla = EmblaCarousel(sliderRoot, { align: "start", containScroll: "trimSnaps" });
-		const arrows = [...item.querySelectorAll(navPanelConfig.arrow)];
-
-		function syncArrows() {
-			// Nothing to page through: the controls are noise.
-			const idle = !embla.canScrollPrev() && !embla.canScrollNext();
-			arrows.forEach((arrow) => {
-				const can =
-					arrow.dataset.navArrow === "prev" ? embla.canScrollPrev() : embla.canScrollNext();
-				arrow.setAttribute("aria-disabled", can ? "false" : "true");
-				arrow.tabIndex = can ? 0 : -1;
-				arrow.hidden = idle;
-			});
-		}
-
-		arrows.forEach((arrow) => {
-			function go() {
-				if (arrow.getAttribute("aria-disabled") === "true") return;
-				if (arrow.dataset.navArrow === "prev") embla.scrollPrev();
-				else embla.scrollNext();
-			}
-			on(arrow, "click", go);
-			on(arrow, "keydown", (event) => {
-				if (event.key !== "Enter" && event.key !== " ") return;
-				event.preventDefault();
-				go();
-			});
-		});
-
-		embla.on("select", syncArrows).on("reInit", syncArrows);
-		syncArrows();
-		sliders.set(item, embla);
-	});
-
 	items.forEach((item) => {
 		on(item, "pointerenter", () => {
 			if (desktop.matches) queueOpen(item);
@@ -308,7 +263,6 @@ export function initNavPanel(root = document, { signal } = {}) {
 		clearTimeout(openTimer);
 		clearTimeout(closeTimer);
 		setOpen(null);
-		items.forEach((item) => sliders.get(item)?.reInit());
 	});
 
 	render();
@@ -316,7 +270,5 @@ export function initNavPanel(root = document, { signal } = {}) {
 	signal?.addEventListener("abort", () => {
 		clearTimeout(openTimer);
 		clearTimeout(closeTimer);
-		sliders.forEach((embla) => embla.destroy());
-		sliders.clear();
 	});
 }
