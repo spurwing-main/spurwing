@@ -92,8 +92,11 @@ const css = `
 	/* The panel is a full-bleed surface under the whole bar, so the bar has to
 	   be what positions it. .nav is already fixed, and the two wrappers between
 	   it and the panel are only positioned for the hover pill — which is put
-	   back by centring it, rather than by measuring the panel's box in script. */
-	.nav .nav_links { position: static; }
+	   back by centring it, rather than by measuring the panel's box in script.
+	   The isolation goes with it: it trapped the panel's z-index inside the link
+	   row, which left the scrim painting over the open panel. The pill and links
+	   sit at 0 and 1, so they keep their order without it. */
+	.nav .nav_links { position: static; isolation: auto; }
 	.nav .nav_links .nav_link-bg { top: 50%; transform: translateY(-50%); }
 
 	/* The pill keeps following the pointer as it always has. While a panel is
