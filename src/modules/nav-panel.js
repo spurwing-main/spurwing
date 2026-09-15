@@ -5,6 +5,10 @@ import { animate } from "motion";
 // One piece of markup serves both breakpoints: a full-bleed surface under the
 // bar on desktop, an in-flow accordion inside the open menu below it.
 //
+// Every panel carries the white sheet; only the one that is open shows it. So a
+// swap is one sheet resizing — the incoming panel starts at the outgoing one's
+// height — while the old contents dissolve out and the new ones focus in.
+//
 // There is one piece of state — which item is open, or none — and one render
 // that drives every panel from it. Events only set that and call render; nothing
 // else writes to the DOM, and no animation callback changes state. render can
@@ -26,7 +30,6 @@ import { animate } from "motion";
 
 const navPanelConfig = {
 	navSelector: ".nav",
-	listSelector: ".nav_links",
 	// Webflow refuses a custom attribute on these two divs — the write reports
 	// success and reads back empty — so the wrapper and the panel are found by
 	// the classes the Designer publishes. State below is still attributes.
@@ -54,17 +57,19 @@ const navPanelConfig = {
 	// life in it. Morphing is a continuation of something already on screen, so
 	// it is quicker and steadier. Leaving has no bounce at all: an overshoot on
 	// the way out reads as the panel bouncing off the top of the page.
-	arriveSpring: { type: "spring", visualDuration: 0.42, bounce: 0.2 },
-	morphSpring: { type: "spring", visualDuration: 0.36, bounce: 0.12 },
+	arriveSpring: { type: "spring", visualDuration: 0.42, bounce: 0.1 },
+	morphSpring: { type: "spring", visualDuration: 0.32, bounce: 0 },
 	leaveSpring: { type: "spring", visualDuration: 0.34, bounce: 0 },
 
 	// Borrowed from the mobile menu, which already brings its links in on this
 	// curve, distance, blur and gap. Shared so the nav moves as one thing.
 	rowIn: { duration: 0.42, ease: [0.16, 1, 0.3, 1] },
-	rowOut: { duration: 0.16, ease: [0.4, 0, 1, 1] },
+	rowOut: { duration: 0.14, ease: [0.16, 1, 0.3, 1] },
+	// The old words leave, a breath, then the new ones focus in. A fade-through
+	// rather than a crossfade — the same shape cursor.js uses to swap its text.
+	rowSwap: { duration: 0.32, ease: [0.16, 1, 0.3, 1], delay: 0.08 },
 	rowStagger: 0.024,
 	rowRise: 8,
-	rowShift: 24,
 	rowBlur: 1.25,
 
 	scrimOpacity: 0.2,
@@ -81,8 +86,6 @@ export function initNavPanel(root = document, { signal } = {}) {
 	);
 	if (!items.length) return;
 
-	const list = nav.querySelector(navPanelConfig.listSelector);
-	const order = list ? [...list.children] : items;
 	const scrim = nav.querySelector(navPanelConfig.scrim);
 	const reduceMotion =
 		typeof window.matchMedia === "function" &&
@@ -111,7 +114,13 @@ export function initNavPanel(root = document, { signal } = {}) {
 
 	function render() {
 		const arriving = Boolean(open) && !rendered;
-		const forward = rendered && open ? order.indexOf(open) > order.indexOf(rendered) : true;
+
+		// The sheet the reader can already see. A panel opening starts from that
+		// height, so on a swap the incoming sheet appears at the outgoing one's
+		// size in the very frame it takes over, and nothing white ever vanishes.
+		const from = Math.max(
+			...items.map((item) => panelOf(item).getBoundingClientRect().height),
+		);
 
 		// One height for the whole gesture. During a swap the outgoing panel
 		// holds the incoming one's height rather than collapsing, so the two
@@ -129,7 +138,9 @@ export function initNavPanel(root = document, { signal } = {}) {
 			const isOpen = item === open;
 			// Only the two panels in play share the height. Anything else is
 			// closed and stays closed.
-			const inPlay = isOpen || item === rendered;
+			// Below the breakpoint the panels are in flow, so a closed one held at
+			// the open one's height is a blank gap in the menu.
+			const inPlay = isOpen || (desktop.matches && item === rendered);
 
 			item.toggleAttribute(navPanelConfig.openAttr, isOpen);
 			panelOf(item).toggleAttribute(navPanelConfig.openAttr, isOpen);
@@ -141,9 +152,14 @@ export function initNavPanel(root = document, { signal } = {}) {
 			const to = inPlay ? height : 0;
 
 			if (reduceMotion) panelOf(item).style.height = `${to}px`;
-			else animate(panelOf(item), { height: `${to}px` }, timing);
+			else {
+				const height =
+					isOpen && desktop.matches ? [`${from}px`, `${to}px`] : `${to}px`;
 
-			renderRows(item, { isOpen, arriving, forward });
+				animate(panelOf(item), { height }, timing);
+			}
+
+			renderRows(item, { isOpen, arriving });
 		});
 
 		if (scrim && desktop.matches) {
@@ -155,43 +171,32 @@ export function initNavPanel(root = document, { signal } = {}) {
 		rendered = open;
 	}
 
-	function renderRows(item, { isOpen, arriving, forward }) {
+	function renderRows(item, { isOpen, arriving }) {
 		if (reduceMotion) return;
 
-		const step = forward ? navPanelConfig.rowShift : -navPanelConfig.rowShift;
+		const blur = `blur(${navPanelConfig.rowBlur}px)`;
 
 		rowsOf(item).forEach((row, index) => {
-			if (isOpen) {
-				// Arriving at a closed nav: rise and stagger, like the mobile
-				// links. Replacing another panel: slide across, together, so the
-				// surface reads as one thing turning over.
-				const from = arriving
-					? { y: [navPanelConfig.rowRise, 0], x: 0 }
-					: { x: [step, 0], y: 0 };
-
+			// Arriving at a closed nav: rise and stagger, like the mobile links.
+			if (isOpen && arriving) {
 				animate(
 					row,
-					{
-						opacity: [0, 1],
-						scale: [0.985, 1],
-						filter: [`blur(${navPanelConfig.rowBlur}px)`, "blur(0px)"],
-						...from,
-					},
-					{
-						...navPanelConfig.rowIn,
-						delay: arriving ? index * navPanelConfig.rowStagger : 0,
-					},
+					{ opacity: [0, 1], y: [navPanelConfig.rowRise, 0], scale: [0.985, 1], filter: [blur, "blur(0px)"] },
+					{ ...navPanelConfig.rowIn, delay: index * navPanelConfig.rowStagger },
 				);
 				return;
 			}
 
-			// Leaving. No from-values: it goes from wherever it currently is,
-			// which is the whole point when a gesture is interrupted.
-			animate(
-				row,
-				{ opacity: 0, x: -step, y: 0, scale: 1, filter: `blur(${navPanelConfig.rowBlur}px)` },
-				navPanelConfig.rowOut,
-			);
+			// Nothing travels on a swap: the sheet's only motion is vertical, and
+			// the pill under the links already says which way you went. No
+			// from-values either, so an interrupted swap carries on from wherever
+			// the row is instead of jumping back to the start.
+			if (isOpen) {
+				animate(row, { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }, navPanelConfig.rowSwap);
+				return;
+			}
+
+			animate(row, { opacity: 0, y: 0, scale: 1, filter: blur }, navPanelConfig.rowOut);
 		});
 	}
 
