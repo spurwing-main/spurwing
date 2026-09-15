@@ -1,4 +1,4 @@
-export function initFaq(root = document) {
+export function initFaq(root = document, { signal } = {}) {
 	const component = root.querySelector('[data-accordion="component"]');
 	if (!component) return;
 
@@ -21,9 +21,9 @@ export function initFaq(root = document) {
 
 	setupFaqItems();
 	bindClicks();
-	observeList();
+	observeList(signal);
 
-	window.addEventListener("resize", requestOpenItemRefresh);
+	window.addEventListener("resize", requestOpenItemRefresh, { signal });
 
 	function setupFaqItems(root = list) {
 		root.querySelectorAll('[data-accordion="item"]').forEach(setupFaqItem);
@@ -263,7 +263,7 @@ export function initFaq(root = document) {
 			});
 	}
 
-	function observeList() {
+	function observeList(signal) {
 		const observer = new MutationObserver(function (mutations) {
 			mutations.forEach(function (mutation) {
 				mutation.addedNodes.forEach(function (node) {
@@ -280,5 +280,7 @@ export function initFaq(root = document) {
 			childList: true,
 			subtree: true,
 		});
+
+		signal?.addEventListener("abort", () => observer.disconnect());
 	}
 }

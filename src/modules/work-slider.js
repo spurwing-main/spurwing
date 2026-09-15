@@ -1,7 +1,6 @@
+import EmblaCarousel from "embla-carousel";
 import { initializeOnce } from "./init-once.js";
 
-let EmblaCarousel;
-let emblaLoad;
 const initKey = Symbol("workSliderInit");
 
 const config = {
@@ -148,7 +147,7 @@ function buildSlides(root) {
 	return emblaViewport;
 }
 
-function wireGrabCursor(emblaViewport) {
+function wireGrabCursor(emblaViewport, signal) {
 	const setGrabbing = (isGrabbing) => {
 		emblaViewport.classList.toggle(config.grabbingClass, isGrabbing);
 	};
@@ -168,7 +167,7 @@ function wireGrabCursor(emblaViewport) {
 	emblaViewport.addEventListener("pointerup", onPointerUp, { passive: true });
 	emblaViewport.addEventListener("pointercancel", onPointerUp, { passive: true });
 	emblaViewport.addEventListener("lostpointercapture", onPointerUp, { passive: true });
-	window.addEventListener("blur", onPointerUp);
+	window.addEventListener("blur", onPointerUp, { signal });
 }
 
 function setDisabled(button, isDisabled) {
@@ -200,7 +199,7 @@ function getArrows(root, emblaViewport) {
 	};
 }
 
-function initOne(root) {
+function initOne(root, signal) {
 	const emblaViewport = buildSlides(root);
 
 	if (!emblaViewport) {
@@ -216,7 +215,7 @@ function initOne(root) {
 		skipSnaps: true,
 	});
 
-	wireGrabCursor(emblaViewport);
+	wireGrabCursor(emblaViewport, signal);
 
 	const syncArrows = () => {
 		setDisabled(prevBtn, !embla.canScrollPrev());
@@ -241,26 +240,7 @@ function initOne(root) {
 	syncArrows();
 }
 
-function loadDefaultEmbla() {
-	return import("https://cdn.jsdelivr.net/npm/embla-carousel@8.5.2/+esm");
-}
-
-async function loadEmbla(load) {
-	if (EmblaCarousel) return;
-
-	emblaLoad ||= load()
-		.then((module) => {
-			EmblaCarousel = module.default;
-		})
-		.catch((error) => {
-			emblaLoad = null;
-			throw error;
-		});
-
-	await emblaLoad;
-}
-
-export async function initWorkSlider(root = document, load = loadDefaultEmbla) {
+export async function initWorkSlider(root = document, { signal } = {}) {
 	const roots = [...root.querySelectorAll(config.rootSelector)];
 	if (!roots.length) return;
 
@@ -269,9 +249,8 @@ export async function initWorkSlider(root = document, load = loadDefaultEmbla) {
 			if (section.dataset.workSliderReady === "true") return undefined;
 
 			return initializeOnce(section, initKey, async () => {
-				await loadEmbla(load);
 				if (section.dataset.workSliderReady === "true") return;
-				initOne(section);
+				initOne(section, signal);
 				section.dataset.workSliderReady = "true";
 			});
 		}),

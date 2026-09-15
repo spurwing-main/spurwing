@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const code = readFileSync("loader.js", "utf8");
-const loaderSource = "https://cdn.jsdelivr.net/gh/spurwing-main/project-starter@1234567890abcdef/loader.js";
+const loaderSource = "https://cdn.jsdelivr.net/gh/spurwing-main/spurwing@1234567890abcdef/loader.js";
 
 async function runLoader({ source = loaderSource, data = {} } = {}) {
   Object.defineProperty(document, "currentScript", {
@@ -24,7 +24,7 @@ describe("loader", () => {
     document.body.innerHTML = "";
     document.documentElement.className = "";
     delete document.documentElement.dataset.projectNamespace;
-    delete window.starter;
+    delete window.spurwing;
   });
 
   it("loads the bundle from the loader commit", async () => {
@@ -33,9 +33,9 @@ describe("loader", () => {
 
     const bundle = document.head.querySelector('script[type="module"]');
     expect(bundle.src).toBe(
-      "https://cdn.jsdelivr.net/gh/spurwing-main/project-starter@1234567890abcdef/dist/bundle.js"
+      "https://cdn.jsdelivr.net/gh/spurwing-main/spurwing@1234567890abcdef/dist/bundle.js"
     );
-    expect(window.starter.boot.commit).toBe("1234567890abcdef");
+    expect(window.spurwing.boot.commit).toBe("1234567890abcdef");
   });
 
   it("uses a valid commit override and shows the panel", async () => {
@@ -53,10 +53,10 @@ describe("loader", () => {
     window.history.replaceState({}, "", "/?env=live");
     await runLoader();
 
-    expect(document.documentElement.classList.contains("starter-loading")).toBe(true);
+    expect(document.documentElement.classList.contains("spurwing-loading")).toBe(true);
     vi.advanceTimersByTime(4000);
-    expect(document.documentElement.classList.contains("starter-ready")).toBe(true);
-    expect(document.documentElement.classList.contains("starter-loading")).toBe(false);
+    expect(document.documentElement.classList.contains("spurwing-ready")).toBe(true);
+    expect(document.documentElement.classList.contains("spurwing-loading")).toBe(false);
   });
 
   it("uses the live bundle if the local module load fails", async () => {
@@ -94,13 +94,13 @@ describe("loader", () => {
   });
 
   it("reads a stored environment on staging", async () => {
-    window.sessionStorage.setItem("starter_environment", "live");
+    window.sessionStorage.setItem("spurwing_environment", "live");
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await runLoader();
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(window.starter.boot.environment).toBe("live");
+    expect(window.spurwing.boot.environment).toBe("live");
     expect(document.querySelector("[data-loader-panel]")).not.toBeNull();
   });
 });

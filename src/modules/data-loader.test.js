@@ -1,9 +1,13 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { bootModules } from "../boot.js";
+import { bootModules, resetModules, restartModules } from "../boot.js";
 import { initDataLoader } from "./data-loader.js";
 
 describe("initDataLoader", () => {
+	beforeEach(() => {
+		resetModules();
+	});
+
 	afterEach(() => {
 		document.body.innerHTML = "";
 		delete document.documentElement.dataset.cmsCountLoaderReady;
@@ -24,13 +28,24 @@ describe("initDataLoader", () => {
 		expect(next).toHaveBeenCalledOnce();
 	});
 
-	it("does not request the same count document twice for repeated initialization", () => {
+	it("requests the count document once per page, not once per boot call", async () => {
+		document.body.innerHTML = '<span data-cms-count-target="work"></span>';
+		const fetch = vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
+		const modules = [{ name: "data-loader", init: initDataLoader }];
+
+		await bootModules(modules);
+		await bootModules(modules);
+
+		expect(fetch).toHaveBeenCalledOnce();
+	});
+
+	it("loads the counts again on the next page, because the markup is new", async () => {
 		document.body.innerHTML = '<span data-cms-count-target="work"></span>';
 		const fetch = vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
 
-		initDataLoader();
-		initDataLoader();
+		await bootModules([{ name: "data-loader", init: initDataLoader }]);
+		restartModules();
 
-		expect(fetch).toHaveBeenCalledOnce();
+		expect(fetch).toHaveBeenCalledTimes(2);
 	});
 });

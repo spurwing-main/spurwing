@@ -1,7 +1,6 @@
+import EmblaCarousel from "embla-carousel";
 import { initializeOnce } from "./init-once.js";
 
-let EmblaCarousel;
-let emblaLoad;
 const initKey = Symbol("workRailInit");
 
 const config = {
@@ -721,26 +720,7 @@ function createWorkRail(section) {
 	};
 }
 
-function loadDefaultEmbla() {
-	return import("https://cdn.jsdelivr.net/npm/embla-carousel@8.6.0/+esm");
-}
-
-async function loadEmbla(load) {
-	if (EmblaCarousel) return;
-
-	emblaLoad ||= load()
-		.then((module) => {
-			EmblaCarousel = module.default;
-		})
-		.catch((error) => {
-			emblaLoad = null;
-			throw error;
-		});
-
-	await emblaLoad;
-}
-
-export async function initWorkRail(root = document, load = loadDefaultEmbla) {
+export async function initWorkRail(root = document) {
 	const sections = Array.from(root.querySelectorAll(config.sectionSelector));
 	if (!sections.length) return;
 
@@ -749,7 +729,6 @@ export async function initWorkRail(root = document, load = loadDefaultEmbla) {
 			if (section.workRail) return undefined;
 
 			return initializeOnce(section, initKey, async () => {
-				await loadEmbla(load);
 				if (section.workRail) return;
 				section.workRail = createWorkRail(section);
 			});

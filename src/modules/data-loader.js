@@ -2,7 +2,6 @@ const config = {
 	endpoint: "/dev/data",
 	targetSelector: "[data-cms-count-target]",
 	sourceAttr: "data-cms-count",
-	okAttrPrefix: "data-cms-count-ok-",
 	allOkAttr: "data-cms-count-ok",
 	preloadEnabled: true,
 };
@@ -66,10 +65,10 @@ async function hydrateCounts(root, preload) {
 export function initDataLoader(root = document) {
 	const targets = root.querySelectorAll(config.targetSelector);
 	if (!targets.length) return;
-	const scopeElement = root.documentElement || root;
-	if (scopeElement.dataset.cmsCountLoaderReady === "true") return;
-	scopeElement.dataset.cmsCountLoaderReady = "true";
 
+	// No sentinel on documentElement: it would survive a page transition and stop
+	// the next page's counts ever loading. boot.js runs each module once a page,
+	// and the response is served from the HTTP cache on a repeat visit.
 	const preload = config.preloadEnabled ? startFetchText(config.endpoint) : null;
 	hydrateCounts(root, preload).catch(() => {});
 }

@@ -1,8 +1,4 @@
-const motionUrl = "https://cdn.jsdelivr.net/npm/motion@12.34.0/+esm";
-let animate;
-let motionValue;
-let springValue;
-let styleEffect;
+import { animate, motionValue, springValue, styleEffect } from "motion";
 
 const config = {
 	rootSel: ".cursor-root",
@@ -30,10 +26,6 @@ const anchorOffsets = {
 };
 
 let pointer;
-
-function loadDefaultMotion() {
-	return import(motionUrl);
-}
 
 function resolveAnchor(el) {
 	const key = (el.getAttribute(config.anchorAttr) || config.defaultAnchor).toLowerCase();
@@ -277,7 +269,7 @@ function createItem(el, queryRoot) {
 	};
 }
 
-export async function initCursor(root = document, loadMotion = loadDefaultMotion) {
+export async function initCursor(root = document, { signal } = {}) {
 	const cursorRoot = root.querySelector(config.rootSel);
 	if (!cursorRoot) return;
 	cursorRoot.cursor?.destroy();
@@ -291,7 +283,6 @@ export async function initCursor(root = document, loadMotion = loadDefaultMotion
 	const itemElements = [...cursorRoot.querySelectorAll(config.itemSel)];
 	if (!itemElements.length) return;
 
-	({ animate, motionValue, springValue, styleEffect } = await loadMotion());
 	pointer = {
 		x: motionValue(0),
 		y: motionValue(0),
@@ -315,6 +306,11 @@ export async function initCursor(root = document, loadMotion = loadDefaultMotion
 	let currentTarget = null;
 	let timer = 0;
 	const abort = new AbortController();
+
+	// boot.js aborts the previous run before the next, so the window and
+	// document listeners below go with it rather than waiting for the next
+	// initCursor to tear them down.
+	signal?.addEventListener("abort", () => abort.abort());
 
 	function on(target, event, fn, opts = {}) {
 		target.addEventListener(event, fn, { signal: abort.signal, ...opts });

@@ -18,7 +18,7 @@ const workSlideConfig = {
 	readyValue: "swiper-fixed-v4",
 };
 
-export function initWorkSlide(root = document) {
+export function initWorkSlide(root = document, { signal } = {}) {
 	const roots = Array.from(root.querySelectorAll(workSlideConfig.rootSelector));
 
 	if (!roots.length) return;
@@ -27,7 +27,7 @@ export function initWorkSlide(root = document) {
 		throw new Error("Swiper failed to load.");
 	}
 
-	roots.forEach(initSlider);
+	roots.forEach((section) => initSlider(section, signal));
 }
 
 function getRequired(scope, selector, label) {
@@ -77,7 +77,7 @@ function getCssLengthInPx(scope, value) {
 	return width;
 }
 
-function initSlider(section) {
+function initSlider(section, signal) {
 	const viewport = getRequired(section, workSlideConfig.viewportSelector, "work slider viewport");
 	const wrapper = getRequired(section, workSlideConfig.wrapperSelector, "work slider wrapper");
 	const dotsNode = getRequired(section, workSlideConfig.dotsSelector, "work slider dots");
@@ -114,8 +114,6 @@ function initSlider(section) {
 		slide.style.maxWidth = "";
 		slide.style.flexBasis = "";
 	});
-
-	const slideGap = getSlideGap();
 
 	wrapper.style.gap = "0px";
 	wrapper.style.columnGap = "0px";
@@ -204,13 +202,18 @@ function initSlider(section) {
 	protectSlideLinks(viewport);
 	wireArrowKeys(section);
 
-	window.addEventListener("resize", scheduleUpdate);
-	window.addEventListener("load", scheduleUpdate, { once: true });
+	window.addEventListener("resize", scheduleUpdate, { signal });
+	window.addEventListener("load", scheduleUpdate, { once: true, signal });
 
 	const resizeObserver = new ResizeObserver(scheduleUpdate);
 
 	resizeObserver.observe(viewport);
 	resizeObserver.observe(container);
+
+	signal?.addEventListener("abort", function () {
+		resizeObserver.disconnect();
+		swiper?.destroy(true, true);
+	});
 
 	function getSlideGap() {
 		const styles = window.getComputedStyle(section);
@@ -439,6 +442,6 @@ function initSlider(section) {
 		el.addEventListener("pointerdown", onPointerDown, { passive: true });
 		el.addEventListener("pointerup", onPointerUp, { passive: true });
 		el.addEventListener("pointercancel", onPointerUp, { passive: true });
-		window.addEventListener("blur", onPointerUp);
+		window.addEventListener("blur", onPointerUp, { signal });
 	}
 }

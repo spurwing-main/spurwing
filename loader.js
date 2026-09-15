@@ -1,12 +1,11 @@
 (() => {
   "use strict";
 
-  // Edit this block when you start a project.
   const DEFAULTS = Object.freeze({
-    namespace: "starter",
-    label: "Project Starter JS",
+    namespace: "spurwing",
+    label: "Spurwing JS",
     owner: "spurwing-main",
-    project: "project-starter",
+    project: "spurwing",
     commit: "main",
     environment: "auto",
     localBase: "http://localhost:5500",

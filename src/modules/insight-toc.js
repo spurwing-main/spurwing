@@ -2,7 +2,7 @@ function qsa(root, selector) {
 	return Array.from(root.querySelectorAll(selector));
 }
 
-export function initInsightToc(root = document) {
+export function initInsightToc(root = document, { signal } = {}) {
 	/**
 	 * Insights table-of-contents indicator.
 	 *
@@ -24,7 +24,7 @@ export function initInsightToc(root = document) {
 	const LINK_SELECTOR = ".insights-item-sidebar_link";
 	const CURRENT_SELECTOR = `${LINK_SELECTOR}.w--current`;
 
-	function setupInsightsToc(list) {
+	function setupInsightsToc(list, signal) {
 		if (list.hasAttribute("data-insights-toc-ready")) return;
 		list.setAttribute("data-insights-toc-ready", "");
 
@@ -69,6 +69,8 @@ export function initInsightToc(root = document) {
 		}
 
 		const mutationObserver = new MutationObserver(updateFromCurrent);
+
+		signal?.addEventListener("abort", () => mutationObserver.disconnect());
 		mutationObserver.observe(list, {
 			subtree: true,
 			attributes: true,
@@ -84,9 +86,10 @@ export function initInsightToc(root = document) {
 			});
 			resizeObserver.observe(list);
 			qsa(list, LINK_SELECTOR).forEach((link) => resizeObserver.observe(link));
+			signal?.addEventListener("abort", () => resizeObserver.disconnect());
 		}
 
 		updateFromCurrent();
 	}
-	qsa(root, LIST_SELECTOR).forEach(setupInsightsToc);
+	qsa(root, LIST_SELECTOR).forEach((list) => setupInsightsToc(list, signal));
 }

@@ -1,24 +1,20 @@
+import { animate, inView } from "motion";
+
 import { initializeOnce } from "./init-once.js";
 
-const motionUrl = "https://cdn.jsdelivr.net/npm/motion@12.34.0/+esm";
 const initKey = Symbol("approachHeroInit");
 
-function loadDefaultMotion() {
-	return import(motionUrl);
-}
-
-export function initApproachHero(root = document, loadMotion = loadDefaultMotion) {
+export function initApproachHero(root = document, { signal } = {}) {
 	const section = root.querySelector(".section_caps");
 	if (!section || section.dataset.approachHeroReady === "true") return;
 
-	return initializeOnce(section, initKey, () => setupApproachHero(root, section, loadMotion));
+	return initializeOnce(section, initKey, () => setupApproachHero(root, section, signal));
 }
 
-async function setupApproachHero(root, section, loadMotion) {
+async function setupApproachHero(root, section, signal) {
 	const blur = root.querySelector(".progressive-blur[data-fade-out]");
 	if (!blur) throw new Error('blur not found: expected ".progressive-blur[data-fade-out]"');
 
-	const { animate, inView } = await loadMotion();
 	section.dataset.approachHeroReady = "true";
 	blur.style.setProperty("--fade", "1");
 
@@ -32,7 +28,6 @@ async function setupApproachHero(root, section, loadMotion) {
 
 	const setFade = (to) => {
 		if (current === to) return;
-		console.log("[blur] fade", current, "->", to);
 		current = to;
 
 		anim?.cancel?.();
@@ -43,13 +38,7 @@ async function setupApproachHero(root, section, loadMotion) {
 		);
 	};
 
-	const update = (reason) => {
-		console.log("[blur] update", reason, {
-			armed,
-			inSection,
-			scrollY: Math.round(window.scrollY),
-		});
-
+	const update = () => {
 		// If you're not armed, always stay visible.
 		if (!armed) return setFade(1);
 
@@ -65,35 +54,30 @@ async function setupApproachHero(root, section, loadMotion) {
 
 		if (armed === nextArmed) return;
 
-		console.log("[blur] armed", armed, "->", nextArmed, {
-			threshold,
-			hysteresisPx,
-			scrollY: Math.round(y),
-		});
-
 		armed = nextArmed;
-		update("arm-toggle");
+		update();
 	};
 
-	window.addEventListener("scroll", armIfNeeded, { passive: true });
-	window.addEventListener("resize", armIfNeeded);
+	window.addEventListener("scroll", armIfNeeded, { passive: true, signal });
+	window.addEventListener("resize", armIfNeeded, { signal });
 
-	inView(
+	// inView returns its own stop function; discarding it left an
+	// IntersectionObserver watching a section the router had already removed.
+	const stopInView = inView(
 		section,
 		() => {
 			inSection = true;
-			console.log("[blur] enter");
-			update("enter");
+			update();
 			return () => {
 				inSection = false;
-				console.log("[blur] leave");
-				update("leave");
+				update();
 			};
 		},
 		{ margin: "-15% 0px -15% 0px" },
 	);
 
-	console.log("[blur] init", { threshold: armY(), hysteresisPx });
+	signal?.addEventListener("abort", () => stopInView());
+
 	armIfNeeded();
-	update("init");
+	update();
 }

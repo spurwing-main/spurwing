@@ -1,4 +1,4 @@
-export function initStick(root = document) {
+export function initStick(root = document, { signal } = {}) {
 	const layout = root.querySelector(".stick_layout");
 	if (!layout || layout.dataset.stickReady === "true") return;
 	const mq = window.matchMedia("(min-width: 768px)");
@@ -66,8 +66,8 @@ export function initStick(root = document) {
 			io.observe(target);
 		});
 
-		window.addEventListener("resize", pickClosestTo50vh);
-		window.addEventListener("scroll", pickClosestTo50vh, { passive: true });
+		window.addEventListener("resize", pickClosestTo50vh, { signal });
+		window.addEventListener("scroll", pickClosestTo50vh, { passive: true, signal });
 		pickClosestTo50vh();
 	}
 
@@ -90,11 +90,9 @@ export function initStick(root = document) {
 		}
 	}
 
-	if (typeof mq.addEventListener === "function") {
-		mq.addEventListener("change", handleBreakpointChange);
-	} else {
-		mq.addListener(handleBreakpointChange);
-	}
+	// A MediaQueryList is global, so without the signal every visit to this page
+	// left another handler behind holding a detached section.
+	mq.addEventListener("change", handleBreakpointChange, { signal });
 
 	handleBreakpointChange();
 }

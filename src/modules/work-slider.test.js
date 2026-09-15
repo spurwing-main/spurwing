@@ -11,9 +11,7 @@ const createEmbla = vi.hoisted(() =>
 	}),
 );
 
-vi.mock("https://cdn.jsdelivr.net/npm/embla-carousel@8.5.2/+esm", () => ({
-	default: createEmbla,
-}));
+vi.mock("embla-carousel", () => ({ default: createEmbla }));
 
 import { initWorkSlider } from "./work-slider.js";
 
@@ -43,9 +41,8 @@ describe("initWorkSlider", () => {
 			</section>
 		`;
 
-		const loadEmbla = async () => ({ default: createEmbla });
 		await expect(
-			Promise.all([initWorkSlider(document, loadEmbla), initWorkSlider(document, loadEmbla)]),
+			Promise.all([initWorkSlider(document), initWorkSlider(document)]),
 		).resolves.toBeDefined();
 
 		expect(createEmbla).toHaveBeenCalledOnce();

@@ -28,12 +28,12 @@ const config = {
 	rootMargin: "0px 0px -5% 0px",
 };
 
-export function initWorkCardAnim(root = document) {
-	const scopeElement = root.documentElement || root;
+export function initWorkCardAnim(root = document, { signal } = {}) {
+	// No sentinel on documentElement: it would survive a page transition and stop
+	// the next page's cards ever revealing. boot.js runs each module once a page.
 	const revealNodes = root.querySelectorAll(".work-item_component, .team_item");
-	if (!revealNodes.length || scopeElement.dataset.workCardAnimReady === "true") return;
+	if (!revealNodes.length) return;
 
-	scopeElement.dataset.workCardAnimReady = "true";
 	const canReduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 	if (canReduce) {
@@ -110,6 +110,8 @@ export function initWorkCardAnim(root = document) {
 		{ threshold: config.threshold, rootMargin: config.rootMargin },
 	);
 
+	signal?.addEventListener("abort", () => io.disconnect());
+
 	const observeItem = (el) => {
 		if (!matchesAny(el, config.itemSelectors)) return;
 		if (isDisabled(el)) return;
@@ -127,8 +129,12 @@ export function initWorkCardAnim(root = document) {
 	observeAllNow();
 
 	let resizeRaf = 0;
-	addEventListener("resize", () => {
-		cancelAnimationFrame(resizeRaf);
-		resizeRaf = requestAnimationFrame(applyStagger);
-	});
+	addEventListener(
+		"resize",
+		() => {
+			cancelAnimationFrame(resizeRaf);
+			resizeRaf = requestAnimationFrame(applyStagger);
+		},
+		{ signal },
+	);
 }

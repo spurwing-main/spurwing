@@ -6,6 +6,8 @@ import { initCursor } from "./cursor.js";
 import { initDataLoader } from "./data-loader.js";
 import { initFaq } from "./faq.js";
 import { initInsightToc } from "./insight-toc.js";
+import { initMenuToggle } from "./menu-toggle.js";
+import { initNavAutoHide } from "./nav-auto-hide.js";
 import { initQuoteFade } from "./quote-fade.js";
 import { initRightway } from "./rightway.js";
 import { initRtFlow } from "./rt-flow.js";
@@ -13,13 +15,14 @@ import { initStick } from "./stick.js";
 import { initTeamSwitch } from "./team-switch.js";
 import { initWorkArchive } from "./work-archive.js";
 import { initWorkCardAnim } from "./work-card-anim.js";
-import { initWorkRail } from "./work-rail.js";
 import { initWorkSlide } from "./work-slide.js";
 import { initWorkSlider } from "./work-slider.js";
 
 // Keep DOM-building modules before the behaviors that measure or animate their output.
 export const modules = [
 	{ name: "data-loader", init: initDataLoader },
+	{ name: "menu-toggle", init: initMenuToggle },
+	{ name: "nav-auto-hide", init: initNavAutoHide },
 	{ name: "rt-flow", init: initRtFlow },
 	{ name: "booking-details", init: initBookingDetails },
 	{ name: "copy", init: initCopy },
@@ -33,7 +36,6 @@ export const modules = [
 	{ name: "rightway", init: initRightway },
 	{ name: "work-slide", init: initWorkSlide },
 	{ name: "quote-fade", init: initQuoteFade },
-	{ name: "work-rail", init: initWorkRail },
 	{ name: "work-card-anim", init: initWorkCardAnim },
 	{ name: "approach-hero", init: initApproachHero },
 	{ name: "cursor", init: initCursor },

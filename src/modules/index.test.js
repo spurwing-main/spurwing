@@ -13,6 +13,8 @@ describe("module registry", () => {
 	it("exposes every migrated behavior through the project module interface", () => {
 		expect(modules.map((module) => module.name)).toEqual([
 			"data-loader",
+			"menu-toggle",
+			"nav-auto-hide",
 			"rt-flow",
 			"booking-details",
 			"copy",
@@ -26,7 +28,6 @@ describe("module registry", () => {
 			"rightway",
 			"work-slide",
 			"quote-fade",
-			"work-rail",
 			"work-card-anim",
 			"approach-hero",
 			"cursor",

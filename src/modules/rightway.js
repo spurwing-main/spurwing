@@ -1,33 +1,22 @@
+import EmblaCarousel from "embla-carousel";
 import { initializeOnce } from "./init-once.js";
 
-const emblaUrl = "https://cdn.jsdelivr.net/npm/embla-carousel/embla-carousel.umd.js";
 const sliderBreakpoint = 991;
 const initKey = Symbol("rightwayInit");
 
-function loadDefaultEmbla() {
-	return import(emblaUrl);
-}
-
-export function initRightway(root = document, loadEmbla = loadDefaultEmbla) {
+export function initRightway(root = document, { signal } = {}) {
 	const slider = root.querySelector(".rightway_slider");
 
 	if (!slider || slider.dataset.rightwayReady === "true") return;
 
 	return initializeOnce(slider, initKey, async () => {
-		if (!window.EmblaCarousel) {
-			await loadEmbla();
-		}
 
-		if (!window.EmblaCarousel) {
-			throw new Error("Embla Carousel failed to load.");
-		}
-
-		createResponsiveSlider(slider);
+		createResponsiveSlider(slider, signal);
 		slider.dataset.rightwayReady = "true";
 	});
 }
 
-function createResponsiveSlider(slider) {
+function createResponsiveSlider(slider, signal) {
 	const root = slider.closest(".rightway_layout");
 	const container = slider.querySelector(".rightway_grid");
 	const slides = slider.querySelectorAll(".rightway_card");
@@ -81,7 +70,7 @@ function createResponsiveSlider(slider) {
 	function enableSlider() {
 		if (emblaApi) return;
 
-		emblaApi = window.EmblaCarousel(slider, {
+		emblaApi = EmblaCarousel(slider, {
 			loop: false,
 			align: "start",
 			containScroll: "trimSnaps",
@@ -115,6 +104,8 @@ function createResponsiveSlider(slider) {
 		}
 	}
 
-	breakpoint.addEventListener("change", syncSlider);
+	// Without the signal this outlives the page it was built for: the router
+	// swaps the DOM but a MediaQueryList is global, so every visit added one.
+	breakpoint.addEventListener("change", syncSlider, { signal });
 	syncSlider();
 }

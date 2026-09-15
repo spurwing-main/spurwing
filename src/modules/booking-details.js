@@ -1,20 +1,17 @@
+import { animate, stagger } from "motion";
+
 import { initializeOnce } from "./init-once.js";
 
-const motionUrl = "https://cdn.jsdelivr.net/npm/motion@12.23.24/+esm";
 const initKey = Symbol("bookingDetailsInit");
 
-function loadDefaultMotion() {
-	return import(motionUrl);
-}
-
-export function initBookingDetails(root = document, loadMotion = loadDefaultMotion) {
+export function initBookingDetails(root = document) {
 	const section = root.querySelector(".section_booking-details");
 	if (!section || section.dataset.bookingDetailsReady === "true") return;
 
-	return initializeOnce(section, initKey, () => setupBookingDetails(section, loadMotion));
+	return initializeOnce(section, initKey, () => setupBookingDetails(section));
 }
 
-async function setupBookingDetails(section, loadMotion) {
+async function setupBookingDetails(section) {
 
 	const rows = [...section.querySelectorAll(".booking-details_row")];
 
@@ -57,7 +54,6 @@ async function setupBookingDetails(section, loadMotion) {
 	section.hidden = false;
 	section.classList.add("is-ready");
 
-	const { animate, stagger } = await loadMotion();
 	animateBookingDetails(section, animate, stagger);
 	section.dataset.bookingDetailsReady = "true";
 }

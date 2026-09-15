@@ -1,8 +1,8 @@
-# Spurwing Webflow project starter
+# Spurwing Webflow JS
 
-Use this repository for the custom JS of a Webflow project. Add one module for each independent behavior.
+The custom JavaScript for spurwing.co.uk. One module for each independent behavior, plus the page transition that swaps pages without reloading them.
 
-The starter keeps source files, generated files, and the loader separate.
+Source files, generated files, and the loader stay separate.
 
 ## Structure
 
@@ -10,7 +10,7 @@ The starter keeps source files, generated files, and the loader separate.
 project/
 ├── src/
 │   ├── index.js             Starts the modules after the DOM is ready.
-│   ├── boot.js              Starts each module. A module fault does not stop the next module.
+│   ├── boot.js              Starts each module with a fresh AbortSignal, and again on each new page.
 │   └── modules/
 │       └── index.js         Lists the modules in their start order.
 ├── dist/
@@ -33,6 +33,10 @@ Do not commit project notes, reports, exports, or client data. Put these files i
 `src/modules/index.js` contains the module list. `src/index.js` waits for the DOM before it starts this list.
 
 Each module starts in list order. A fault in one module does not stop the next module.
+
+Every module is called as `init(root, { signal })`. The signal is fresh on each run, and the previous run's signal is aborted first, so listeners, observers and timers cannot stack up when the page transition starts the modules again. A module that only reads the DOM can ignore it. Nothing else belongs in that second argument. Do not guard a module with a flag on `documentElement`: that flag survives a page transition and stops the next page ever starting.
+
+The page transition is not in the module list. It owns navigation for the whole session, so `src/index.js` starts it once.
 
 The bundle puts each start function in `window[NAMESPACE].modules`. This interface helps with console checks and content reloads.
 
@@ -134,7 +138,7 @@ The loader file does not change during this preview. The panel shows the selecte
 
 The namespace controls the readiness class names. A namespace of `example` gives these HTML states:
 
-The current defaults use the classes `starter-loading` and `starter-ready`. Change the namespace once when you start a project.
+The namespace is `spurwing`, so the classes are `spurwing-loading` and `spurwing-ready`.
 
 | Event                                 | HTML state                                                    |
 | ------------------------------------- | ------------------------------------------------------------- |
@@ -194,7 +198,7 @@ Set `data-local-base` on the loader tag if you use an HTTPS tunnel:
 
 ## Start a project
 
-1. Copy the starter files into the new repository.
+1. Copy these files into the new repository.
 2. Change the `DEFAULTS` values in `loader.js`.
 3. Set the GitHub remote for the new repository.
 4. Run `npm install`.

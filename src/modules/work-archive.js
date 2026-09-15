@@ -1,4 +1,4 @@
-export function initWorkArchive(queryRoot = document) {
+export function initWorkArchive(queryRoot = document, { signal } = {}) {
 	const root = queryRoot.querySelector(".section_work-archive");
 
 	if (!root || root.dataset.workArchiveReady === "true") return;
@@ -209,4 +209,6 @@ export function initWorkArchive(queryRoot = document) {
 		childList: true,
 		subtree: true,
 	});
+
+	signal?.addEventListener("abort", () => observer.disconnect());
 }

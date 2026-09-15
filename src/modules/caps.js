@@ -1,7 +1,8 @@
-const emblaUrl = "https://cdn.jsdelivr.net/npm/embla-carousel/embla-carousel.umd.js";
+import EmblaCarousel from "embla-carousel";
+
 const autoplayDelay = 4000;
 
-export async function initCaps(root = document) {
+export async function initCaps(root = document, { signal } = {}) {
 	const sliders = [...root.querySelectorAll(".embla")].filter((slider) => {
 		return slider.querySelector(".embla__container .embla__slide, .embla__slide") &&
 			slider.querySelector(".carousel-dots");
@@ -9,18 +10,11 @@ export async function initCaps(root = document) {
 
 	if (!sliders.length) return;
 
-	if (!window.EmblaCarousel) {
-		await import(emblaUrl);
-	}
 
-	if (!window.EmblaCarousel) {
-		throw new Error("Embla Carousel failed to load.");
-	}
-
-	sliders.forEach(initSlider);
+	sliders.forEach((slider) => initSlider(slider, signal));
 }
 
-function initSlider(slider) {
+function initSlider(slider, signal) {
 	if (slider.dataset.capsReady === "true") return;
 
 	const container = slider.querySelector(".embla__container");
@@ -36,7 +30,7 @@ function initSlider(slider) {
 
 	slider.dataset.capsReady = "true";
 
-	const emblaApi = window.EmblaCarousel(slider, {
+	const emblaApi = EmblaCarousel(slider, {
 		loop: true,
 		align: "start",
 	});
@@ -104,8 +98,8 @@ function initSlider(slider) {
 		{ threshold: 0.3 },
 	);
 
-	slider.addEventListener("mouseenter", stopAutoplay);
-	slider.addEventListener("mouseleave", startAutoplay);
+	slider.addEventListener("mouseenter", stopAutoplay, { signal });
+	slider.addEventListener("mouseleave", startAutoplay, { signal });
 
 	emblaApi
 		.on("init", buildDots)
@@ -119,4 +113,12 @@ function initSlider(slider) {
 	buildDots();
 	updateActiveDot();
 	observer.observe(slider);
+
+	// The router swaps the DOM but leaves this observer and the autoplay timer
+	// watching a detached slider; each visit used to add another.
+	signal?.addEventListener("abort", () => {
+		observer.disconnect();
+		stopAutoplay();
+		emblaApi.destroy();
+	});
 }

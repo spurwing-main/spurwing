@@ -1,8 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const animate = vi.hoisted(() => vi.fn(() => ({ cancel() {}, finished: Promise.resolve() })));
+
+vi.mock("motion", () => ({
+	animate,
+	motionValue: createMotionValue,
+	springValue: (source) => createMotionValue(source.get()),
+	styleEffect: () => () => {},
+}));
+
 import { initCursor } from "./cursor.js";
 
-function createMotionValue(initialValue) {
+const createMotionValue = vi.hoisted(() => function createMotionValue(initialValue) {
 	let value = initialValue;
 	const listeners = new Set();
 
@@ -23,14 +32,7 @@ function createMotionValue(initialValue) {
 			listeners.clear();
 		},
 	};
-}
-
-const motion = {
-	animate: () => ({ cancel() {}, finished: Promise.resolve() }),
-	motionValue: createMotionValue,
-	springValue: (source) => createMotionValue(source.get()),
-	styleEffect: () => () => {},
-};
+});
 
 function cursorMarkup() {
 	return `
@@ -44,6 +46,7 @@ function cursorMarkup() {
 
 describe("initCursor", () => {
 	beforeEach(() => {
+		animate.mockClear();
 		vi.stubGlobal(
 			"matchMedia",
 			vi.fn(() => ({
@@ -63,7 +66,7 @@ describe("initCursor", () => {
 
 	it("matches a target added after startup whenever a cursor root is present", async () => {
 		document.body.innerHTML = cursorMarkup();
-		await initCursor(document, async () => motion);
+		await initCursor(document);
 
 		const target = document.createElement("a");
 		target.className = "loaded-card";
@@ -77,26 +80,24 @@ describe("initCursor", () => {
 		expect(document.querySelector(".cursor-item").style.visibility).toBe("visible");
 	});
 
-	it("does not initialize on a device without hover and a fine pointer", async () => {
+	it("does not start on a device without hover and a fine pointer", async () => {
 		matchMedia.mockReturnValue({
 			matches: false,
 			addEventListener() {},
 			removeEventListener() {},
 		});
 		document.body.innerHTML = cursorMarkup();
-		const loadMotion = vi.fn(async () => motion);
 
-		await initCursor(document, loadMotion);
+		await initCursor(document);
 
-		expect(loadMotion).not.toHaveBeenCalled();
+		expect(animate).not.toHaveBeenCalled();
 	});
 
-	it("does not load Motion when the cursor root has no cursor items", async () => {
+	it("does not start when the cursor root has no cursor items", async () => {
 		document.body.innerHTML = '<div class="cursor-root"></div>';
-		const loadMotion = vi.fn(async () => motion);
 
-		await initCursor(document, loadMotion);
+		await initCursor(document);
 
-		expect(loadMotion).not.toHaveBeenCalled();
+		expect(animate).not.toHaveBeenCalled();
 	});
 });

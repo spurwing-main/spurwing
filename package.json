@@ -1,5 +1,5 @@
 {
-  "name": "project-starter",
+  "name": "spurwing",
   "private": true,
   "type": "module",
   "engines": {
@@ -16,5 +16,9 @@
     "esbuild": "^0.25.12",
     "jsdom": "^29.1.1",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "embla-carousel": "^8.6.0",
+    "motion": "^12.34.0"
   }
 }
