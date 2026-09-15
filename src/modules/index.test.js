@@ -19,6 +19,7 @@ describe("module registry", () => {
 			"booking-details",
 			"menu-toggle",
 			"nav-auto-hide",
+			"nav-panel",
 			"copy-to-clipboard",
 			"faq",
 			"insight-toc",

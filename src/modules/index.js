@@ -11,6 +11,7 @@ import { initInsightToc } from "./insight-toc.js";
 import { initIslandReveal } from "./island-reveal.js";
 import { initMenuToggle } from "./menu-toggle.js";
 import { initNavAutoHide } from "./nav-auto-hide.js";
+import { initNavPanel } from "./nav-panel.js";
 import { initQuoteFade } from "./quote-fade.js";
 import { initRightway } from "./rightway.js";
 import { initRtFlow } from "./rt-flow.js";
@@ -31,6 +32,7 @@ export const modules = [
 
 	{ name: "menu-toggle", init: initMenuToggle },
 	{ name: "nav-auto-hide", init: initNavAutoHide },
+	{ name: "nav-panel", init: initNavPanel },
 	{ name: "copy-to-clipboard", init: initCopyToClipboard },
 	{ name: "faq", init: initFaq },
 	{ name: "insight-toc", init: initInsightToc },
