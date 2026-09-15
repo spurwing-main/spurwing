@@ -46,7 +46,11 @@ Hides the navigation bar as the visitor scrolls down and brings it back once the
 
 ### `page-transition.js`
 
-Crossfades `main` and the footer through a brief white hold while the navigation stays untouched, so nothing in the nav rebuilds or flashes. It fetches the next page, waits for that page's stylesheet, webfonts and above-the-fold images, then swaps the content with `setHTMLUnsafe` so Webflow code components keep their shadow DOM. A page with a different shell, a failed fetch or a missing `setHTMLUnsafe` falls back to an ordinary navigation. It owns navigation for the whole session, so it starts once from `src/index.js` rather than through the module registry, and it carries its own CSS.
+Crossfades `main` and the footer through a brief white hold while the navigation stays untouched, so nothing in the nav rebuilds or flashes. It fetches the next page, waits for that page's stylesheet, webfonts and above-the-fold images, then swaps the content with `setHTMLUnsafe` so Webflow code components keep their shadow DOM. A page with a different shell, a failed fetch or a missing `setHTMLUnsafe` falls back to an ordinary navigation. It owns navigation for the whole session, so it starts once from `src/index.js` rather than through the module registry, and it carries its own CSS. The container it fades is built on the first navigation, never on load: moving `main` takes every `<code-island>` out of the document and puts it back, and doing that while a component's first mount is still in flight makes Webflow mount it twice and append a second copy. `page-transition.test.js` holds that line.
+
+### `island-reveal.js`
+
+Holds a Webflow code component's wrapper at zero opacity until the component has rendered something with a height, then fades it in. Webflow serves these components as an empty shell — the shadow root holds only a hidden slot — so on `/approach` the hero media was a blank gap for around 600ms and then snapped in. It leaves alone any component that had already rendered, and any wrapper holding more than the component itself, and reveals regardless after 2.5s so a failed component CDN is late rather than blank.
 
 ### `insight-toc.js`
 

@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { routeTarget } from "./page-transition.js";
+import { initPageTransition, routeTarget } from "./page-transition.js";
 
 const here = new URL("https://spurwing.co.uk/about?ref=nav");
 
@@ -84,5 +84,53 @@ describe("routeTarget", () => {
 
 	it("ignores a click that did not land on a link", () => {
 		expect(routeTarget(null, null, here)).toBeNull();
+	});
+});
+
+describe("initPageTransition", () => {
+	beforeEach(() => {
+		// jsdom has neither, and the router needs both to get past its own guards.
+		Element.prototype.setHTMLUnsafe = function (html) {
+			this.innerHTML = html;
+		};
+		vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {} }));
+		document.body.innerHTML =
+			'<div class="page-wrap"><nav class="nav"></nav>' +
+			'<main class="main-wrap"></main><div class="footer"></div></div>';
+	});
+
+	afterEach(() => {
+		document.body.innerHTML = "";
+		document.querySelectorAll("[data-pt-style]").forEach((node) => node.remove());
+		delete Element.prototype.setHTMLUnsafe;
+		vi.unstubAllGlobals();
+	});
+
+	// Moving main takes every <code-island> in it out of the document and puts it
+	// back, which runs connectedCallback again. At DOMContentLoaded a component's
+	// first mount is still in flight, so Webflow mounted it twice and appended a
+	// second copy: the approach hero ran two tickers at once. The container is
+	// built on the first navigation instead, when nothing is mid-mount.
+	it("leaves the page's own structure alone until a navigation starts", () => {
+		initPageTransition();
+
+		expect(document.querySelector("[data-pt-container]")).toBeNull();
+		expect(document.querySelector(".page-wrap > main.main-wrap")).not.toBeNull();
+		expect(document.querySelector(".page-wrap > .footer")).not.toBeNull();
+	});
+
+	it("still installs itself on a page it can swap", () => {
+		initPageTransition();
+
+		expect(document.querySelector("[data-pt-style]")).not.toBeNull();
+		expect(window.SPW?.navigate).toBeTypeOf("function");
+	});
+
+	it("stays out of the way on a page with nothing to swap", () => {
+		document.body.innerHTML = '<div class="page-wrap"><nav class="nav"></nav></div>';
+
+		initPageTransition();
+
+		expect(document.querySelector("[data-pt-container]")).toBeNull();
 	});
 });

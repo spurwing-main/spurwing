@@ -166,8 +166,16 @@ export function initPageTransition(root = document) {
 
 	// One element around main + footer so a single opacity transition covers
 	// both. Built at runtime, so the Designer and published markup are untouched
-	// and the pages still work with JavaScript off. Moving an already-hydrated
-	// <code-island> is safe — renderer, root and shadow content all survive.
+	// and the pages still work with JavaScript off.
+	//
+	// Called on the first navigation, never on load. Moving main takes every
+	// <code-island> in it out of the document and puts it back, which runs
+	// connectedCallback again. Do that while a component's first mount is still
+	// in flight — which is exactly where DOMContentLoaded falls — and Webflow
+	// mounts it twice, appending a second copy beside the first instead of
+	// reconciling: the approach hero ran two tickers, 34ms apart, stacked. By
+	// the time anyone clicks a link, every component has finished mounting and
+	// the same move is harmless.
 	function wrapCurrent() {
 		const parts = pageTransitionConfig.swap
 			.map((selector) => root.querySelector(selector))
@@ -418,6 +426,8 @@ export function initPageTransition(root = document) {
 				history.pushState({ y: targetY }, "", url);
 			}
 
+			current ??= wrapCurrent();
+
 			// Freeze the outgoing page where the eye sees it. Taking it out of flow
 			// hands the document height to the incoming page, so moving the scroll
 			// underneath is invisible even from the very bottom of the footer.
@@ -590,9 +600,9 @@ export function initPageTransition(root = document) {
 	style.textContent = STYLES;
 	document.head.append(style);
 
-	current = wrapCurrent();
-
-	if (!current) return log("nothing to swap here — leaving navigation alone");
+	if (!pageTransitionConfig.swap.some((selector) => root.querySelector(selector))) {
+		return log("nothing to swap here — leaving navigation alone");
+	}
 
 	shell = shellOf(document);
 
