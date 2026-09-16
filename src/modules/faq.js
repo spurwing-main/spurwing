@@ -16,6 +16,15 @@ export function initFaq(root = document, { signal } = {}) {
 
 	let resizeFrame = null;
 
+	// A page asks for its first answer to be showing on arrival by carrying
+	// data-faq-open-first. The FAQ section is one Component on five pages, so
+	// the page is the only place that can say it. Marked before setup, which
+	// already knows how to render an item that starts open.
+	if (document.querySelector("[data-faq-open-first]")) {
+		const firstItem = list.querySelector('[data-accordion="item"]');
+		if (firstItem) firstItem.dataset.accordionOpen = "true";
+	}
+
 	setupFaqItems();
 	bindClicks();
 	observeList(signal);
