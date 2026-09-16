@@ -29,6 +29,11 @@ const pageTransitionConfig = {
 	// out to own its DOM and cannot be told to re-read it.
 	noSwap: ["[data-pt-no-swap]"],
 
+	// What a page says about the shell it wants — today only the minimal nav on
+	// the discovery-call pages, which CSS reads off the live main. Dropped from
+	// the outgoing page so the shell follows the page the reader can see.
+	pageDeclaration: "data-nav-mode",
+
 	fetchTimeout: 6000,
 	cssTimeout: 4000,
 	readyTimeout: 800, // ceiling on waiting for fonts and above-the-fold images
@@ -434,6 +439,13 @@ export function initPageTransition(root = document) {
 			current.style.cssText =
 				`position:fixed;top:${Math.round(current.getBoundingClientRect().top)}px;` +
 				`left:0;right:0;z-index:2;pointer-events:none;`; // .nav is z-index 100
+
+			// The outgoing page has stopped speaking for the shell, so its
+			// page-level declarations stop applying here too. Both containers are
+			// in the DOM until the fade ends, and the nav reads the live page with
+			// :has(main[data-nav-mode]) — leave this on and the nav would keep the
+			// old page's bar until removal, a beat after the new page is up.
+			current.querySelector("main")?.removeAttribute(pageTransitionConfig.pageDeclaration);
 
 			// Insert BEFORE the outgoing container. Both are in the DOM during the
 			// fade and a module calls root.querySelector, which returns the first
