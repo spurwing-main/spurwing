@@ -7,8 +7,11 @@ export function initFaq(root = document, { signal } = {}) {
 	}
 	const { gsap } = window;
 
-	const ease = "expo.inOut";
-	const duration = 0.8;
+	// The reference Helena marked this against animates on the CSS `ease` curve:
+	// a soft entry, then most of the travel by half way. None of GSAP's power
+	// eases follow that shape, so it is expressed directly rather than guessed at.
+	const ease = cubicBezierEase(0.25, 0.1, 0.25, 1);
+	const duration = 0.4;
 
 	const list = component.querySelector('[fs-list-element="list"]') || component;
 	const items = new WeakMap();
@@ -64,22 +67,15 @@ export function initFaq(root = document, { signal } = {}) {
 			overflow: "hidden",
 		});
 
-		gsap.set(icon, {
-			rotate: isOpen ? 180 : 0,
-			transformOrigin: "50% 50%",
-			willChange: "transform",
-		});
-
 		gsap.set(verticalLine, {
-			opacity: isOpen ? 0 : 1,
-			transformOrigin: "50% 50%",
-			willChange: "opacity",
+			rotate: isOpen ? 90 : 0,
+			svgOrigin: "12 12",
+			willChange: "transform",
 		});
 
 		items.set(item, {
 			trigger,
 			content,
-			icon,
 			verticalLine,
 			tl: null,
 		});
@@ -131,8 +127,7 @@ export function initFaq(root = document, { signal } = {}) {
 
 		if (shouldReduceMotion) {
 			gsap.set(entry.content, { height: "auto", overflow: "hidden" });
-			gsap.set(entry.icon, { rotate: 180 });
-			gsap.set(entry.verticalLine, { opacity: 0 });
+			gsap.set(entry.verticalLine, { rotate: 90 });
 			return;
 		}
 
@@ -163,19 +158,9 @@ export function initFaq(root = document, { signal } = {}) {
 		);
 
 		entry.tl.to(
-			entry.icon,
-			{
-				rotate: 180,
-				duration,
-				ease,
-			},
-			0,
-		);
-
-		entry.tl.to(
 			entry.verticalLine,
 			{
-				opacity: 0,
+				rotate: 90,
 				duration,
 				ease,
 			},
@@ -195,8 +180,7 @@ export function initFaq(root = document, { signal } = {}) {
 
 		if (shouldReduceMotion) {
 			gsap.set(entry.content, { height: 0, overflow: "hidden" });
-			gsap.set(entry.icon, { rotate: 0 });
-			gsap.set(entry.verticalLine, { opacity: 1 });
+			gsap.set(entry.verticalLine, { rotate: 0 });
 			return;
 		}
 
@@ -224,19 +208,9 @@ export function initFaq(root = document, { signal } = {}) {
 		);
 
 		entry.tl.to(
-			entry.icon,
-			{
-				rotate: 0,
-				duration,
-				ease,
-			},
-			0,
-		);
-
-		entry.tl.to(
 			entry.verticalLine,
 			{
-				opacity: 1,
+				rotate: 0,
 				duration,
 				ease,
 			},
@@ -289,4 +263,25 @@ export function initFaq(root = document, { signal } = {}) {
 
 		signal?.addEventListener("abort", () => observer.disconnect());
 	}
+}
+
+// y for a given x on a CSS cubic-bezier, the shape a browser uses for
+// transition-timing-function. x is solved by bisection, which is exact enough
+// for a 0.4s tween and needs no plugin.
+function cubicBezierEase(p1x, p1y, p2x, p2y) {
+	const curve = (a, b, t) => 3 * (1 - t) ** 2 * t * a + 3 * (1 - t) * t * t * b + t ** 3;
+
+	return (progress) => {
+		let low = 0;
+		let high = 1;
+
+		for (let i = 0; i < 20; i += 1) {
+			const middle = (low + high) / 2;
+
+			if (curve(p1x, p2x, middle) < progress) low = middle;
+			else high = middle;
+		}
+
+		return curve(p1y, p2y, (low + high) / 2);
+	};
 }

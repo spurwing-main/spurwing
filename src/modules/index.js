@@ -15,6 +15,7 @@ import { initNavPanel } from "./nav-panel.js";
 import { initQuoteFade } from "./quote-fade.js";
 import { initRightway } from "./rightway.js";
 import { initRtFlow } from "./rt-flow.js";
+import { initWorkSchema } from "./work-schema.js";
 import { initStick } from "./stick.js";
 import { initTeamSwitch } from "./team-switch.js";
 import { initWorkArchive } from "./work-archive.js";
@@ -27,6 +28,8 @@ export const modules = [
 	{ name: "island-reveal", init: initIslandReveal },
 	{ name: "cms-counts", init: initCmsCounts },
 	{ name: "rt-flow", init: initRtFlow },
+	// After rt-flow: the facts it reads only exist once that has run.
+	{ name: "work-schema", init: initWorkSchema },
 	{ name: "impact-slider", init: initImpactSlider },
 	{ name: "booking-details", init: initBookingDetails },
 

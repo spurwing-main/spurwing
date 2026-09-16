@@ -15,6 +15,7 @@ describe("module registry", () => {
 			"island-reveal",
 			"cms-counts",
 			"rt-flow",
+			"work-schema",
 			"impact-slider",
 			"booking-details",
 			"menu-toggle",
