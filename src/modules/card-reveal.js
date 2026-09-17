@@ -106,10 +106,19 @@ export function initCardReveal(root = document, { signal } = {}) {
 	}
 
 	let resizeFrame = 0;
+	let lastWidth = window.innerWidth;
 
+	// --stagger is the transition delay, so rewriting it restarts a reveal that is
+	// already running and Safari resolves that by jumping to the end state. iOS
+	// fires resize every time the address bar collapses on scroll, which is why
+	// cards scrolled into view there sometimes appeared instantly. Only the column
+	// count feeds the stagger, and that only moves with the width.
 	window.addEventListener(
 		"resize",
 		() => {
+			if (window.innerWidth === lastWidth) return;
+
+			lastWidth = window.innerWidth;
 			cancelAnimationFrame(resizeFrame);
 			resizeFrame = requestAnimationFrame(applyStagger);
 		},
