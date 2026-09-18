@@ -56,8 +56,8 @@
 
 /**
  * Subtrees where a scroll reveal cannot work. Anything tagged inside one
- * reveals IMMEDIATELY and is never observed. All three selectors are
- * structural or framework hooks, never design class names.
+ * reveals IMMEDIATELY and is never observed. Every selector is structural or a
+ * framework hook, never a design class name.
  *
  *   .nav_item-panel: a closed dropdown is clipped to nothing and carries
  *     `content-visibility: hidden`, so its contents never intersect. Observed,
@@ -65,11 +65,18 @@
  *   .w-richtext: article body copy is content, not section furniture.
  *   [fs-list-element='list']: a Finsweet list re-renders its items on filter,
  *     and a re-rendered item has no observer on it.
+ *   .swiper, .embla: a slide sits outside the viewport HORIZONTALLY and never
+ *     intersects, however far the page is scrolled. Observed, it would stay
+ *     hidden for good and a visitor would drag to an empty panel. This is why
+ *     the capability slides on /approach and the quote slider beside them are
+ *     not grouped: they can carry the attribute now and reveal on arrival
+ *     instead. Both class names come from the carousel libraries, not the
+ *     design system.
  *
  * Reveal, do not skip: a skipped element still matches the CSS hold rule,
  * with nothing left to release it.
  */
-const EXCLUDE = ".nav_item-panel, .w-richtext, [fs-list-element='list']";
+const EXCLUDE = ".nav_item-panel, .w-richtext, [fs-list-element='list'], .swiper, .embla";
 
 /** Long enough to cover a slow bundle load. Short enough that a failure isn't felt. */
 const GRACE_MS = 2500;
@@ -96,6 +103,24 @@ function release(element, { track = true } = {}) {
 	if (track) revealedAt.set(element, performance.now());
 
 	element.setAttribute("data-anim-state", "in");
+}
+
+/**
+ * Show an element without animating it. A reveal is an introduction, not a
+ * transition: content already on screen when the page settles has nothing to
+ * arrive from, and animating it is a second entrance on top of the one the
+ * visitor already watched. Below the fold still reveals on scroll, on a cold
+ * load and a soft navigation alike.
+ */
+function show(element) {
+	element.setAttribute("data-anim-state", "instant");
+}
+
+/** Already on screen, so there is nothing to reveal it from. */
+function onScreen(element) {
+	const box = element.getBoundingClientRect();
+
+	return box.bottom > 0 && box.top < (window.innerHeight || 0);
 }
 
 /**
@@ -127,7 +152,7 @@ function guard() {
 	if (stuck) document.documentElement.setAttribute("data-anim-panic", "");
 }
 
-function startObserver(root) {
+function startObserver(root, coldLoad) {
 	// Groups are observed alongside individually tagged elements. A group's
 	// children reveal without an attribute of their own, so there is nothing on
 	// the child to flip: the CSS reads state off the group, and the group is
@@ -139,6 +164,13 @@ function startObserver(root) {
 		),
 	];
 
+	// The load preset is the page-once entrance, so it only plays on a cold
+	// load. Arriving from another page, the transition has already announced
+	// the change and a hero that performs again on every click wears thin.
+	if (!coldLoad) {
+		root.querySelectorAll('[data-anim-on="load"]').forEach(show);
+	}
+
 	targets.filter((element) => element.closest(EXCLUDE)).forEach((element) => release(element, { track: false }));
 
 	const observable = targets.filter((element) => !element.closest(EXCLUDE));
@@ -147,6 +179,13 @@ function startObserver(root) {
 		observable.forEach((element) => release(element));
 		return;
 	}
+
+	const below = observable.filter((element) => {
+		if (!onScreen(element)) return true;
+
+		show(element);
+		return false;
+	});
 
 	const observer = new IntersectionObserver(
 		(entries) => {
@@ -167,7 +206,7 @@ function startObserver(root) {
 		{ rootMargin: "0px 0px -10% 0px", threshold: 0 },
 	);
 
-	observable.forEach((element) => observer.observe(element));
+	below.forEach((element) => observer.observe(element));
 }
 
 export function initAnim(root = document, { signal } = {}) {
@@ -183,9 +222,17 @@ export function initAnim(root = document, { signal } = {}) {
 
 	signal?.addEventListener("abort", () => clearTimeout(timer));
 
+	// html[data-pt] is set for the length of a soft navigation, so its absence
+	// is a cold load. The transition announces spw:entered once the incoming
+	// page has finished fading in; setting up before that runs every reveal
+	// behind a transparent container.
+	const coldLoad = !document.documentElement.hasAttribute("data-pt");
+
 	try {
 		document.documentElement.setAttribute("data-anim-ready", "");
-		startObserver(root);
+
+		if (coldLoad) startObserver(root, true);
+		else document.addEventListener("spw:entered", () => startObserver(root, false), { once: true, signal });
 	} catch (error) {
 		document.documentElement.removeAttribute("data-anim-ready");
 		throw error;

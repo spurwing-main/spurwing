@@ -156,6 +156,10 @@ export function initPageTransition(root = document) {
 
 	     spw:leave  a navigation started. Stop timers, close menus, tear down.
 	     spw:page   the new page is in the DOM and laid out. Set yourself up.
+	     spw:entered  the incoming page has finished fading in. Anything driven
+	                  by what the visitor can actually see belongs here, not in
+	                  spw:page: at spw:page the container is still at opacity 0
+	                  and does not start arriving for --pt-out + --pt-hold.
 	   -------------------------------------------------------------------- */
 	const announce = (type, detail) =>
 		document.dispatchEvent(new CustomEvent(type, { detail }));
@@ -497,6 +501,11 @@ export function initPageTransition(root = document) {
 
 			current.remove();
 			current = next;
+
+			// The page is on screen now. A scroll reveal set up before this point
+			// runs behind a transparent container and is over before anyone sees
+			// it, which is why this phase exists separately from spw:page.
+			announce("spw:entered", { container: next, url });
 
 			rememberScroll();
 			announcer.textContent = document.title;
