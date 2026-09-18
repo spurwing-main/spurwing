@@ -1,5 +1,6 @@
 import { initAnim } from "./anim.js";
 import { initApproachHero } from "./approach-hero.js";
+import { initApproachSlider } from "./approach-slider.js";
 import { initBookingDetails } from "./booking-details.js";
 import { initCaps } from "./caps.js";
 import { initCardReveal } from "./card-reveal.js";
@@ -48,5 +49,6 @@ export const modules = [
 	{ name: "card-reveal", init: initCardReveal },
 	{ name: "anim", init: initAnim },
 	{ name: "approach-hero", init: initApproachHero },
+	{ name: "approach-slider", init: initApproachSlider },
 	{ name: "cursor", init: initCursor },
 ];

@@ -33,6 +33,7 @@ describe("module registry", () => {
 			"card-reveal",
 			"anim",
 			"approach-hero",
+			"approach-slider",
 			"cursor",
 		]);
 
