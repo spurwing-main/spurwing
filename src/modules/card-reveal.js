@@ -43,6 +43,14 @@ export function initCardReveal(root = document, { signal } = {}) {
 
 	const optedOut = (element) => element.hasAttribute(cardRevealConfig.optOutAttr);
 
+	// Opting a card out is what the CSS reads to show it with no transition, so
+	// it is also how a card that is already in view is handled.
+	function onScreen(element) {
+		const box = element.getBoundingClientRect();
+
+		return box.bottom > 0 && box.top < (window.innerHeight || 0);
+	}
+
 	// Items that share a top edge are one row, so counting them counts the grid's
 	// columns without needing to know the CSS.
 	function measureColumns(items) {
@@ -97,9 +105,21 @@ export function initCardReveal(root = document, { signal } = {}) {
 
 	applyStagger();
 
+	// A card already on screen when this runs has nothing to arrive from. The
+	// module boots behind everything else on the page, so on a phone the reader
+	// has often scrolled to the work list before it does — and observing a
+	// screenful of cards at once released them all together, transitioning from
+	// a standing start with no sequence. That reads as no animation at all,
+	// which is exactly what it looked like. These are shown instead: no
+	// transition to interrupt, no stagger to be absent.
 	for (const selector of cardRevealConfig.itemSelectors) {
 		for (const item of root.querySelectorAll(selector)) {
 			if (optedOut(item) || item.hasAttribute(cardRevealConfig.revealedAttr)) continue;
+
+			if (onScreen(item)) {
+				item.setAttribute(cardRevealConfig.optOutAttr, "");
+				continue;
+			}
 
 			observer.observe(item);
 		}
