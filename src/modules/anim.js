@@ -105,18 +105,7 @@ function release(element, { track = true } = {}) {
 	element.setAttribute("data-anim-state", "in");
 }
 
-/**
- * Show an element without animating it. A reveal is an introduction, not a
- * transition: content already on screen when the page settles has nothing to
- * arrive from, and animating it is a second entrance on top of the one the
- * visitor already watched. Below the fold still reveals on scroll, on a cold
- * load and a soft navigation alike.
- */
-function show(element) {
-	element.setAttribute("data-anim-state", "instant");
-}
-
-/** Already on screen, so there is nothing to reveal it from. */
+/** On screen already, so it reveals now rather than waiting for a scroll. */
 function onScreen(element) {
 	const box = element.getBoundingClientRect();
 
@@ -152,7 +141,7 @@ function guard() {
 	if (stuck) document.documentElement.setAttribute("data-anim-panic", "");
 }
 
-function startObserver(root, coldLoad) {
+function startObserver(root) {
 	// Groups are observed alongside individually tagged elements. A group's
 	// children reveal without an attribute of their own, so there is nothing on
 	// the child to flip: the CSS reads state off the group, and the group is
@@ -163,13 +152,6 @@ function startObserver(root, coldLoad) {
 				'[data-anim-group]:not([data-anim-on="load"])',
 		),
 	];
-
-	// The load preset is the page-once entrance, so it only plays on a cold
-	// load. Arriving from another page, the transition has already announced
-	// the change and a hero that performs again on every click wears thin.
-	if (!coldLoad) {
-		root.querySelectorAll('[data-anim-on="load"]').forEach(show);
-	}
 
 	targets.filter((element) => element.closest(EXCLUDE)).forEach((element) => release(element, { track: false }));
 
@@ -183,7 +165,7 @@ function startObserver(root, coldLoad) {
 	const below = observable.filter((element) => {
 		if (!onScreen(element)) return true;
 
-		show(element);
+		release(element);
 		return false;
 	});
 
@@ -222,17 +204,19 @@ export function initAnim(root = document, { signal } = {}) {
 
 	signal?.addEventListener("abort", () => clearTimeout(timer));
 
-	// html[data-pt] is set for the length of a soft navigation, so its absence
-	// is a cold load. The transition announces spw:entered once the incoming
-	// page has finished fading in; setting up before that runs every reveal
-	// behind a transparent container.
+	// A page reveals the same way however the reader arrived; the only
+	// difference is when. html[data-pt] is set for the length of a soft
+	// navigation, so its absence is a cold load and the reveal can start now.
+	// Mid-navigation it waits for spw:entered, because the incoming page is
+	// still at opacity 0 at spw:page: start there and every reveal plays out
+	// behind a transparent container and is over before anyone sees it.
 	const coldLoad = !document.documentElement.hasAttribute("data-pt");
 
 	try {
 		document.documentElement.setAttribute("data-anim-ready", "");
 
-		if (coldLoad) startObserver(root, true);
-		else document.addEventListener("spw:entered", () => startObserver(root, false), { once: true, signal });
+		if (coldLoad) startObserver(root);
+		else document.addEventListener("spw:entered", () => startObserver(root), { once: true, signal });
 	} catch (error) {
 		document.documentElement.removeAttribute("data-anim-ready");
 		throw error;
