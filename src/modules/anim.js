@@ -113,6 +113,21 @@ function onScreen(element) {
 }
 
 /**
+ * Parked off to the left or right, which on this site means a slide waiting its
+ * turn in a carousel. Scrolling never brings it into view, so an observer would
+ * hold it hidden until the reader dragged to it and then sweep the text as the
+ * slide arrived. This is the same rule as the carousel class names in EXCLUDE,
+ * expressed as geometry so it also covers the sliders that carry neither class:
+ * the cards on the homepage, the case-study rail. Nothing on this site enters
+ * from the side by design, so being off to one side always means a carousel.
+ */
+function offToTheSide(element) {
+	const box = element.getBoundingClientRect();
+
+	return box.right <= 0 || box.left >= (document.documentElement.clientWidth || 0);
+}
+
+/**
  * Last line of defence, and it has to be careful about what it calls stuck.
  * An element not yet triggered is not stuck; it is waiting its turn, which is
  * the system working. The real stuck condition is narrower: already told to
@@ -153,9 +168,11 @@ function startObserver(root) {
 		),
 	];
 
-	targets.filter((element) => element.closest(EXCLUDE)).forEach((element) => release(element, { track: false }));
+	const unreachable = (element) => element.closest(EXCLUDE) || offToTheSide(element);
 
-	const observable = targets.filter((element) => !element.closest(EXCLUDE));
+	targets.filter(unreachable).forEach((element) => release(element, { track: false }));
+
+	const observable = targets.filter((element) => !unreachable(element));
 
 	if (typeof IntersectionObserver !== "function") {
 		observable.forEach((element) => release(element));
