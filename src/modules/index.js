@@ -8,6 +8,7 @@ import { initCmsCounts } from "./cms-counts.js";
 import { initCopyToClipboard } from "./copy-to-clipboard.js";
 import { initCursor } from "./cursor.js";
 import { initFaq } from "./faq.js";
+import { initImageFade } from "./image-fade.js";
 import { initImpactSlider } from "./impact-slider.js";
 import { initInsightToc } from "./insight-toc.js";
 import { initIslandReveal } from "./island-reveal.js";
@@ -31,6 +32,7 @@ export const modules = [
 	{ name: "rt-flow", init: initRtFlow },
 	{ name: "impact-slider", init: initImpactSlider },
 	{ name: "booking-details", init: initBookingDetails },
+	{ name: "image-fade", init: initImageFade },
 
 	{ name: "menu-toggle", init: initMenuToggle },
 	{ name: "nav-auto-hide", init: initNavAutoHide },

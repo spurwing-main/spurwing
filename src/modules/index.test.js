@@ -17,6 +17,7 @@ describe("module registry", () => {
 			"rt-flow",
 			"impact-slider",
 			"booking-details",
+			"image-fade",
 			"menu-toggle",
 			"nav-auto-hide",
 			"nav-panel",
