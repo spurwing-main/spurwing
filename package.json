@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "embla-carousel": "^8.6.0",
-    "motion": "^12.34.0"
+    "motion": "^12.34.0",
+    "swiper": "^11.2.10"
   }
 }

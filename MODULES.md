@@ -6,7 +6,7 @@ Every module is called as `init(root, { signal })`. The signal is fresh on each 
 
 `boot.js` owns running each module once per page, so a module does not guard itself. The three that do — `impact-slider.js`, `quote-fade.js` and `rt-flow.js` — build by consuming the markup they build from, so a second run would read their own output. Each says so where it guards.
 
-Embla and Motion are ordinary npm imports, bundled by esbuild. Swiper and GSAP are globals that Webflow's own head loads. Tests mock the npm packages (`vi.mock("motion", …)`) rather than injecting a loader.
+Embla, Motion and Swiper are ordinary npm imports, bundled by esbuild; `src/swiper.js` registers the Swiper modules the site uses and is what the sliders import. GSAP is still a global that Webflow's own head loads, as is Swiper's stylesheet. Tests mock the npm packages (`vi.mock("motion", …)`) rather than injecting a loader.
 
 Most modules have a test beside them; `booking-details`, `caps`, `card-reveal`, `copy-to-clipboard`, `nav-panel`, `rightway`, `rt-flow`, `stick`, `team-switch` and `work-archive` do not yet.
 

@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const createSwiper = vi.hoisted(() => vi.fn());
+
+vi.mock("../swiper.js", () => ({ default: createSwiper }));
+
 import { initQuoteFade } from "./quote-fade.js";
 
 function quoteList(count) {
@@ -27,7 +31,7 @@ function stubReducedMotion(matches) {
 
 describe("initQuoteFade", () => {
 	beforeEach(() => {
-		vi.stubGlobal("Swiper", vi.fn());
+		createSwiper.mockReset();
 		stubReducedMotion(false);
 	});
 
@@ -53,9 +57,9 @@ describe("initQuoteFade", () => {
 			}),
 		).toBe(true);
 
-		expect(window.Swiper).toHaveBeenCalledTimes(1);
+		expect(createSwiper).toHaveBeenCalledTimes(1);
 
-		const options = window.Swiper.mock.calls[0][1];
+		const options = createSwiper.mock.calls[0][1];
 
 		expect(options.effect).toBe("fade");
 		expect(options.autoplay.delay).toBe(5000);
@@ -67,7 +71,7 @@ describe("initQuoteFade", () => {
 
 		initQuoteFade();
 
-		expect(window.Swiper).not.toHaveBeenCalled();
+		expect(createSwiper).not.toHaveBeenCalled();
 		expect(document.querySelector(".dc-quote").classList.contains("swiper")).toBe(false);
 	});
 
@@ -77,7 +81,7 @@ describe("initQuoteFade", () => {
 		initQuoteFade();
 		initQuoteFade();
 
-		expect(window.Swiper).toHaveBeenCalledTimes(1);
+		expect(createSwiper).toHaveBeenCalledTimes(1);
 	});
 
 	it("drops autoplay and transition speed for reduced motion", () => {
@@ -86,7 +90,7 @@ describe("initQuoteFade", () => {
 
 		initQuoteFade();
 
-		const options = window.Swiper.mock.calls[0][1];
+		const options = createSwiper.mock.calls[0][1];
 
 		expect(options.autoplay).toBe(false);
 		expect(options.speed).toBe(0);
@@ -99,7 +103,7 @@ describe("initQuoteFade", () => {
 		initQuoteFade();
 
 		const quote = document.querySelector(".dc-quote");
-		const handlers = window.Swiper.mock.calls[0][1].on;
+		const handlers = createSwiper.mock.calls[0][1].on;
 
 		handlers.autoplayTimeLeft({}, 2500, 0.5);
 		expect(quote.style.getPropertyValue("--quote-progress")).toBe("0.5");
@@ -114,12 +118,12 @@ describe("initQuoteFade", () => {
 
 		initQuoteFade();
 
-		expect(window.Swiper.mock.calls[0][1].on).toEqual({});
+		expect(createSwiper.mock.calls[0][1].on).toEqual({});
 	});
 
 	it("does nothing when the page has no quote list", () => {
 		initQuoteFade();
 
-		expect(window.Swiper).not.toHaveBeenCalled();
+		expect(createSwiper).not.toHaveBeenCalled();
 	});
 });

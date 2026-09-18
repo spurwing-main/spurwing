@@ -1,3 +1,5 @@
+import Swiper from "../swiper.js";
+
 const quoteFadeConfig = {
 	rootSelector: ".dc-quote",
 	wrapperSelector: ".w-dyn-items",
@@ -12,9 +14,6 @@ export function initQuoteFade(root = document, { signal } = {}) {
 
 	if (!roots.length) return;
 
-	if (!window.Swiper) {
-		throw new Error("Swiper failed to load.");
-	}
 
 	roots.forEach((quote) => initQuote(quote, signal));
 }
@@ -58,7 +57,7 @@ function initQuote(quote, signal) {
 		quote.style.setProperty(quoteFadeConfig.progressVar, String(filled));
 	}
 
-	const swiper = new window.Swiper(quote, {
+	const swiper = new Swiper(quote, {
 		slidesPerView: 1,
 		loop: true,
 		autoHeight: true,

@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const createSwiper = vi.hoisted(() => vi.fn());
+
+vi.mock("../swiper.js", () => ({ default: createSwiper }));
+
 import { initWorkSlide } from "./work-slide.js";
 
 function section({ arrows = true } = {}) {
@@ -43,12 +47,10 @@ describe("initWorkSlide", () => {
 			activeIndex: 0,
 		};
 
-		vi.stubGlobal(
-			"Swiper",
-			vi.fn(function () {
-				return instance;
-			}),
-		);
+		createSwiper.mockReset();
+		createSwiper.mockImplementation(function () {
+			return instance;
+		});
 		vi.stubGlobal(
 			"ResizeObserver",
 			vi.fn(function () {
@@ -78,7 +80,7 @@ describe("initWorkSlide", () => {
 
 		initWorkSlide();
 
-		const options = window.Swiper.mock.calls[0][1];
+		const options = createSwiper.mock.calls[0][1];
 
 		expect(options.navigation.prevEl).toBe(document.querySelector('[data-work-slide="prev"]'));
 		expect(options.navigation.nextEl).toBe(document.querySelector('[data-work-slide="next"]'));
@@ -118,13 +120,13 @@ describe("initWorkSlide", () => {
 		document.body.innerHTML = section({ arrows: false });
 
 		expect(() => initWorkSlide()).not.toThrow();
-		expect(window.Swiper).toHaveBeenCalledTimes(1);
-		expect(window.Swiper.mock.calls[0][1].navigation).toBe(false);
+		expect(createSwiper).toHaveBeenCalledTimes(1);
+		expect(createSwiper.mock.calls[0][1].navigation).toBe(false);
 	});
 
 	it("does nothing when the page has no work slider", () => {
 		initWorkSlide();
 
-		expect(window.Swiper).not.toHaveBeenCalled();
+		expect(createSwiper).not.toHaveBeenCalled();
 	});
 });

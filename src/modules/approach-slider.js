@@ -5,10 +5,11 @@
 // bottom bleed elements take on as it arrives.
 //
 // This ran as a 192-line embed on the page and pulled a second, different major
-// version of Swiper from the CDN to do it. It uses the site's own Swiper now,
-// the same global work-slide.js reads.
+// version of Swiper from the CDN to do it. It uses the bundled Swiper now, the
+// same one work-slide.js builds on.
 
 import { requireElement } from "../dom.js";
+import Swiper from "../swiper.js";
 
 const approachSliderConfig = {
 	rootSelector: ".g-slide_item",
@@ -47,7 +48,6 @@ export function initApproachSlider(root = document, { signal } = {}) {
 
 	if (!sliders.length) return;
 
-	if (!window.Swiper) throw new Error("Swiper failed to load.");
 
 	sliders.forEach((slider) => initSlider(slider, signal));
 }
@@ -78,21 +78,21 @@ function initSlider(slider, signal) {
 		watchSlidesProgress: true,
 	};
 
-	const meta = new window.Swiper(stacks.meta, {
+	const meta = new Swiper(stacks.meta, {
 		...shared,
 		allowTouchMove: false,
 		creativeEffect: creativeEffects.meta,
 	});
 
 	const logo = stacks.logo
-		? new window.Swiper(stacks.logo, {
+		? new Swiper(stacks.logo, {
 				...shared,
 				allowTouchMove: false,
 				creativeEffect: creativeEffects.logo,
 			})
 		: null;
 
-	const main = new window.Swiper(stacks.main, {
+	const main = new Swiper(stacks.main, {
 		...shared,
 		allowTouchMove: true,
 		simulateTouch: true,

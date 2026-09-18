@@ -1,4 +1,5 @@
 import { requireElement } from "../dom.js";
+import Swiper from "../swiper.js";
 import { buildDots, grabCursor } from "./slider-controls.js";
 
 const workSlideConfig = {
@@ -28,7 +29,6 @@ export function initWorkSlide(root = document, { signal } = {}) {
 
 	if (!sections.length) return;
 
-	if (!window.Swiper) throw new Error("Swiper failed to load.");
 
 	sections.forEach((section) => initSlider(section, signal));
 }
@@ -157,7 +157,7 @@ function initSlider(section, signal) {
 		return swiper.activeIndex;
 	};
 
-	const swiper = new window.Swiper(viewport, {
+	const swiper = new Swiper(viewport, {
 		navigation:
 			previous || next
 				? { prevEl: previous, nextEl: next, disabledClass: workSlideConfig.disabledArrowClass }
