@@ -1,3 +1,4 @@
+import { initAnim } from "./anim.js";
 import { initApproachHero } from "./approach-hero.js";
 import { initBookingDetails } from "./booking-details.js";
 import { initCaps } from "./caps.js";
@@ -45,6 +46,7 @@ export const modules = [
 	{ name: "work-slide", init: initWorkSlide },
 	{ name: "quote-fade", init: initQuoteFade },
 	{ name: "card-reveal", init: initCardReveal },
+	{ name: "anim", init: initAnim },
 	{ name: "approach-hero", init: initApproachHero },
 	{ name: "cursor", init: initCursor },
 ];

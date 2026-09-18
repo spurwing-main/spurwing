@@ -31,6 +31,7 @@ describe("module registry", () => {
 			"work-slide",
 			"quote-fade",
 			"card-reveal",
+			"anim",
 			"approach-hero",
 			"cursor",
 		]);
