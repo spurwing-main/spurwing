@@ -36,11 +36,25 @@ export function initCardReveal(root = document, { signal } = {}) {
 
 	// Opting every card out is what the CSS reads to show them immediately.
 	if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+		// `cards` is already the element the CSS reads.
 		cards.forEach((card) => card.setAttribute(cardRevealConfig.optOutAttr, ""));
 		return;
 	}
 
-	const optedOut = (element) => element.hasAttribute(cardRevealConfig.optOutAttr);
+	// THE TWO ATTRIBUTES LIVE ON DIFFERENT ELEMENTS, because the CSS reads them
+	// from different places:
+	//
+	//   .work_list-item[data-in-viewport] .work-item_component  — on the item
+	//   .work-item_component[data-reveal-disabled]               — on the card
+	//
+	// A work card is a .work-item_component inside a .work_list-item; a team card
+	// is one element doing both jobs. Opting out on the item put the attribute
+	// where no rule reads it, so the hold stayed and the card was invisible for
+	// good — and every card at the top of /work is opted out at boot, which is
+	// what made the work list come up blank.
+	const cardOf = (item) => item.querySelector(".work-item_component") ?? item;
+	const optedOut = (element) => cardOf(element).hasAttribute(cardRevealConfig.optOutAttr);
+	const optOut = (element) => cardOf(element).setAttribute(cardRevealConfig.optOutAttr, "");
 
 	// Opting a card out is what the CSS reads to show it with no transition, so
 	// it is also how a card that is already in view is handled.
@@ -118,7 +132,7 @@ export function initCardReveal(root = document, { signal } = {}) {
 		if (optedOut(item) || item.hasAttribute(cardRevealConfig.revealedAttr)) return;
 
 		if (onScreen(item)) {
-			item.setAttribute(cardRevealConfig.optOutAttr, "");
+			optOut(item);
 			return;
 		}
 
