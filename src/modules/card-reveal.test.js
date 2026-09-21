@@ -45,17 +45,28 @@ describe("initCardReveal", () => {
 		vi.restoreAllMocks();
 	});
 
-	// The rule is .work-item_component[data-reveal-disabled]. On the list item it
-	// matches nothing, and the card stays held at opacity 0 for good.
-	it("opts a card that is already on screen out on the card itself", () => {
+	// A card on screen at boot must ARRIVE, so it takes the reveal attribute like
+	// any other. The opt-out means "show with no transition" and would rob it of
+	// the animation entirely.
+	it("reveals a card that is already on screen rather than opting it out", () => {
 		const items = grid({ onScreen: true });
 
 		initCardReveal();
 
 		for (const item of items) {
-			expect(item.querySelector(".work-item_component").hasAttribute("data-reveal-disabled")).toBe(true);
-			expect(item.hasAttribute("data-reveal-disabled")).toBe(false);
+			expect(item.hasAttribute("data-in-viewport")).toBe(true);
+			expect(item.querySelector(".work-item_component").hasAttribute("data-reveal-disabled")).toBe(false);
 		}
+	});
+
+	it("gives a screenful of cards a stagger so they arrive in sequence", () => {
+		const items = grid({ onScreen: true });
+
+		initCardReveal();
+
+		const delays = items.map((item) => item.querySelector(".work-item_component").style.getPropertyValue("--stagger"));
+
+		expect(delays).toEqual(["0ms", "70ms"]);
 	});
 
 	// The rule is .work_list-item[data-in-viewport] .work-item_component, so this

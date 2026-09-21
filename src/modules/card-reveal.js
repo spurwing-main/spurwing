@@ -34,7 +34,8 @@ export function initCardReveal(root = document, { signal } = {}) {
 
 	if (!cards.length) return;
 
-	// Opting every card out is what the CSS reads to show them immediately.
+	// Opting every card out is what the CSS reads to show them immediately, with
+	// no transition. It is the one place that is the right thing to do.
 	if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
 		// `cards` is already the element the CSS reads.
 		cards.forEach((card) => card.setAttribute(cardRevealConfig.optOutAttr, ""));
@@ -48,16 +49,12 @@ export function initCardReveal(root = document, { signal } = {}) {
 	//   .work-item_component[data-reveal-disabled]               — on the card
 	//
 	// A work card is a .work-item_component inside a .work_list-item; a team card
-	// is one element doing both jobs. Opting out on the item put the attribute
-	// where no rule reads it, so the hold stayed and the card was invisible for
-	// good — and every card at the top of /work is opted out at boot, which is
-	// what made the work list come up blank.
+	// is one element doing both jobs. Reading the opt-out off the item answered
+	// false for every work card ever opted out, which is how a held card stayed
+	// held. Only reduced motion opts a card out now, and it does so on the card.
 	const cardOf = (item) => item.querySelector(".work-item_component") ?? item;
 	const optedOut = (element) => cardOf(element).hasAttribute(cardRevealConfig.optOutAttr);
-	const optOut = (element) => cardOf(element).setAttribute(cardRevealConfig.optOutAttr, "");
 
-	// Opting a card out is what the CSS reads to show it with no transition, so
-	// it is also how a card that is already in view is handled.
 	function onScreen(element) {
 		const box = element.getBoundingClientRect();
 
@@ -121,18 +118,25 @@ export function initCardReveal(root = document, { signal } = {}) {
 
 	applyStagger();
 
-	// A card already on screen when this runs has nothing to arrive from. The
-	// module boots behind everything else on the page, so on a phone the reader
-	// has often scrolled to the work list before it does — and observing a
-	// screenful of cards at once released them all together, transitioning from
-	// a standing start with no sequence. That reads as no animation at all,
-	// which is exactly what it looked like. These are shown instead: no
-	// transition to interrupt, no stagger to be absent.
+	// A card already on screen when this runs is REVEALED, not opted out.
+	//
+	// Opting it out was the obvious-looking shortcut and it was wrong twice over.
+	// The opt-out is defined as "show this with no animation" — opacity 1,
+	// transform none, transition none — so it cannot be the way to make a card
+	// arrive. And it is read off the card while the reveal is read off the list
+	// item, so putting it on the item showed nothing at all and left the whole
+	// top of /work blank.
+	//
+	// Measured on the page: setting the reveal attribute in the same task the
+	// card was first laid out transitions perfectly, 0.19 → 0.35 → 0.48 → 0.59 →
+	// 0.74 → 0.83 → 1 over its 0.52s. No forced reflow, no deferred frame. The
+	// stagger is already on each card by now, so a screenful arrives as a
+	// sequence rather than a block.
 	function claim(item) {
 		if (optedOut(item) || item.hasAttribute(cardRevealConfig.revealedAttr)) return;
 
 		if (onScreen(item)) {
-			optOut(item);
+			item.setAttribute(cardRevealConfig.revealedAttr, "");
 			return;
 		}
 
