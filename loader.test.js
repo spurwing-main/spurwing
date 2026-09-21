@@ -48,17 +48,6 @@ describe("loader", () => {
     expect(document.querySelector("[data-loader-commit]").textContent).toBe("abcdef1234");
   });
 
-  it("shows content after the ready timeout", async () => {
-    vi.useFakeTimers();
-    window.history.replaceState({}, "", "/?env=live");
-    await runLoader();
-
-    expect(document.documentElement.classList.contains("spurwing-loading")).toBe(true);
-    vi.advanceTimersByTime(4000);
-    expect(document.documentElement.classList.contains("spurwing-ready")).toBe(true);
-    expect(document.documentElement.classList.contains("spurwing-loading")).toBe(false);
-  });
-
   it("uses the live bundle if the local module load fails", async () => {
     window.history.replaceState({}, "", "/?env=local");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));

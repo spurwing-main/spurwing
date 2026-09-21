@@ -43,7 +43,12 @@ export function initInsightToc(root = document, { signal } = {}) {
 
 	template.remove();
 
-	const used = new Set([...root.querySelectorAll("[id]")].map((element) => element.id));
+	// Ids already in use on THIS page. Read from the whole document, it also saw
+	// the outgoing article during a transition: two articles sharing a "Summary"
+	// heading gave the second one `summary-2`, so a contents link copied from it
+	// was dead the moment the old page was removed.
+	const page = list.closest("[data-pt-container]") ?? root;
+	const used = new Set([...page.querySelectorAll("[id]")].map((element) => element.id));
 
 	for (const heading of body.querySelectorAll(insightTocConfig.headingSelector)) {
 		if (!heading.id) heading.id = uniqueId(slug(heading.textContent), used);

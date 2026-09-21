@@ -27,6 +27,13 @@ export function initTeamSwitch(root = document, { signal } = {}) {
 	function show(index) {
 		control.setAttribute(teamSwitchConfig.activeAttr, String(index));
 		section.setAttribute(teamSwitchConfig.activeAttr, String(index));
+
+		// The index is what the CSS reads. This is what a screen reader reads:
+		// without it, which pill is selected was carried only by an attribute on
+		// the parent and announced nowhere.
+		pills.forEach((pill, pillIndex) => {
+			pill.setAttribute("aria-pressed", pillIndex === index ? "true" : "false");
+		});
 	}
 
 	const start = Number(control.getAttribute(teamSwitchConfig.activeAttr));

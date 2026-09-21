@@ -1,6 +1,6 @@
 import EmblaCarousel from "embla-carousel";
 
-import { requireElement } from "../dom.js";
+import { freezeAndDestroy, requireElement } from "../dom.js";
 import { buildDots } from "./slider-controls.js";
 
 const rightwayConfig = {
@@ -79,7 +79,15 @@ export function initRightway(root = document, { signal } = {}) {
 	// Without the signal this outlives the page it was built for: the router
 	// swaps the DOM but a MediaQueryList is global, so every visit added one.
 	isNarrow.addEventListener("change", sync, { signal });
-	signal?.addEventListener("abort", disable);
+	// Not disable(). That one is for dropping back to the plain grid at a
+	// breakpoint, where clearing the transform and the dots is the point. Leaving
+	// the page is the opposite: the outgoing page is still on screen and opaque
+	// while it fades, so the slides stay where the reader left them.
+	signal?.addEventListener("abort", () => {
+		if (embla) freezeAndDestroy(embla, slider.querySelector(rightwayConfig.containerSelector));
+
+		embla = null;
+	});
 
 	sync();
 }

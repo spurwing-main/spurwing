@@ -143,37 +143,35 @@ The namespace is `spurwing`, so the classes are `spurwing-loading` and `spurwing
 
 | Event                                 | HTML state                                                    |
 | ------------------------------------- | ------------------------------------------------------------- |
-| The loader starts                     | Adds `data-project-namespace="example"` and `example-loading` |
+| The loader starts                     | Adds `data-project-namespace="example"`                       |
 | All module start attempts finish      | Adds `data-modules-ready`                                     |
-| The bundle finishes its start process | Removes `example-loading` and adds `example-ready`            |
-| `readyTimeout` expires                | Removes `example-loading` and adds `example-ready`            |
 | The loader does not run               | Adds no state; content stays visible                          |
 
 After a normal start, the HTML element has this state:
 
 ```html
-<html class="example-ready" data-project-namespace="example" data-modules-ready></html>
+<html data-project-namespace="example" data-modules-ready></html>
 ```
 
-The default visibility timeout is 4000 milliseconds. It protects the page if the bundle does not load or does not finish.
+One module fault does not stop the next module. The bundle still adds `data-modules-ready`.
 
-One module fault does not stop the next module. The bundle still adds `data-modules-ready` and calls `window.example.boot.ready()`.
+### What hides content, and what brings it back
 
-Gate hidden animation states only on the loading class:
+The loader hides nothing. Anything hidden before the bundle arrives is hidden by
+CSS in Webflow, gated on an attribute an inline script in Site Settings → Head
+sets before paint — today `data-anim-ready` and `data-img-ready`. That same
+inline script removes them after 8 seconds if `data-modules-ready` has not
+appeared, so a blocked CDN costs the motion and not the content.
 
-```css
-html.example-loading [data-anim] {
-	opacity: 0;
-}
+That script is the real protection and it lives in Webflow, not here. Two rules
+for anything new that hides content:
 
-html.example-ready [data-anim] {
-	opacity: 1;
-}
-```
-
-Do not use the absence of `example-ready` to hide content. Content must stay visible when `example-loading` is absent.
-
-The timeout adds `example-ready` even when the bundle fails. In that case, `data-modules-ready` is absent because the modules did not start.
+- gate it on an attribute that script controls, so one timeout releases
+  everything; and
+- make the reveal survive being cancelled. A page transition aborts every
+  module's signal, so a reveal that depends on a listener carrying that signal
+  can be taken away mid-flight, and the next run will skip an element that is
+  already marked. That has shipped twice.
 
 ### Local flow
 

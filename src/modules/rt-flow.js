@@ -54,9 +54,11 @@ export function initRtFlow(root = document) {
 			clone.querySelectorAll("[data-rt-el]").forEach((target) => {
 				const key = target.getAttribute("data-rt-el");
 
-				if (item[key] !== undefined) {
-					target.textContent = item[key];
-				}
+				// A slot the source has nothing for is removed, not left alone. Left
+				// alone it kept the template's own text, so an item written without
+				// its italic line published the Designer's placeholder copy.
+				if (item[key] === undefined) target.remove();
+				else target.textContent = item[key];
 			});
 
 			fragment.appendChild(clone);

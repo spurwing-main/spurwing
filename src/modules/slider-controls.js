@@ -1,3 +1,5 @@
+import { press } from "../dom.js";
+
 // The parts every slider on the site shares, whichever library drives it.
 
 // Dots are rebuilt rather than reconciled: a slider re-inits on resize and on
@@ -10,13 +12,17 @@ export function buildDots(dotsNode, { count, label, dotClass, selectedClass, onS
 	const dots = [...dotsNode.querySelectorAll(`.${dotClass}`)];
 
 	dots.forEach((dot) => {
-		dot.addEventListener("click", () => onSelect(Number(dot.dataset.index)));
+		press(dot, () => onSelect(Number(dot.dataset.index)));
 	});
 
 	return {
 		select(selectedIndex) {
 			dots.forEach((dot, index) => {
-				dot.classList.toggle(selectedClass, index === selectedIndex);
+				const isSelected = index === selectedIndex;
+
+				dot.classList.toggle(selectedClass, isSelected);
+				// The class is the look; this is the announcement.
+				dot.setAttribute("aria-current", isSelected ? "true" : "false");
 			});
 		},
 	};

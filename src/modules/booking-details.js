@@ -50,9 +50,11 @@ export function initBookingDetails(root = document) {
 function setBookingValue(section, label, value) {
 	const row = getBookingRow(section, label);
 
-	if (!row) {
-		throw new Error(`Booking row "${label}" not found.`);
-	}
+	// A Designer renaming a label to "E-mail", or Webflow writing a non-breaking
+	// space into one, used to throw here — before the section was unhidden, so
+	// the visitor arriving from cal.com got a heading and an empty box. One row
+	// we cannot find costs that row.
+	if (!row) return;
 
 	const valueElement = row.children[1];
 
@@ -73,7 +75,7 @@ function getBookingRow(section, label) {
 	const rows = section.querySelectorAll(".booking-details_row");
 
 	for (const row of rows) {
-		const rowLabel = row.children[0]?.textContent.trim().toLowerCase();
+		const rowLabel = row.children[0]?.textContent.replace(/\s+/g, " ").trim().toLowerCase();
 
 		if (rowLabel === label) {
 			return row;

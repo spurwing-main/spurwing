@@ -285,7 +285,19 @@ export function initCursor(root = document, { signal } = {}) {
 		x: motionValue(0),
 		y: motionValue(0),
 	};
-	const items = itemElements.map((item) => createItem(item, root));
+	// Built one at a time, and a failure takes back what was already built. Each
+	// item appends a measure node to <body> and holds spring subscriptions, and
+	// those are reachable only through this array — so a throw partway used to
+	// leak every item before it, on every navigation, with no cursor to show for
+	// it.
+	const items = [];
+
+	try {
+		for (const itemElement of itemElements) items.push(createItem(itemElement, root));
+	} catch (error) {
+		items.forEach((item) => item.destroy());
+		throw error;
+	}
 
 	function findMatch(node) {
 		let el = node instanceof Element ? node : null;

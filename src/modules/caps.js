@@ -1,5 +1,6 @@
 import EmblaCarousel from "embla-carousel";
 
+import { claimOnce, freezeAndDestroy } from "../dom.js";
 import { buildDots } from "./slider-controls.js";
 
 const capsConfig = {
@@ -15,7 +16,7 @@ const capsConfig = {
 
 export function initCaps(root = document, { signal } = {}) {
 	root.querySelectorAll(capsConfig.sliderSelector).forEach((slider) => {
-		initSlider(slider, signal);
+		if (claimOnce(slider, "data-caps-built")) initSlider(slider, signal);
 	});
 }
 
@@ -95,6 +96,6 @@ function initSlider(slider, signal) {
 	signal?.addEventListener("abort", () => {
 		observer.disconnect();
 		stop();
-		embla.destroy();
+		freezeAndDestroy(embla, container);
 	});
 }

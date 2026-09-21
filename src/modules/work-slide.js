@@ -1,4 +1,4 @@
-import { requireElement } from "../dom.js";
+import { claimOnce, keyActivates, requireElement } from "../dom.js";
 import Swiper from "../swiper.js";
 import { buildDots, grabCursor } from "./slider-controls.js";
 
@@ -30,7 +30,9 @@ export function initWorkSlide(root = document, { signal } = {}) {
 	if (!sections.length) return;
 
 
-	sections.forEach((section) => initSlider(section, signal));
+	sections.forEach((section) => {
+		if (claimOnce(section, "data-work-slide-built")) initSlider(section, signal);
+	});
 }
 
 // The CSS gap is authored in whatever unit suits the breakpoint, and Swiper
@@ -214,20 +216,10 @@ function initSlider(section, signal) {
 	grabCursor(viewport, workSlideConfig.grabbingClass, signal);
 	keepLinksFromFiringOnDrag(viewport, signal);
 
-	// The controls are divs with role="button", so Enter and Space do not
-	// activate them by themselves. Swiper owns the click; this only forwards the
-	// keys to it, and a disabled arrow stays inert because Swiper ignores it.
+	// The controls are divs, so Enter and Space do not activate them by
+	// themselves. Swiper owns the click; this only forwards the keys to it.
 	section.querySelectorAll(workSlideConfig.arrowSelector).forEach((arrow) => {
-		arrow.addEventListener(
-			"keydown",
-			(event) => {
-				if (event.key !== "Enter" && event.key !== " ") return;
-
-				event.preventDefault();
-				arrow.click();
-			},
-			{ signal },
-		);
+		keyActivates(arrow, signal);
 	});
 
 	// The observer already fires on a window resize, because both boxes are
@@ -242,7 +234,10 @@ function initSlider(section, signal) {
 	signal?.addEventListener("abort", () => {
 		cancelAnimationFrame(updateFrame);
 		resizeObserver.disconnect();
-		swiper.destroy(true, true);
+		// Not cleanStyles: see approach-slider. The outgoing page is still on
+		// screen when this runs, so stripping the transforms snaps the rail back
+		// to its first slide in front of the reader.
+		swiper.destroy(true, false);
 	});
 }
 

@@ -56,7 +56,14 @@ function revealWhenRendered(island, wrap, signal) {
 	let frame = 0;
 
 	const check = () => {
-		if (signal?.aborted) return;
+		// Hiding is instant and revealing is a promise, so the promise has to
+		// survive being cancelled. Returning here used to leave opacity 0 inline,
+		// and the next run skips an island that has since rendered — nothing was
+		// left to clear it.
+		if (signal?.aborted) {
+			wrap.style.opacity = "";
+			return;
+		}
 
 		if (!hasRendered(island) && performance.now() < deadline) {
 			frame = requestAnimationFrame(check);

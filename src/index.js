@@ -11,14 +11,16 @@ project.modules = Object.fromEntries(modules.map((module) => [module.name, modul
 document.addEventListener("spw:page", () => restartModules());
 
 async function start() {
-  initPageTransition();
-  await bootModules(modules);
-
-  if (typeof project.boot?.ready === "function") {
-    project.boot.ready();
-  } else {
-    document.documentElement.classList.add(`${namespace}-ready`);
+  // Outside bootModules' per-module try/catch, so it gets one of its own. The
+  // router throwing used to mean no module booted at all and data-modules-ready
+  // was never set — the page's whole reveal system resting on one call.
+  try {
+    initPageTransition();
+  } catch (error) {
+    console.error("[site] the router did not start.", error);
   }
+
+  await bootModules(modules);
 }
 
 if (document.readyState === "loading") {

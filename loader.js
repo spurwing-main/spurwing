@@ -10,15 +10,12 @@
     environment: "auto",
     localBase: "http://localhost:5500",
     probeTimeout: 900,
-    readyTimeout: 4000,
   });
 
   const root = document.documentElement;
   const params = new URLSearchParams(location.search);
   const script = document.currentScript;
   const namespace = DEFAULTS.namespace;
-  const readyClass = `${namespace}-ready`;
-  const loadingClass = `${namespace}-loading`;
   const storageKey = `${namespace}_environment`;
 
   if (!/^[a-z][a-z0-9-]*$/.test(namespace)) {
@@ -28,16 +25,6 @@
 
   const project = (window[namespace] = window[namespace] || {});
   root.dataset.projectNamespace = namespace;
-  root.classList.remove(readyClass);
-  root.classList.add(loadingClass);
-
-  let readyTimer;
-  const setReady = () => {
-    window.clearTimeout(readyTimer);
-    root.classList.remove(loadingClass);
-    root.classList.add(readyClass);
-  };
-  readyTimer = window.setTimeout(setReady, DEFAULTS.readyTimeout);
 
   const getParam = (name) => {
     const value = params.get(name);
@@ -114,7 +101,6 @@
     localUrl,
     liveUrl,
     devMode,
-    ready: setReady,
   };
 
   async function localIsAvailable() {

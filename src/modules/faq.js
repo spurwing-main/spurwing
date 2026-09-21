@@ -23,7 +23,10 @@ export function initFaq(root = document, { signal } = {}) {
 	// data-faq-open-first. The FAQ section is one Component on five pages, so
 	// the page is the only place that can say it. Marked before setup, which
 	// already knows how to render an item that starts open.
-	if (document.querySelector("[data-faq-open-first]")) {
+	// Scoped to the page this component is on. Read from the document, it found
+	// the outgoing page's flag during a transition and opened the first answer on
+	// a page that had not asked for it.
+	if (component.closest("[data-faq-open-first]") || pageOf(component)?.querySelector("[data-faq-open-first]")) {
 		const firstItem = list.querySelector('[data-accordion="item"]');
 		if (firstItem) firstItem.dataset.accordionOpen = "true";
 	}
@@ -67,6 +70,11 @@ export function initFaq(root = document, { signal } = {}) {
 			overflow: "hidden",
 		});
 
+		// Height 0 hides an answer from the eye but not from Tab or a screen
+		// reader: a link inside a closed answer was still reachable, and focusing
+		// it moved focus somewhere invisible.
+		content.inert = !isOpen;
+
 		gsap.set(verticalLine, {
 			rotate: isOpen ? 90 : 0,
 			svgOrigin: "12 12",
@@ -81,20 +89,30 @@ export function initFaq(root = document, { signal } = {}) {
 		});
 	}
 
+	// The page container this component sits in, so a lookup cannot reach across
+	// to the other page that is in the DOM during a transition.
+	function pageOf(element) {
+		return element.closest("[data-pt-container], main") ?? document;
+	}
+
 	function bindClicks() {
-		component.addEventListener("click", function (event) {
-			const trigger = event.target.closest('[data-accordion="trigger"]');
-			if (!trigger || !component.contains(trigger)) return;
+		component.addEventListener(
+			"click",
+			function (event) {
+				const trigger = event.target.closest('[data-accordion="trigger"]');
 
-			const item = trigger.closest('[data-accordion="item"]');
-			if (!item) {
-				throw new Error(
-					'Clicked data-accordion="trigger" has no parent data-accordion="item".',
-				);
-			}
+				if (!trigger || !component.contains(trigger)) return;
 
-			toggleItem(item);
-		});
+				const item = trigger.closest('[data-accordion="item"]');
+
+				// A trigger outside an item is markup we cannot act on. It used to
+				// throw from inside a click handler, which reaches nobody.
+				if (!item) return;
+
+				toggleItem(item);
+			},
+			{ signal },
+		);
 	}
 
 	function toggleItem(item) {

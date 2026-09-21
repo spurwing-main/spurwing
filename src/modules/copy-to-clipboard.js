@@ -1,3 +1,5 @@
+import { claimOnce, press } from "../dom.js";
+
 const copyConfig = {
 	componentSelector: ".copy_component",
 	iconSelector: ".copy_icon-svg",
@@ -7,18 +9,23 @@ const copyConfig = {
 
 export function initCopyToClipboard(root = document, { signal } = {}) {
 	root.querySelectorAll(copyConfig.componentSelector).forEach((component) => {
+		if (!claimOnce(component, "data-copy-built")) return;
+
 		const icons = [...component.querySelectorAll(copyConfig.iconSelector)];
 
-		if (!icons.length) {
-			throw new Error(`copy component has no "${copyConfig.iconSelector}"`);
-		}
+		// One component missing its icon is not a reason to leave the others
+		// without a copy button.
+		if (!icons.length) return;
 
 		component.style.cursor = "pointer";
 
 		let activeTimer = 0;
 
-		component.addEventListener(
-			"click",
+		// press(), not a click listener: this is a div styled to look like a
+		// button, so without a tabindex and a keydown it could not be reached or
+		// used without a mouse at all.
+		press(
+			component,
 			async () => {
 				const text = component.textContent.replace(/\s+/g, " ").trim();
 
@@ -39,7 +46,7 @@ export function initCopyToClipboard(root = document, { signal } = {}) {
 					icons.forEach((icon) => icon.classList.remove(copyConfig.activeClass));
 				}, copyConfig.activeMs);
 			},
-			{ signal },
+			signal,
 		);
 	});
 }

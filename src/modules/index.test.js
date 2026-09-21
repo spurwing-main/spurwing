@@ -1,3 +1,5 @@
+import { readdirSync } from "node:fs";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { bootModules } from "../boot.js";
@@ -10,36 +12,32 @@ afterEach(() => {
 });
 
 describe("module registry", () => {
-	it("exposes every migrated behavior through the project module interface", () => {
-		expect(modules.map((module) => module.name)).toEqual([
-			"island-reveal",
-			"cms-counts",
-			"rt-flow",
-			"impact-slider",
-			"booking-details",
-			"image-fade",
-			"menu-toggle",
-			"nav-auto-hide",
-			"nav-panel",
-			"copy-to-clipboard",
-			"faq",
-			"insight-toc",
-			"team-switch",
-			"stick",
-			"work-archive",
-			"caps",
-			"rightway",
-			"work-slide",
-			"quote-fade",
-			"card-reveal",
-			"anim",
-			"approach-hero",
-			"approach-slider",
-			"cursor",
-		]);
+	// Read from the directory, not from a list. The old version compared the
+	// registry with a hard-coded copy of itself, which passed if a module was
+	// deleted from both and never noticed a module file that existed but was
+	// never registered — a module nobody would have missed until the behaviour
+	// was reported broken.
+	// Two files in here are deliberately not modules: page-transition owns
+	// navigation for the whole session and is started once by src/index.js rather
+	// than restarted per page, and slider-controls is a helper the sliders share.
+	// Anything else is a module and belongs in the registry.
+	const notModules = new Set(["index", "page-transition", "slider-controls"]);
 
+	it("registers every module file", () => {
+		const files = readdirSync("src/modules")
+			.filter((file) => file.endsWith(".js") && !file.endsWith(".test.js"))
+			.map((file) => file.replace(/\.js$/, ""))
+			.filter((name) => !notModules.has(name))
+			.sort();
+
+		expect(modules.map((module) => module.name).sort()).toEqual(files);
+	});
+
+	it("gives every module a name and a callable init", () => {
 		for (const module of modules) {
-			expect(module.init).toBeTypeOf("function");
+			expect(typeof module.name).toBe("string");
+			expect(module.name).not.toBe("");
+			expect(typeof module.init).toBe("function");
 		}
 	});
 

@@ -25,7 +25,6 @@ const cardRevealConfig = {
 	stepMs: 70,
 	maxDelayMs: 260,
 	threshold: 0.05,
-	rootMargin: "0px 0px -5% 0px",
 };
 
 export function initCardReveal(root = document, { signal } = {}) {
@@ -100,7 +99,10 @@ export function initCardReveal(root = document, { signal } = {}) {
 				observer.unobserve(entry.target);
 			}
 		},
-		{ threshold: cardRevealConfig.threshold, rootMargin: cardRevealConfig.rootMargin },
+		// No negative bottom margin: it left a band at the foot of the page that
+		// the shrunken root could never reach, where a card stayed at opacity 0
+		// for good. See the same note in anim.js.
+		{ threshold: cardRevealConfig.threshold },
 	);
 
 	applyStagger();
@@ -112,18 +114,37 @@ export function initCardReveal(root = document, { signal } = {}) {
 	// a standing start with no sequence. That reads as no animation at all,
 	// which is exactly what it looked like. These are shown instead: no
 	// transition to interrupt, no stagger to be absent.
-	for (const selector of cardRevealConfig.itemSelectors) {
-		for (const item of root.querySelectorAll(selector)) {
-			if (optedOut(item) || item.hasAttribute(cardRevealConfig.revealedAttr)) continue;
+	function claim(item) {
+		if (optedOut(item) || item.hasAttribute(cardRevealConfig.revealedAttr)) return;
 
-			if (onScreen(item)) {
-				item.setAttribute(cardRevealConfig.optOutAttr, "");
-				continue;
-			}
-
-			observer.observe(item);
+		if (onScreen(item)) {
+			item.setAttribute(cardRevealConfig.optOutAttr, "");
+			return;
 		}
+
+		observer.observe(item);
 	}
+
+	const selector = cardRevealConfig.itemSelectors.join(",");
+
+	root.querySelectorAll(selector).forEach(claim);
+
+	// The CSS holds every card at opacity 0 and this is the only thing that ever
+	// releases one, so a card built after this runs — a Finsweet list re-rendering
+	// on filter, anything cloned — would be observed by nobody and stay blank for
+	// good. Watching is the only way to see DOM that did not exist yet.
+	const late = new MutationObserver((records) => {
+		for (const record of records) {
+			for (const node of record.addedNodes) {
+				if (node.nodeType !== 1) continue;
+
+				if (node.matches(selector)) claim(node);
+				else node.querySelectorAll?.(selector).forEach(claim);
+			}
+		}
+	});
+
+	late.observe(root === document ? document.documentElement : root, { childList: true, subtree: true });
 
 	let resizeFrame = 0;
 	let lastWidth = window.innerWidth;
@@ -148,5 +169,6 @@ export function initCardReveal(root = document, { signal } = {}) {
 	signal?.addEventListener("abort", () => {
 		cancelAnimationFrame(resizeFrame);
 		observer.disconnect();
+		late.disconnect();
 	});
 }

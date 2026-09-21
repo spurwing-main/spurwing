@@ -8,7 +8,7 @@
 // version of Swiper from the CDN to do it. It uses the bundled Swiper now, the
 // same one work-slide.js builds on.
 
-import { requireElement } from "../dom.js";
+import { claimOnce, keyActivates, requireElement } from "../dom.js";
 import Swiper from "../swiper.js";
 
 const approachSliderConfig = {
@@ -49,7 +49,9 @@ export function initApproachSlider(root = document, { signal } = {}) {
 	if (!sliders.length) return;
 
 
-	sliders.forEach((slider) => initSlider(slider, signal));
+	sliders.forEach((slider) => {
+		if (claimOnce(slider, "data-approach-slider-built")) initSlider(slider, signal);
+	});
 }
 
 function initSlider(slider, signal) {
@@ -103,6 +105,10 @@ function initSlider(slider, signal) {
 
 	main.controller.control = logo ? [meta, logo] : meta;
 
+	// Swiper binds the click on these; without this they answered the mouse only.
+	keyActivates(next, signal);
+	keyActivates(previous, signal);
+
 	const applyTheme = themeApplier(slider, main);
 
 	slider.style.color = approachSliderConfig.darkText;
@@ -115,7 +121,12 @@ function initSlider(slider, signal) {
 
 	signal?.addEventListener("abort", () => {
 		[main, meta, logo].forEach((instance) => {
-			if (instance && !instance.destroyed) instance.destroy(true, true);
+			// Not cleanStyles. Teardown runs while the outgoing page is still fully
+			// on screen and the crossfade has not started, so stripping the inline
+			// transforms snaps the slider back to its first slide in front of the
+			// reader. The page is about to be removed; its styles do not need
+			// tidying.
+			if (instance && !instance.destroyed) instance.destroy(true, false);
 		});
 	});
 }

@@ -105,9 +105,10 @@ export function initWorkArchive(root = document, { signal } = {}) {
 
 		const input = getInputByValue(value);
 
-		if (!input) {
-			throw new Error(`No sector filter found for "${value}".`);
-		}
+		// A card's sector that is not in the filter list — a case difference, a
+		// stray space, a sector retired from the filters — used to throw here, so
+		// the tag looked like a button and did nothing. Leave the list as it is.
+		if (!input) return;
 
 		lockSectionHeight();
 
@@ -141,6 +142,11 @@ export function initWorkArchive(root = document, { signal } = {}) {
 		syncActiveTags();
 	};
 
+	// Written on the way down, before the browser toggles the radio, so the click
+	// handler can tell "selected this" from "clicked the one already selected".
+	// It is cleared straight after use: keyboard activation fires click with no
+	// pointerdown before it, and a stale flag from an earlier press on a
+	// different radio read as a deselect.
 	filters.addEventListener(
 		"pointerdown",
 		(event) => {
@@ -162,7 +168,15 @@ export function initWorkArchive(root = document, { signal } = {}) {
 				return;
 			}
 
-			if (!wasCheckedBeforeClick) {
+			// Read once and cleared. A keyboard click arrives with no pointerdown
+			// before it, so leaving the flag set meant the next Space on a
+			// different radio read the previous press's state and cleared the
+			// filter instead of selecting it.
+			const clickedTheSelectedOne = wasCheckedBeforeClick;
+
+			wasCheckedBeforeClick = false;
+
+			if (!clickedTheSelectedOne) {
 				lockSectionHeight();
 				syncActiveTags();
 				releaseSectionHeight();

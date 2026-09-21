@@ -202,7 +202,14 @@ function startObserver(root) {
 				observer.unobserve(entry.target);
 			}
 		},
-		{ rootMargin: "0px 0px -10% 0px", threshold: 0 },
+		// No negative bottom margin. It shrank the root, and an element sitting
+		// entirely inside the bottom tenth of the viewport when the page is
+		// scrolled to its end never intersected a root that stops short of the
+		// page's last tenth — it stayed hidden however far the reader scrolled,
+		// and guard() only samples elements already released. Revealing a
+		// fraction earlier costs nothing; the foot of a long page never appearing
+		// costs the content.
+		{ threshold: 0 },
 	);
 
 	below.forEach((element) => observer.observe(element));

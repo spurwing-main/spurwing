@@ -1,6 +1,6 @@
 import EmblaCarousel from "embla-carousel";
 
-import { requireElement } from "../dom.js";
+import { freezeAndDestroy, press, requireElement } from "../dom.js";
 import { grabCursor } from "./slider-controls.js";
 
 const impactConfig = {
@@ -48,25 +48,29 @@ function isTag(element, tagName) {
 	return element?.tagName === tagName.toUpperCase();
 }
 
+// A card an editor has not finished is skipped, not thrown on. This used to
+// throw, and the throw landed before the list was cleared and the source
+// hidden — so one empty paragraph in the Rich Text left the raw source on the
+// page next to the Designer's placeholder slide, with no slider and no retry.
+// An unfinished card should cost that card and nothing else.
 function readCards(source) {
-	return [...source.querySelectorAll("h3")].map((title, index) => {
-		const position = index + 1;
+	const cards = [];
+
+	for (const title of source.querySelectorAll("h3")) {
 		const body = title.nextElementSibling;
 
-		if (!isTag(body, "p")) {
-			throw new Error(`card ${position} invalid body: expected a <p> directly after the h3`);
-		}
+		if (!isTag(body, "p")) continue;
 
 		const after = body.nextElementSibling;
 		const italic = isTag(after, "p") ? textOf(after.querySelector(":scope > em, :scope > i")) : "";
-
 		const card = { title: textOf(title), body: textOf(body), italic };
 
-		if (!card.title) throw new Error(`card ${position} has no title`);
-		if (!card.body) throw new Error(`card ${position} has no body`);
+		if (!card.title || !card.body) continue;
 
-		return card;
-	});
+		cards.push(card);
+	}
+
+	return cards;
 }
 
 // Returns the Embla viewport, or null when the section has nothing to show and
@@ -123,15 +127,11 @@ function readArrows(section, viewport) {
 		section.querySelector(impactConfig.arrowsSelector) ||
 		viewport.closest(impactConfig.layoutSelector)?.querySelector(impactConfig.arrowsSelector);
 
-	if (!arrowsWrap) {
-		throw new Error(`missing arrows: expected "${impactConfig.arrowsSelector}" near the slider`);
-	}
+	const arrows = [...(arrowsWrap?.querySelectorAll(impactConfig.arrowSelector) ?? [])];
 
-	const arrows = [...arrowsWrap.querySelectorAll(impactConfig.arrowSelector)];
-
-	if (arrows.length < 2) {
-		throw new Error(`missing arrows: expected 2 "${impactConfig.arrowSelector}" elements`);
-	}
+	// Missing arrows cost the arrows. Dragging still works, and throwing here
+	// left real cards on the page with no slider at all.
+	if (arrows.length < 2) return null;
 
 	return { previous: arrows[0], next: arrows[1] };
 }
@@ -141,7 +141,7 @@ function buildSection(section, signal) {
 
 	if (!viewport) return;
 
-	const { previous, next } = readArrows(section, viewport);
+	const arrows = readArrows(section, viewport);
 
 	const embla = EmblaCarousel(viewport, {
 		loop: false,
@@ -150,18 +150,21 @@ function buildSection(section, signal) {
 		skipSnaps: true,
 	});
 
+	grabCursor(viewport, impactConfig.grabbingClass, signal);
+	signal?.addEventListener("abort", () => freezeAndDestroy(embla, viewport.firstElementChild));
+
+	if (!arrows) return;
+
 	const syncArrows = () => {
-		setDisabled(previous, !embla.canScrollPrev());
-		setDisabled(next, !embla.canScrollNext());
+		setDisabled(arrows.previous, !embla.canScrollPrev());
+		setDisabled(arrows.next, !embla.canScrollNext());
 	};
 
-	previous.addEventListener("click", () => embla.scrollPrev(), { signal });
-	next.addEventListener("click", () => embla.scrollNext(), { signal });
-
-	grabCursor(viewport, impactConfig.grabbingClass, signal);
+	// The arrows carry tabindex, so they answer the keyboard as well as the mouse.
+	press(arrows.previous, () => embla.scrollPrev(), signal);
+	press(arrows.next, () => embla.scrollNext(), signal);
 
 	embla.on("select", syncArrows).on("reInit", syncArrows);
-	signal?.addEventListener("abort", () => embla.destroy());
 
 	syncArrows();
 }

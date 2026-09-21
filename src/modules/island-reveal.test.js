@@ -90,7 +90,10 @@ describe("initIslandReveal", () => {
 		expect(wrap.style.opacity).toBe("1");
 	});
 
-	it("stops checking once its signal is aborted", async () => {
+	// Stopping the wait must not leave the island hidden. The next run skips an
+	// island that has rendered in the meantime, so an inline opacity 0 left here
+	// is one nothing ever clears.
+	it("stops checking once its signal is aborted, and hides nothing", async () => {
 		const controller = new AbortController();
 		const { wrap } = island();
 
@@ -100,7 +103,8 @@ describe("initIslandReveal", () => {
 		await frame();
 		await frame();
 
-		expect(wrap.style.opacity).toBe("0");
+		expect(wrap.style.opacity).toBe("");
+		expect(wrap.style.transition).toBe("");
 	});
 
 	it("does nothing on a page with no code components", () => {

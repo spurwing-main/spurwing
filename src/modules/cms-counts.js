@@ -18,15 +18,20 @@ export function initCmsCounts(root = document) {
 	// modules. No sentinel either — one on documentElement would survive a page
 	// transition and stop the next page's counts ever loading, and boot.js
 	// already runs each module once a page.
-	fillIn(targets).catch(() => {});
+	//
+	// The flag is set whatever happens. A count is hidden until it is right, so
+	// the flag is the only thing that can ever show it: leaving it unset on a
+	// failure means a blank where a number should be, for the whole visit. A
+	// stale number from the Designer is a smaller wrong than no number at all.
+	fillIn(targets)
+		.catch(() => {})
+		.finally(() => document.documentElement.setAttribute(cmsCountsConfig.doneAttr, "1"));
 }
 
 async function fillIn(targets) {
 	const source = await fetchSource();
 
 	if (!source) return;
-
-	let filled = false;
 
 	for (const target of targets) {
 		const key = target.getAttribute(cmsCountsConfig.targetAttr).trim();
@@ -35,10 +40,7 @@ async function fillIn(targets) {
 		if (!list) continue;
 
 		target.textContent = String(list.children.length);
-		filled = true;
 	}
-
-	if (filled) document.documentElement.setAttribute(cmsCountsConfig.doneAttr, "1");
 }
 
 async function fetchSource() {
