@@ -47,6 +47,25 @@ const ATTRIBUTE = "data-img";
 /** The longest the fade waits on a decode that may never answer. */
 const DECODE_DEADLINE_MS = 1000;
 
+/**
+ * The longest an image is hidden waiting to load.
+ *
+ * Marking an image costs nothing if it loads. It costs everything if the
+ * browser never starts fetching it — and with `loading="lazy"` that is the
+ * browser's decision, not ours. It defers a lazy image in a backgrounded tab,
+ * and one whose box has collapsed to no height, which is exactly what a card
+ * does while the image that gives it its height has not arrived. The fetch is
+ * simply never scheduled, so no `load` and no `error` is ever coming and
+ * nothing clears the mark.
+ *
+ * Without our attribute such an image is an empty box that fills in whenever it
+ * turns up. With it, it is invisible for the rest of the visit — which is why a
+ * refresh "fixed" it: the second time it was in cache and never marked at all.
+ * Past this deadline we stop hiding it and let the browser paint it whenever it
+ * arrives, fade or no fade.
+ */
+const LOAD_DEADLINE_MS = 2000;
+
 /** The Designer canvas and the Editor must never hide an image from an editor. */
 function isAuthoringSurface() {
 	const classes = document.documentElement.classList;
@@ -87,9 +106,18 @@ function watch(image) {
 	if (image.complete || image.hasAttribute(ATTRIBUTE)) return;
 	if (image.closest('[data-anim="off"]')) return;
 
-	const arrive = () => image.setAttribute(ATTRIBUTE, "in");
+	let deadline = 0;
+
+	const arrive = () => {
+		clearTimeout(deadline);
+		image.setAttribute(ATTRIBUTE, "in");
+	};
 
 	image.setAttribute(ATTRIBUTE, "wait");
+
+	// Not tied to the page signal either: an image must never be left hidden by
+	// the one thing that could have shown it going away.
+	deadline = setTimeout(arrive, LOAD_DEADLINE_MS);
 
 	// No signal on either listener. `once` removes them, and a page transition
 	// must never take away the one thing that can un-hide an image.
