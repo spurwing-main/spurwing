@@ -23,12 +23,29 @@
  * the work cards snapped in while the rest of the page faded. A mutation
  * observer catches what arrives afterwards.
  *
- * FAIL OPEN: the rule that hides a pending image is gated on
- * `html[data-img-ready]`, set here and nowhere else. No JavaScript, no hidden
- * images. It also does nothing in the Designer canvas or Editor.
+ * FAIL OPEN, PER IMAGE. The rule that hides a pending image is gated on
+ * `html[data-img-ready]`, set here and nowhere else: no JavaScript, no hidden
+ * images. But that gate is site-wide, and the real hazard is one image. Hiding
+ * is instant and revealing is a promise, so anything that can break the promise
+ * leaves that picture blank for good. Two things could:
+ *
+ *   - the page signal. These listeners used to carry it, and a soft navigation
+ *     aborts the outgoing run's signal. Images the router had already inserted
+ *     were marked by the outgoing run, lost their listeners on the abort, and
+ *     were skipped by the incoming run as already watched. That is the blank
+ *     image that came back on refresh. `once` already removes them, so they are
+ *     no longer tied to a page at all — only the observer is.
+ *   - `decode()` never settling, which WebKit has done for an image in a
+ *     subtree it is not painting. The deadline below is the answer to that: an
+ *     image that has loaded is shown whatever decode says.
+ *
+ * It also does nothing in the Designer canvas or Editor.
  */
 
 const ATTRIBUTE = "data-img";
+
+/** The longest the fade waits on a decode that may never answer. */
+const DECODE_DEADLINE_MS = 1000;
 
 /** The Designer canvas and the Editor must never hide an image from an editor. */
 function isAuthoringSurface() {
@@ -42,7 +59,7 @@ export function initImageFade(root = document, { signal } = {}) {
 
 	document.documentElement.setAttribute("data-img-ready", "");
 
-	for (const image of root.querySelectorAll("img")) watch(image, signal);
+	for (const image of root.querySelectorAll("img")) watch(image);
 
 	// A Finsweet list replaces its items after this has run — the work list on
 	// /work is one, and its cards were the ones snapping in. Those images are DOM
@@ -53,8 +70,8 @@ export function initImageFade(root = document, { signal } = {}) {
 			for (const node of record.addedNodes) {
 				if (node.nodeType !== 1) continue;
 
-				if (node.tagName === "IMG") watch(node, signal);
-				else node.querySelectorAll?.("img").forEach((image) => watch(image, signal));
+				if (node.tagName === "IMG") watch(node);
+				else node.querySelectorAll?.("img").forEach((image) => watch(image));
 			}
 		}
 	});
@@ -63,7 +80,7 @@ export function initImageFade(root = document, { signal } = {}) {
 	signal?.addEventListener("abort", () => observer.disconnect());
 }
 
-function watch(image, signal) {
+function watch(image) {
 	// Already decoded, or already being watched. An image that finished before
 	// this saw it is left alone: fading it in would invent a delay the reader did
 	// not have.
@@ -74,19 +91,25 @@ function watch(image, signal) {
 
 	image.setAttribute(ATTRIBUTE, "wait");
 
+	// No signal on either listener. `once` removes them, and a page transition
+	// must never take away the one thing that can un-hide an image.
 	image.addEventListener(
 		"load",
 		() => {
 			// `load` fires when the bytes are in; `decode` resolves when there is a
 			// picture to draw. On a slow device those are far enough apart to fade up
 			// an empty box, so the fade waits for the second one. A rejected decode
-			// still arrives: a broken image must never stay hidden.
-			(image.decode?.() ?? Promise.resolve()).then(arrive, arrive);
+			// still arrives: a broken image must never stay hidden. Nor must one
+			// whose decode never answers, so the wait is bounded.
+			Promise.race([
+				image.decode?.() ?? Promise.resolve(),
+				new Promise((resolve) => setTimeout(resolve, DECODE_DEADLINE_MS)),
+			]).then(arrive, arrive);
 		},
-		{ once: true, signal },
+		{ once: true },
 	);
 
-	image.addEventListener("error", arrive, { once: true, signal });
+	image.addEventListener("error", arrive, { once: true });
 
 	// It can finish between the check above and the listener above, and then no
 	// event is ever coming.
