@@ -19,6 +19,7 @@ import { initQuoteFade } from "./quote-fade.js";
 import { initRightway } from "./rightway.js";
 import { initRtFlow } from "./rt-flow.js";
 import { initStick } from "./stick.js";
+import { initTabbed } from "./tabbed.js";
 import { initTeamSwitch } from "./team-switch.js";
 import { initWorkArchive } from "./work-archive.js";
 import { initWorkSlide } from "./work-slide.js";
@@ -40,6 +41,7 @@ export const modules = [
 	{ name: "copy-to-clipboard", init: initCopyToClipboard },
 	{ name: "faq", init: initFaq },
 	{ name: "insight-toc", init: initInsightToc },
+	{ name: "tabbed", init: initTabbed },
 	{ name: "team-switch", init: initTeamSwitch },
 	{ name: "stick", init: initStick },
 	{ name: "work-archive", init: initWorkArchive },
