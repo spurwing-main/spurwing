@@ -1,13 +1,15 @@
 import { animate, inView } from "motion";
 
-import { requireElement } from "../dom.js";
-
 export function initApproachHero(root = document, { signal } = {}) {
 	const section = root.querySelector(".section_caps");
 
 	if (!section) return;
 
-	const blur = requireElement(root, ".progressive-blur[data-fade-out]", "progressive blur");
+	// The services pages reuse .section_caps for their process steps, without
+	// the hero's blur; there is nothing to fade there.
+	const blur = root.querySelector(".progressive-blur[data-fade-out]");
+
+	if (!blur) return;
 
 	blur.style.setProperty("--fade", "1");
 

@@ -242,6 +242,11 @@ export function initNavPanel(root = document, { signal } = {}) {
 			arrow.setAttribute("tabindex", "0");
 			arrow.setAttribute("aria-label", index === 0 ? "Previous work" : "Next work");
 		});
+
+		// The link names its panel with aria-controls, but the panel rejects a
+		// Designer id like the arrows reject attributes, so it is given here.
+		const controls = linkOf(item)?.getAttribute("aria-controls");
+		if (controls) panelOf(item).id = controls;
 	});
 
 	items.forEach((item) => {
@@ -274,11 +279,12 @@ export function initNavPanel(root = document, { signal } = {}) {
 		});
 	});
 
+	// Focus goes back first: moving it onto the link fires focusin, which would
+	// otherwise queue the panel open again straight after closing it.
 	on(document, "keydown", (event) => {
 		if (event.key !== "Escape" || !open) return;
-		const link = linkOf(open);
+		linkOf(open)?.focus();
 		setOpen(null);
-		link?.focus();
 	});
 
 	// The nav hides itself on the way down; an open panel would be stranded.
