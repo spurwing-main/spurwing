@@ -6,7 +6,6 @@ import { initCaps } from "./caps.js";
 import { initCardReveal } from "./card-reveal.js";
 import { initCmsCounts } from "./cms-counts.js";
 import { initCopyToClipboard } from "./copy-to-clipboard.js";
-import { initCursor } from "./cursor.js";
 import { initFaq } from "./faq.js";
 import { initImageFade } from "./image-fade.js";
 import { initImpactSlider } from "./impact-slider.js";
@@ -54,5 +53,4 @@ export const modules = [
 	{ name: "anim", init: initAnim },
 	{ name: "approach-hero", init: initApproachHero },
 	{ name: "approach-slider", init: initApproachSlider },
-	{ name: "cursor", init: initCursor },
 ];

@@ -17,11 +17,12 @@ describe("module registry", () => {
 	// deleted from both and never noticed a module file that existed but was
 	// never registered — a module nobody would have missed until the behaviour
 	// was reported broken.
-	// Two files in here are deliberately not modules: page-transition owns
-	// navigation for the whole session and is started once by src/index.js rather
-	// than restarted per page, and slider-controls is a helper the sliders share.
-	// Anything else is a module and belongs in the registry.
-	const notModules = new Set(["index", "page-transition", "slider-controls"]);
+	// Three files in here are deliberately not modules: page-transition owns
+	// navigation for the whole session and cursor follows the pointer across it,
+	// so src/index.js starts each once rather than restarting them per page, and
+	// slider-controls is a helper the sliders share. Anything else is a module and
+	// belongs in the registry.
+	const notModules = new Set(["index", "page-transition", "cursor", "slider-controls"]);
 
 	it("registers every module file", () => {
 		const files = readdirSync("src/modules")

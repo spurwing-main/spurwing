@@ -1,4 +1,5 @@
 import { bootModules, restartModules } from "./boot.js";
+import { initCursor } from "./modules/cursor.js";
 import { modules } from "./modules/index.js";
 import { initPageTransition } from "./modules/page-transition.js";
 
@@ -18,6 +19,14 @@ async function start() {
     initPageTransition();
   } catch (error) {
     console.error("[site] the router did not start.", error);
+  }
+
+  // The cursor lives in the header, which no transition replaces, so it also
+  // starts once and follows the pointer from page to page.
+  try {
+    initCursor();
+  } catch (error) {
+    console.error("[site] the cursor did not start.", error);
   }
 
   await bootModules(modules);

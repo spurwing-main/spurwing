@@ -48,7 +48,7 @@ Copies a `.copy_component`'s own text on click and ticks its icon for two second
 
 ### `cursor.js`
 
-Runs the pointer-following cursor: matches cursor items to their target selectors, positions each at its configured anchor, and springs the movement, resize and text swap. Devices without a fine pointer are skipped.
+Runs the one pill that follows the pointer over anything carrying `data-cursor-text`. The Designer holds `.cursor-root` with a single `.button` div inside it; the root moves and the pill grows in, resizes and cross-fades its words, so moving between two targets morphs one pill rather than replaying its entrance. A target's `data-cursor-text` sets the words, and an empty value keeps the pill's own. Leaving is a spring with no bounce, so a pointer that comes back part way turns the pill round rather than restarting it. The root sits in the header, which no transition replaces, so like the router it starts once from `src/index.js` and lets go of its target on `spw:leave`. Skipped without a fine pointer; a visitor who asks for reduced motion gets a plain fade.
 
 ### `faq.js`
 
@@ -107,6 +107,10 @@ The parts every slider shares, whichever library drives it: the dots, and the gr
 ### `stick.js`
 
 Marks whichever item in the sticky list sits nearest the middle of the viewport. Desktop only — below the breakpoint the list reads straight through.
+
+### `tabbed.js`
+
+Runs the tabbed capabilities section (`.tcp`): one stage at a time, and one panel open inside it. A stage and its row of panels pair by position, not by id. The module writes one attribute per level — `data-stage-open` on the group, `data-open` on the item, `data-current` on the stage — and gives each panel and its copy the ids that tie them together. Panels are controls, not tabs: each is a click-and-key target and the paragraph below the row is the region it names. The state the markup ships wins, so the Designer decides what opens; the section is marked ready only after it is wired, and every rule that collapses it is gated on that mark, so a blocked bundle leaves the section in normal flow. It claims each section once, because a page transition leaves both pages in the DOM. Rail width, expansion, the vertical label and the durations all live in the section's CSS embed — this file sets no style and knows no duration.
 
 ### `team-switch.js`
 

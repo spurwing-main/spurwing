@@ -1,411 +1,271 @@
 import { animate, motionValue, springValue, styleEffect } from "motion";
 
-const cursorConfig = {
+/**
+ * A label that follows the pointer over anything carrying data-cursor-text.
+ *
+ *   <div class="cursor-root" aria-hidden="true">
+ *     <div class="button is-no-hover"><div>View work</div></div>
+ *   </div>
+ *
+ * One pill for the whole site. The root moves with the pointer; the pill
+ * inside it grows in, resizes and cross-fades its words, so the two never fight
+ * over one transform. The pill is the site's own button class.
+ *
+ * The pill shows for whichever target the pointer last entered, and changes
+ * only when the pointer enters something else. A target's data-cursor-text is
+ * its words; an empty value keeps the pill's own.
+ *
+ * The root sits in the header, which no page transition replaces, so like the
+ * router this starts once for the whole visit, and lets go of its target when a
+ * navigation starts.
+ */
+
+const config = {
 	rootSelector: ".cursor-root",
-	itemSelector: ".cursor-item",
-	targetAttr: "data-cursor-target",
-	anchorAttr: "data-cursor-anchor",
-	textAttr: "data-cursor-text",
-	defaultAnchor: "bottom-right",
-	padding: 16,
-	margin: 12,
-	handoffDelay: 80,
-	spring: { stiffness: 1800, damping: 80, mass: 0.1 },
-	shellSpring: { type: "spring", visualDuration: 0.42, bounce: 0.22 },
-	fxSpring: { type: "spring", visualDuration: 0.34, bounce: 0.18 },
-	fadeOut: { duration: 0.14, ease: "easeOut" },
-	fadeIn: { duration: 0.2, ease: "easeOut" },
+	pillSelector: ".button",
+	targetSelector: "[data-cursor-text]",
+	// Below and right of the pointer, and never closer to the viewport edge.
+	offset: 12,
+	edge: 16,
+	// Long enough to cross the gap between two cards at an ordinary pace. A
+	// slower crossing only dips, because a pill on its way out turns round.
+	grace: 120,
+	// Close to locked: at a quick 1500px/s flick it trails by about 28px and
+	// catches up within 35ms of the pointer stopping. The old 1800 / 80 was
+	// damped so heavily it trailed by 72px and took over 200ms, which read as
+	// detached.
+	follow: { stiffness: 1210, damping: 17.6, mass: 0.1 },
+	resize: { type: "spring", visualDuration: 0.42 },
+	enter: { type: "spring", visualDuration: 0.34, bounce: 0.18 },
+	// Everything leaving rides a spring with no bounce: it eases into rest
+	// instead of stopping on a timer, and if the pointer comes back part way the
+	// next spring starts from where this one had got to, at the speed it had.
+	exit: { type: "spring", visualDuration: 0.34, bounce: 0 },
+	wordsOut: { type: "spring", visualDuration: 0.2, bounce: 0 },
+	fade: { duration: 0.2, ease: "easeOut" },
 };
 
-const anchorOffsets = {
-	center: [0, 0],
-	"top-left": [-1, -1],
-	"top-right": [1, -1],
-	"bottom-left": [-1, 1],
-	"bottom-right": [1, 1],
-};
+// How much a resize bounces, after the Dynamic Island as Emil Kowalski builds
+// it: a change too small to notice gets the most, so it still reads as alive;
+// a large one a little more when growing than when shrinking.
+function bounceFor(from, to) {
+	const change = Math.abs(to - from);
+	if (change < 20) return 0.5;
 
-let pointer;
-
-function resolveAnchor(el) {
-	const key = (el.getAttribute(cursorConfig.anchorAttr) || cursorConfig.defaultAnchor).toLowerCase();
-	return anchorOffsets[key] || anchorOffsets[cursorConfig.defaultAnchor];
+	const step = (change / 100) * 0.3;
+	return Math.min(Math.max(to > from ? 0.3 + step : 0.35 - step, 0.3), 0.35);
 }
 
-function clamp(value, min, max) {
-	return Math.min(Math.max(value, min), max);
-}
+const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
 
-function clampedPosition(ax, ay, el) {
-	const w = el.offsetWidth;
-	const h = el.offsetHeight;
-	const p = cursorConfig.padding;
-	const m = cursorConfig.margin;
+export function initCursor(root = document, { signal } = {}) {
+	const cursor = root.querySelector(config.rootSelector);
+	// Only a pointer that can hover. Anyone else keeps their own pointer and
+	// loses nothing: the cards are links.
+	if (!cursor || !matchMedia("(hover: hover) and (pointer: fine)").matches) return;
 
-	return {
-		x: clamp(pointer.x.get() + ax * (w / 2 + m) - w / 2, p, innerWidth - p - w),
-		y: clamp(pointer.y.get() + ay * (h / 2 + m) - h / 2, p, innerHeight - p - h),
-	};
-}
+	const pill = cursor.querySelector(config.pillSelector);
+	if (!pill) throw new Error(`${config.rootSelector} needs a ${config.pillSelector} pill`);
 
-function createItem(el, root) {
-	const sel = el.getAttribute(cursorConfig.targetAttr);
-	if (!sel) throw new Error(`${cursorConfig.itemSelector} missing ${cursorConfig.targetAttr}`);
-	root.querySelector(sel); // Validate the selector without requiring an initial match.
+	const words = pill.firstElementChild;
+	if (!words) throw new Error(`${config.rootSelector} pill needs a div for its words`);
 
-	const visual = el.querySelector(".cursor-item-visual");
-	if (!visual) throw new Error(".cursor-item needs a .cursor-item-visual child");
+	// A visitor who asked for less motion still gets the label, as a fade that
+	// sits on the pointer: nothing trails, scales, blurs or bounces.
+	const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-	const content = visual.firstElementChild;
-	if (!content) throw new Error(".cursor-item-visual needs one direct child");
-
-	const textEl = content.querySelector("div");
-	if (!textEl) throw new Error(".cursor-item visual needs a text div");
-
-	const defaultText = textEl.textContent.trim();
-	const [ax, ay] = resolveAnchor(el);
+	const defaultText = words.textContent.trim();
 
 	const srcX = motionValue(0);
 	const srcY = motionValue(0);
-	const x = springValue(srcX, cursorConfig.spring);
-	const y = springValue(srcY, cursorConfig.spring);
-	const stopStyle = styleEffect(el, { x, y });
+	const x = calm ? srcX : springValue(srcX, config.follow);
+	const y = calm ? srcY : springValue(srcY, config.follow);
+	styleEffect(cursor, { x, y });
 
-	el.style.visibility = "hidden";
-
-	const measure = document.createElement("div");
-	measure.style.position = "fixed";
-	measure.style.left = "-9999px";
-	measure.style.top = "-9999px";
-	measure.style.visibility = "hidden";
-	measure.style.pointerEvents = "none";
-	measure.style.width = "max-content";
-	measure.style.height = "max-content";
-
-	const measureContent = content.cloneNode(true);
-	measure.appendChild(measureContent);
-	document.body.appendChild(measure);
-
-	const measureTextEl = measureContent.querySelector("div");
-	if (!measureTextEl) throw new Error("measure node missing text div");
-
-	let unsub = null;
-	let currentText = defaultText;
-	let textSwapId = 0;
-	let hasShown = false;
-
-	function sync() {
-		const pos = clampedPosition(ax, ay, el);
-		srcX.set(pos.x);
-		srcY.set(pos.y);
-	}
-
-	function jump() {
-		const pos = clampedPosition(ax, ay, el);
-		srcX.jump(pos.x);
-		srcY.jump(pos.y);
-		x.jump(pos.x);
-		y.jump(pos.y);
-	}
-
-	function subscribe() {
-		if (unsub) return;
-		const unX = pointer.x.on("change", sync);
-		const unY = pointer.y.on("change", sync);
-		unsub = () => {
-			unX();
-			unY();
-			unsub = null;
-		};
-	}
-
-	function unsubscribe() {
-		unsub?.();
-	}
-
-	function getTargetText(target) {
-		if (!target) return defaultText;
-
-		const attrText = target.getAttribute(cursorConfig.textAttr);
-		if (typeof attrText !== "string") return defaultText;
-
-		const cleanText = attrText.trim();
-		if (!cleanText) return defaultText;
-
-		return cleanText;
-	}
-
-	function measureSize(text) {
-		measureTextEl.textContent = text;
-		const rect = measureContent.getBoundingClientRect();
-
-		return {
-			width: Math.ceil(rect.width),
-			height: Math.ceil(rect.height),
-		};
-	}
-
-	function animateShellToText(text, immediate = false) {
-		const size = measureSize(text);
-		const radius = Math.max(24, Math.ceil(size.height * 0.5 + 10));
-
-		animate(
-			visual,
-			{
-				width: size.width,
-				height: size.height,
-				borderRadius: radius,
-				filter: immediate ? "blur(0px)" : ["blur(0px)", "blur(8px)", "blur(0px)"],
-				scale: immediate ? 1 : [1, 1.035, 1],
-			},
-			immediate ? { duration: 0 } : cursorConfig.shellSpring,
-		);
-	}
-
-	function swapText(nextText, immediate = false) {
-		if (immediate) {
-			currentText = nextText;
-			textEl.textContent = nextText;
-			animateShellToText(nextText, true);
-			return;
-		}
-
-		if (nextText === currentText) return;
-
-		textSwapId += 1;
-		const swapId = textSwapId;
-
-		animateShellToText(nextText, false);
-
-		animate(
-			textEl,
-			{
-				opacity: [1, 0],
-				y: [0, 4],
-				filter: ["blur(0px)", "blur(10px)"],
-			},
-			cursorConfig.fadeOut,
-		).finished.then(() => {
-			if (swapId !== textSwapId) return;
-			currentText = nextText;
-			textEl.textContent = nextText;
-
-			animate(
-				textEl,
-				{
-					opacity: [0, 1],
-					y: [-4, 0],
-					filter: ["blur(10px)", "blur(0px)"],
-				},
-				cursorConfig.fadeIn,
-			);
-		});
-	}
-
-	function show(target) {
-		const nextText = getTargetText(target);
-
-		if (!hasShown) {
-			swapText(nextText, true);
-			hasShown = true;
-		} else {
-			swapText(nextText, false);
-		}
-
-		el.style.visibility = "visible";
-		subscribe();
-		jump();
-
-		animate(
-			visual,
-			{
-				opacity: 1,
-				scale: [0.84, 1.04, 1],
-				filter: ["blur(10px)", "blur(0px)"],
-			},
-			cursorConfig.fxSpring,
-		);
-
-		animate(
-			content,
-			{
-				scale: [0.98, 1],
-			},
-			{ duration: 0.22, ease: "easeOut" },
-		);
-	}
-
-	function hide() {
-		animate(
-			visual,
-			{
-				opacity: 0,
-				scale: [1, 0.92, 0.88],
-				filter: ["blur(0px)", "blur(12px)"],
-			},
-			{ duration: 0.22, ease: "easeOut" },
-		);
-
-		unsubscribe();
-	}
-
-	function destroy() {
-		unsubscribe();
-		stopStyle();
-		srcX.destroy();
-		srcY.destroy();
-		x.destroy();
-		y.destroy();
-		measure.remove();
-	}
-
-	swapText(defaultText, true);
-
-	return {
-		show,
-		hide,
-		destroy,
-		selector: sel,
-	};
-}
-
-export function initCursor(root = document, { signal } = {}) {
-	const cursorRoot = root.querySelector(cursorConfig.rootSelector);
-	if (!cursorRoot) return;
-
-	const canUseCursor =
-		typeof window.matchMedia !== "function" ||
-		window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-	if (!canUseCursor) return;
-
-	const itemElements = [...cursorRoot.querySelectorAll(cursorConfig.itemSelector)];
-	if (!itemElements.length) return;
-
-	pointer = {
-		x: motionValue(0),
-		y: motionValue(0),
-	};
-	// Built one at a time, and a failure takes back what was already built. Each
-	// item appends a measure node to <body> and holds spring subscriptions, and
-	// those are reachable only through this array — so a throw partway used to
-	// leak every item before it, on every navigation, with no cursor to show for
-	// it.
-	const items = [];
-
-	try {
-		for (const itemElement of itemElements) items.push(createItem(itemElement, root));
-	} catch (error) {
-		items.forEach((item) => item.destroy());
-		throw error;
-	}
-
-	function findMatch(node) {
-		let el = node instanceof Element ? node : null;
-
-		while (el) {
-			for (const item of items) {
-				if (el.matches(item.selector)) return { item, target: el };
-			}
-			el = el.parentElement;
-		}
-
-		return null;
-	}
-
-	let currentItem = null;
-	let currentTarget = null;
+	let pointerX = 0;
+	let pointerY = 0;
+	// The width the pill is heading for, so it is placed for the label it is
+	// about to show rather than the one it has mid-spring.
+	let width = pill.offsetWidth;
+	// The target the pill is showing for; null once it has let go.
+	let target = null;
 	let timer = 0;
+	let leaving = null;
 
-	// One teardown, on the signal. The measure nodes each item appends to
-	// <body>, and its spring subscriptions, used to be cleaned up only by the
-	// next run finding the same .cursor-root — which holds while the root sits
-	// outside the swapped page, and leaks a node and four motion values per
-	// navigation the moment it does not.
-	signal?.addEventListener("abort", () => {
-		clearTimeout(timer);
-		items.forEach((item) => item.destroy());
-	});
-
-	function on(target, event, fn, opts = {}) {
-		target.addEventListener(event, fn, { signal, ...opts });
+	function place() {
+		const { offset, edge } = config;
+		srcX.set(clamp(pointerX + offset, edge, innerWidth - edge - width));
+		srcY.set(clamp(pointerY + offset, edge, innerHeight - edge - pill.offsetHeight));
 	}
 
-	function activate(match) {
-		clearTimeout(timer);
+	function track(event) {
+		pointerX = event.clientX;
+		pointerY = event.clientY;
+		place();
+	}
 
-		const nextItem = match?.item || null;
-		const nextTarget = match?.target || null;
+	// Springs the pill to the width its words need, read by letting go of its
+	// width for a moment: its padding is in the site's fluid rem, so a width
+	// measured once goes stale as soon as the window is resized.
+	function resize(immediate) {
+		const from = pill.offsetWidth;
+		const held = pill.style.width;
+		pill.style.width = "";
+		const to = pill.offsetWidth;
+		pill.style.width = held;
 
-		if (currentItem === nextItem) {
-			currentTarget = nextTarget;
-			currentItem?.show(currentTarget);
+		width = to;
+		place();
+		animate(pill, { width: to }, immediate || calm ? { duration: 0 } : { ...config.resize, bounce: bounceFor(from, to) });
+		return { from, to };
+	}
+
+	function enter(label) {
+		// Caught on its way out: turned round from wherever it had got to, rather
+		// than snapped back to the start.
+		if (getComputedStyle(pill).opacity !== "0") {
+			if (label !== words.textContent) swap(label);
+			else if (!calm) {
+				resize(false);
+				animate(words, { opacity: 1, scale: 1, filter: "blur(0px)" }, config.enter);
+			}
+			animate(pill, calm ? { opacity: 1 } : { opacity: 1, scale: 1 }, calm ? config.fade : config.enter);
 			return;
 		}
 
-		currentItem?.hide();
-		currentItem = nextItem;
-		currentTarget = nextTarget;
-		currentItem?.show(currentTarget);
+		words.textContent = label;
+		resize(true);
+		x.jump(srcX.get());
+		y.jump(srcY.get());
+
+		if (calm) {
+			animate(pill, { opacity: [0, 1] }, config.fade);
+			return;
+		}
+
+		// The pill grows in; the words, counter-scaled so they grow less, follow
+		// out of a blur a beat behind.
+		animate(pill, { opacity: [0, 1], scale: [0.84, 1] }, config.enter);
+		animate(
+			words,
+			{ opacity: [0, 1], scale: [1.1, 1], filter: ["blur(5px)", "blur(0px)"] },
+			{ ...config.enter, delay: 0.05 },
+		);
 	}
 
-	on(
-		window,
-		"pointermove",
-		(e) => {
-			pointer.x.set(e.clientX);
-			pointer.y.set(e.clientY);
-		},
-		{ passive: true },
-	);
+	function swap(label) {
+		if (label === words.textContent) return;
 
+		// The old words leave as a copy laid over the pill but outside it, so the
+		// pill's clip never cuts them off. Outside the button they lose its type,
+		// so they carry it with them, and they start from how they looked.
+		leaving?.remove();
+		const look = getComputedStyle(words);
+		const copy = words.cloneNode(true);
+		Object.assign(copy.style, {
+			position: "absolute",
+			left: "0",
+			top: "0",
+			width: `${pill.offsetWidth}px`,
+			height: `${pill.offsetHeight}px`,
+			display: "flex",
+			alignItems: "center",
+			justifyContent: "center",
+			whiteSpace: "nowrap",
+			font: look.font,
+			letterSpacing: look.letterSpacing,
+			color: look.color,
+			opacity: look.opacity,
+			filter: look.filter,
+		});
+		cursor.appendChild(copy);
+		leaving = copy;
+
+		words.textContent = label;
+		const { from, to } = resize(false);
+		const gone = () => copy.remove();
+
+		if (calm) {
+			animate(copy, { opacity: 0 }, config.fade).finished.then(gone);
+			animate(words, { opacity: [0, 1] }, config.fade);
+			return;
+		}
+
+		// The old words go the way the pill is going: along to its new centre,
+		// stretched or squeezed with it. The new ones ride the resize's spring.
+		animate(
+			copy,
+			{ opacity: 0, filter: "blur(5px)", x: (to - from) / 2, scale: clamp(to / from, 0.85, 1.15) },
+			config.wordsOut,
+		).finished.then(gone);
+		animate(
+			words,
+			{ opacity: [0, 1], scale: [0.9, 1], filter: ["blur(5px)", "blur(0px)"] },
+			{ ...config.resize, bounce: bounceFor(from, to), delay: 0.05 },
+		);
+	}
+
+	function exit() {
+		if (calm) {
+			animate(pill, { opacity: 0 }, config.fade);
+			return;
+		}
+
+		// The words go first. The pill draws back into the pointer after them,
+		// narrowing towards a dot as it shrinks, and is gone before it gets
+		// there, so no faint dot is left hanging by the pointer.
+		animate(words, { opacity: 0, scale: 0.9, filter: "blur(5px)" }, config.wordsOut);
+		animate(pill, { width: pill.offsetHeight, scale: 0.6 }, config.exit);
+		animate(pill, { opacity: 0 }, { ...config.wordsOut, delay: 0.05 });
+	}
+
+	function leave() {
+		clearTimeout(timer);
+		timer = 0;
+		if (!target) return;
+
+		target = null;
+		exit();
+	}
+
+	// The whole state machine. Entering a target shows or swaps the pill and
+	// cancels any pending exit, even for the target it was leaving. Entering
+	// anything else starts the exit once, however many elements the pointer
+	// crosses on the way.
+	function hover(next) {
+		if (!next) {
+			if (target && !timer) timer = setTimeout(leave, config.grace);
+			return;
+		}
+
+		clearTimeout(timer);
+		timer = 0;
+		if (next === target) return;
+
+		const label = next.getAttribute("data-cursor-text").trim() || defaultText;
+		if (target) swap(label);
+		else enter(label);
+		target = next;
+	}
+
+	// The signal is for tests; the site never stops the cursor.
+	const on = (el, type, fn, opts) => el.addEventListener(type, fn, { signal, ...opts });
+
+	on(window, "pointermove", track, { passive: true });
+	// Every element the pointer enters reports here, so one listener covers
+	// every target on every page, including ones a list builds later.
 	on(
 		document,
 		"pointerover",
-		(e) => {
-			const to = findMatch(e.target);
-			const from = findMatch(e.relatedTarget);
-
-			if (!to) return;
-			if (to.item !== from?.item || to.target !== from?.target) activate(to);
+		(event) => {
+			track(event);
+			hover(event.target.closest?.(config.targetSelector) || null);
 		},
 		{ capture: true },
 	);
-
-	on(
-		document,
-		"pointerout",
-		(e) => {
-			const from = findMatch(e.target);
-			if (!from) return;
-
-			const to = findMatch(e.relatedTarget);
-
-			if (to?.item === from.item) {
-				if (to.target !== from.target) activate(to);
-				return;
-			}
-
-			if (to) {
-				activate(to);
-				return;
-			}
-
-			if (currentItem === from.item) {
-				timer = setTimeout(() => {
-					if (currentItem !== from.item) return;
-					currentItem.hide();
-					currentItem = null;
-					currentTarget = null;
-				}, cursorConfig.handoffDelay);
-			}
-		},
-		{ capture: true },
-	);
-
-	on(window, "blur", () => {
-		currentItem?.hide();
-		currentItem = null;
-		currentTarget = null;
-	});
-
+	// Leaving the window enters nothing.
+	on(document, "pointerout", (event) => event.relatedTarget || hover(null));
+	on(window, "blur", leave);
+	// A navigation started: what the pill was showing is leaving with the page.
+	on(document, "spw:leave", leave);
 }

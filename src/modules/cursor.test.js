@@ -36,68 +36,147 @@ const createMotionValue = vi.hoisted(() => function createMotionValue(initialVal
 
 function cursorMarkup() {
 	return `
-		<div class="cursor-root">
-			<div class="cursor-item" data-cursor-target=".loaded-card" data-cursor-anchor="bottom-right">
-				<div class="cursor-item-visual"><div><div>View item</div></div></div>
-			</div>
+		<style>.cursor-root > .button { opacity: 0; }</style>
+		<div class="cursor-root" aria-hidden="true">
+			<div class="button is-no-hover"><div>View work</div></div>
 		</div>
+		<a class="card" data-cursor-text="View TYX"><span>TYX</span></a>
+		<a class="card" data-cursor-text=""><span>Aethos</span></a>
+		<p class="gap">Between cards</p>
 	`;
 }
 
+const pill = () => document.querySelector(".cursor-root .button");
+const words = () => document.querySelector(".cursor-root .button > div").textContent;
+const enter = (selector) =>
+	document.querySelector(selector).dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
+const pillAnimations = () =>
+	animate.mock.calls.filter(([el]) => el === pill()).map(([, v]) => v);
+
+function stubMedia({ pointer = true, reduce }) {
+	vi.stubGlobal(
+		"matchMedia",
+		vi.fn((query) => ({
+			matches: query.includes("reduced-motion") ? reduce : pointer,
+			addEventListener() {},
+			removeEventListener() {},
+		})),
+	);
+}
+
 describe("initCursor", () => {
+	let controller;
+
 	beforeEach(() => {
 		animate.mockClear();
-		vi.stubGlobal(
-			"matchMedia",
-			vi.fn(() => ({
-				matches: true,
-				addEventListener() {},
-				removeEventListener() {},
-			})),
-		);
+		controller = new AbortController();
+		stubMedia({ reduce: false });
 	});
 
 	afterEach(() => {
-		document.querySelector(".cursor-root")?.cursor?.destroy();
+		controller.abort();
 		document.body.innerHTML = "";
+		vi.useRealTimers();
 		vi.unstubAllGlobals();
-		vi.restoreAllMocks();
 	});
 
-	it("matches a target added after startup whenever a cursor root is present", async () => {
+	it("shows a target's own words, including a target added after startup", () => {
 		document.body.innerHTML = cursorMarkup();
-		await initCursor(document);
+		initCursor(document, { signal: controller.signal });
 
-		const target = document.createElement("a");
-		target.className = "loaded-card";
-		target.innerHTML = "<span>Loaded card</span>";
-		document.body.appendChild(target);
+		const late = document.createElement("a");
+		late.setAttribute("data-cursor-text", "Read insight");
+		late.innerHTML = "<span>Loaded later</span>";
+		document.body.appendChild(late);
 
-		target.firstElementChild.dispatchEvent(
-			new MouseEvent("pointerover", { bubbles: true, relatedTarget: null }),
-		);
+		late.firstElementChild.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
 
-		expect(document.querySelector(".cursor-item").style.visibility).toBe("visible");
+		expect(words()).toBe("Read insight");
+		expect(pillAnimations()).toContainEqual(expect.objectContaining({ opacity: [0, 1] }));
 	});
 
-	it("does not start on a device without hover and a fine pointer", async () => {
-		matchMedia.mockReturnValue({
-			matches: false,
-			addEventListener() {},
-			removeEventListener() {},
-		});
+	it("keeps the pill's own words for a target with an empty label", () => {
+		document.body.innerHTML = cursorMarkup();
+		initCursor(document, { signal: controller.signal });
+
+		enter(".card:nth-of-type(2) span");
+
+		expect(words()).toBe("View work");
+	});
+
+	it("stays on a card the pointer leaves and comes back to within the grace", () => {
+		vi.useFakeTimers();
+		document.body.innerHTML = cursorMarkup();
+		initCursor(document, { signal: controller.signal });
+
+		enter(".card span");
+		enter(".gap");
+		enter(".card span");
+		vi.advanceTimersByTime(1000);
+
+		expect(pillAnimations()).not.toContainEqual(expect.objectContaining({ opacity: 0 }));
+	});
+
+	it("leaves once the pointer has been off every target for the grace", () => {
+		vi.useFakeTimers();
+		document.body.innerHTML = cursorMarkup();
+		initCursor(document, { signal: controller.signal });
+
+		enter(".card span");
+		enter(".gap");
+		vi.advanceTimersByTime(1000);
+
+		expect(pillAnimations()).toContainEqual(expect.objectContaining({ opacity: 0 }));
+	});
+
+	it("turns round from wherever its exit had got to when the pointer comes back", () => {
+		vi.useFakeTimers();
+		document.body.innerHTML = cursorMarkup();
+		initCursor(document, { signal: controller.signal });
+
+		enter(".card span");
+		enter(".gap");
+		vi.advanceTimersByTime(1000);
+		pill().style.opacity = "0.4";
+		animate.mockClear();
+		enter(".card span");
+
+		expect(pillAnimations()).toContainEqual({ opacity: 1, scale: 1 });
+		expect(pillAnimations()).not.toContainEqual(expect.objectContaining({ opacity: [0, 1] }));
+	});
+
+	it("lets go at once when a navigation starts", () => {
+		document.body.innerHTML = cursorMarkup();
+		initCursor(document, { signal: controller.signal });
+
+		enter(".card span");
+		document.dispatchEvent(new CustomEvent("spw:leave"));
+
+		expect(pillAnimations()).toContainEqual(expect.objectContaining({ opacity: 0 }));
+	});
+
+	it("does not start on a device without hover and a fine pointer", () => {
+		stubMedia({ pointer: false, reduce: false });
 		document.body.innerHTML = cursorMarkup();
 
-		await initCursor(document);
+		initCursor(document, { signal: controller.signal });
+		enter(".card span");
 
 		expect(animate).not.toHaveBeenCalled();
 	});
 
-	it("does not start when the cursor root has no cursor items", async () => {
-		document.body.innerHTML = '<div class="cursor-root"></div>';
+	it("only fades for a visitor who asked for less motion", () => {
+		stubMedia({ reduce: true });
+		document.body.innerHTML = cursorMarkup();
+		initCursor(document, { signal: controller.signal });
 
-		await initCursor(document);
+		enter(".card span");
+		enter(".card:nth-of-type(2) span");
 
-		expect(animate).not.toHaveBeenCalled();
+		const moved = animate.mock.calls.flatMap(([, values]) => Object.keys(values));
+		expect(words()).toBe("View work");
+		expect(moved).not.toContain("scale");
+		expect(moved).not.toContain("filter");
 	});
 });
+
