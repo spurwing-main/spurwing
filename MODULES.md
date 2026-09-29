@@ -48,7 +48,7 @@ Copies a `.copy_component`'s own text on click and ticks its icon for two second
 
 ### `cursor.js`
 
-Runs the one pill that follows the pointer over anything carrying `data-cursor-text`. The Designer holds `.cursor-root` with a single `.button` div inside it; the root moves and the pill grows in, resizes and cross-fades its words, so moving between two targets morphs one pill rather than replaying its entrance. A target's `data-cursor-text` sets the words, and an empty value keeps the pill's own. Leaving is a spring with no bounce, so a pointer that comes back part way turns the pill round rather than restarting it. The root sits in the header, which no transition replaces, so like the router it starts once from `src/index.js` and lets go of its target on `spw:leave`. Skipped without a fine pointer; a visitor who asks for reduced motion gets a plain fade.
+Runs the one pill that follows the pointer over anything carrying `data-cursor-text`. The Designer holds `.cursor-root` with a single `.button` div inside it; the root moves and the pill grows in, resizes and cross-fades its words, so moving between two targets morphs one pill rather than replaying its entrance. A target's `data-cursor-text` sets the words, and an empty value keeps the pill's own. A target marked `aria-disabled="true"`, like a slider's arrow at its last slide, shows nothing, and a click that switches the target off under a still pointer lets go of it. Leaving is a spring with no bounce, so a pointer that comes back part way turns the pill round rather than restarting it. The root sits in the header, which no transition replaces, so like the router it starts once from `src/index.js` and lets go of its target on `spw:leave`. Skipped without a fine pointer; a visitor who asks for reduced motion gets a plain fade.
 
 ### `faq.js`
 
@@ -122,7 +122,7 @@ Adds the two things Finsweet does not do on the work archive: a second click on 
 
 ### `work-slide.js`
 
-Runs the `.section_work-slide` slider: slides all as wide as the widest card, first and last aligned to the page's text column while the track runs full-bleed, dots, arrows, and links that do not fire at the end of a drag.
+Runs the `.section_work-slide` slider: slides all as wide as the widest card, first and last aligned to the page's text column while the track runs full-bleed, dots, arrows marked `aria-disabled` at each end, and links that do not fire at the end of a drag.
 
 ## Runtime support
 

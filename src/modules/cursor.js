@@ -4,7 +4,7 @@ import { animate, motionValue, springValue, styleEffect } from "motion";
  * A label that follows the pointer over anything carrying data-cursor-text.
  *
  *   <div class="cursor-root" aria-hidden="true">
- *     <div class="button is-no-hover"><div>View work</div></div>
+ *     <div class="button"><div>View work</div></div>
  *   </div>
  *
  * One pill for the whole site. The root moves with the pointer; the pill
@@ -13,7 +13,8 @@ import { animate, motionValue, springValue, styleEffect } from "motion";
  *
  * The pill shows for whichever target the pointer last entered, and changes
  * only when the pointer enters something else. A target's data-cursor-text is
- * its words; an empty value keeps the pill's own.
+ * its words; an empty value keeps the pill's own. A target switched off with
+ * aria-disabled, like a slider's arrow at its last slide, says nothing.
  *
  * The root sits in the header, which no page transition replaces, so like the
  * router this starts once for the whole visit, and lets go of its target when a
@@ -23,7 +24,7 @@ import { animate, motionValue, springValue, styleEffect } from "motion";
 const config = {
 	rootSelector: ".cursor-root",
 	pillSelector: ".button",
-	targetSelector: "[data-cursor-text]",
+	targetSelector: '[data-cursor-text]:not([aria-disabled="true"])',
 	// Below and right of the pointer, and never closer to the viewport edge.
 	offset: 12,
 	edge: 16,
@@ -31,9 +32,8 @@ const config = {
 	// slower crossing only dips, because a pill on its way out turns round.
 	grace: 120,
 	// Close to locked: at a quick 1500px/s flick it trails by about 28px and
-	// catches up within 35ms of the pointer stopping. The old 1800 / 80 was
-	// damped so heavily it trailed by 72px and took over 200ms, which read as
-	// detached.
+	// catches up within 35ms of the pointer stopping. Damped much harder, it
+	// trails far enough to read as detached.
 	follow: { stiffness: 1210, damping: 17.6, mass: 0.1 },
 	resize: { type: "spring", visualDuration: 0.42 },
 	enter: { type: "spring", visualDuration: 0.34, bounce: 0.18 },
@@ -265,6 +265,13 @@ export function initCursor(root = document, { signal } = {}) {
 	);
 	// Leaving the window enters nothing.
 	on(document, "pointerout", (event) => event.relatedTarget || hover(null));
+	// A click can switch the target off under a still pointer: an arrow that has
+	// just reached its slider's last slide.
+	on(document, "click", () =>
+		requestAnimationFrame(() => {
+			if (target && !target.matches(config.targetSelector)) hover(null);
+		}),
+	);
 	on(window, "blur", leave);
 	// A navigation started: what the pill was showing is leaving with the page.
 	on(document, "spw:leave", leave);

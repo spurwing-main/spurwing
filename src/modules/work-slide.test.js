@@ -87,6 +87,29 @@ describe("initWorkSlide", () => {
 		expect(options.navigation.disabledClass).toBe("swiper-button-disabled");
 	});
 
+	it("marks the arrow at each end as switched off, which Swiper's class alone does not say", () => {
+		document.body.innerHTML = section();
+
+		initWorkSlide();
+
+		const { on } = createSwiper.mock.calls[0][1];
+		const previous = document.querySelector('[data-work-slide="prev"]');
+		const next = document.querySelector('[data-work-slide="next"]');
+
+		instance.isBeginning = true;
+		on.init(instance);
+
+		expect(previous.getAttribute("aria-disabled")).toBe("true");
+		expect(next.getAttribute("aria-disabled")).toBe("false");
+
+		instance.isBeginning = false;
+		instance.isEnd = true;
+		on.toEdge(instance);
+
+		expect(previous.getAttribute("aria-disabled")).toBe("false");
+		expect(next.getAttribute("aria-disabled")).toBe("true");
+	});
+
 	it("steps from the keyboard, because the controls are not native buttons", () => {
 		document.body.innerHTML = section();
 

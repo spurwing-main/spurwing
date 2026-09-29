@@ -241,6 +241,7 @@ export function initNavPanel(root = document, { signal } = {}) {
 			arrow.setAttribute("role", "button");
 			arrow.setAttribute("tabindex", "0");
 			arrow.setAttribute("aria-label", index === 0 ? "Previous work" : "Next work");
+			arrow.setAttribute("data-cursor-text", index === 0 ? "Previous" : "Next");
 		});
 
 		// The link names its panel with aria-controls, but the panel rejects a

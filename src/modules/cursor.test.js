@@ -38,7 +38,7 @@ function cursorMarkup() {
 	return `
 		<style>.cursor-root > .button { opacity: 0; }</style>
 		<div class="cursor-root" aria-hidden="true">
-			<div class="button is-no-hover"><div>View work</div></div>
+			<div class="button"><div>View work</div></div>
 		</div>
 		<a class="card" data-cursor-text="View TYX"><span>TYX</span></a>
 		<a class="card" data-cursor-text=""><span>Aethos</span></a>
@@ -143,6 +143,31 @@ describe("initCursor", () => {
 
 		expect(pillAnimations()).toContainEqual({ opacity: 1, scale: 1 });
 		expect(pillAnimations()).not.toContainEqual(expect.objectContaining({ opacity: [0, 1] }));
+	});
+
+	it("says nothing over a target that is switched off", () => {
+		document.body.innerHTML = cursorMarkup();
+		initCursor(document, { signal: controller.signal });
+
+		document.querySelector(".card").setAttribute("aria-disabled", "true");
+		enter(".card span");
+
+		expect(animate).not.toHaveBeenCalled();
+	});
+
+	it("lets go when a click switches its target off under a still pointer", () => {
+		vi.useFakeTimers();
+		vi.stubGlobal("requestAnimationFrame", (run) => run());
+		document.body.innerHTML = cursorMarkup();
+		initCursor(document, { signal: controller.signal });
+
+		const card = document.querySelector(".card");
+		enter(".card span");
+		card.setAttribute("aria-disabled", "true");
+		card.click();
+		vi.advanceTimersByTime(1000);
+
+		expect(pillAnimations()).toContainEqual(expect.objectContaining({ opacity: 0 }));
 	});
 
 	it("lets go at once when a navigation starts", () => {

@@ -150,6 +150,13 @@ function initSlider(section, signal) {
 	const previous = section.querySelector(workSlideConfig.previousSelector);
 	const next = section.querySelector(workSlideConfig.nextSelector);
 
+	// Swiper marks an arrow at its end with a class alone. aria-disabled says so
+	// to a screen reader too, and to the cursor, which then shows nothing on it.
+	const syncArrows = (instance) => {
+		previous?.setAttribute("aria-disabled", String(instance.isBeginning));
+		next?.setAttribute("aria-disabled", String(instance.isEnd));
+	};
+
 	// Swiper reports activeIndex conservatively at the ends, where several
 	// slides are on screen at once, so the dots follow the edge instead.
 	const selectedIndex = (swiper) => {
@@ -176,6 +183,8 @@ function initSlider(section, signal) {
 		threshold: workSlideConfig.dragThreshold,
 		on: {
 			init(instance) {
+				syncArrows(instance);
+
 				if (!dotsNode) return;
 
 				dots = buildDots(dotsNode, {
@@ -190,7 +199,13 @@ function initSlider(section, signal) {
 			},
 			slideChange: (instance) => dots?.select(selectedIndex(instance)),
 			transitionEnd: (instance) => dots?.select(selectedIndex(instance)),
-			fromEdge: (instance) => dots?.select(selectedIndex(instance)),
+			fromEdge: (instance) => {
+				syncArrows(instance);
+				dots?.select(selectedIndex(instance));
+			},
+			toEdge: syncArrows,
+			lock: syncArrows,
+			unlock: syncArrows,
 			resize: () => scheduleUpdate(),
 		},
 	});
