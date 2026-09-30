@@ -118,7 +118,7 @@ Switches the team section between its groups, cross-fading with a view transitio
 
 ### `ticker.js`
 
-Runs every `[data-ticker]` strip: it drifts left at `data-ticker-velocity` rem a second, slows to `data-ticker-hover` times that under the pointer, stays under a dragging finger, and carries a flick before easing back into the drift. The Designer holds the real items in `[data-ticker-track]`, laid out as the strip first paints; this appends hidden copies after them and moves the track with a transform, so starting moves nothing on screen. Pauses off screen; reduced motion stops the drift but keeps the drag.
+Runs every `[data-ticker]` strip: it drifts left at `data-ticker-velocity` rem a second, slows to `data-ticker-hover` times that under the pointer, stays under a dragging finger, and carries a flick before easing back into the drift. The Designer holds the real items in `[data-ticker-track]`, laid out as the strip first paints; this adds hidden copies on both sides and moves the track with a transform, so starting moves nothing on screen. The copies to the left fill the room a wide screen leaves before the text column, and fade in, since that room was empty before. Pauses off screen; reduced motion stops the drift but keeps the drag.
 
 ### `wave.js`
 

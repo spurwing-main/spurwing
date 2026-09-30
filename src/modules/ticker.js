@@ -1,4 +1,4 @@
-import { cancelFrame, frame } from "motion";
+import { animate, cancelFrame, frame } from "motion";
 
 import { claimOnce } from "../dom.js";
 
@@ -16,8 +16,8 @@ import { claimOnce } from "../dom.js";
  * and eases back into the drift, which is always leftwards again.
  *
  * The Designer holds the real items, laid out in a row, so the page paints the
- * strip exactly where it will sit once this takes over. This only appends
- * copies after them and moves the track with a transform, so nothing already on
+ * strip exactly where it will sit once this takes over. This only adds copies
+ * beside them and moves the track with a transform, so nothing already on
  * screen moves when it starts.
  */
 
@@ -32,6 +32,7 @@ const config = {
 	flick: 2,
 	// A pointer that stopped for this long before letting go was not flicking.
 	still: 80,
+	lead: { duration: 0.6, ease: "easeOut" },
 };
 
 export function initTicker(root = document, { signal } = {}) {
@@ -51,10 +52,11 @@ function run(ticker, track, signal) {
 
 	const originals = [...track.children];
 	const sets = [];
+	const lead = leader(track);
+	let leading = 0;
 
 	let x = 0;
 	let period = 0;
-	let gutter = 0;
 	let speed = 0;
 	let releasing = false;
 	let hovered = false;
@@ -62,8 +64,10 @@ function run(ticker, track, signal) {
 	let rem = 16;
 
 	// One set's length, gap included, is how far the first copy sits from the
-	// first original. The gutter is the room left of the track, which is on
-	// screen for the client strip because the page, not the strip, clips it.
+	// first original. Copies follow the originals to the right edge of the
+	// screen, and lead them leftwards across whatever room the page leaves before
+	// the track: the client strip starts at the text column, but the page, not
+	// the strip, clips it, so on a wide screen that room is on show.
 	const measure = () => {
 		rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
 
@@ -72,24 +76,21 @@ function run(ticker, track, signal) {
 		if (!sets.length) sets.push(copy(originals, track));
 
 		period = firstBox(sets[0][0]).getBoundingClientRect().left - x - left;
-		gutter = Math.max(0, left);
 
 		if (period <= 0) return;
 
-		const span = window.innerWidth - left + period + gutter;
-
-		while ((sets.length + 1) * period < span) sets.push(copy(originals, track));
+		while ((sets.length + 1) * period < window.innerWidth - left + period) sets.push(copy(originals, track));
+		for (; leading * period < left + period; leading++) copy(originals, lead);
 
 		x = wrap(x);
 		paint();
 	};
 
-	// Starting at 0 the gutter is empty, as it was before this ran. Once the
-	// strip has moved a whole set, x stays in a range where jumping back by one
-	// set shows exactly the same picture, gutter included.
+	// Copies on both sides make every position one set apart look the same, so
+	// the strip can jump back a set whenever it has travelled one.
 	const wrap = (value) => {
 		if (period <= 0) return value;
-		while (value < -(period + gutter)) value += period;
+		while (value <= -period) value += period;
 		while (value > 0) value -= period;
 		return value;
 	};
@@ -207,7 +208,7 @@ function run(ticker, track, signal) {
 // A copy of every original, hidden from assistive technology and the keyboard.
 // Images copy whatever image-fade had marked them with, and it never watches an
 // image already marked, so the copies drop the mark and get watched afresh.
-function copy(originals, track) {
+function copy(originals, parent) {
 	return originals.map((original) => {
 		const clone = original.cloneNode(true);
 
@@ -219,10 +220,39 @@ function copy(originals, track) {
 			image.loading = "eager";
 		}
 
-		track.append(clone);
+		parent.append(clone);
 
 		return clone;
 	});
+}
+
+// The copies left of the originals. They sit outside the row, so adding them
+// moves nothing, in a second row styled like the track and ending one gap short
+// of it. The room they fill was empty before this ran, so they fade in rather
+// than appear.
+function leader(track) {
+	const lead = track.cloneNode(false);
+	const gap = getComputedStyle(track).columnGap;
+
+	lead.removeAttribute("data-ticker-track");
+	lead.setAttribute("aria-hidden", "true");
+	lead.inert = true;
+	Object.assign(lead.style, {
+		position: "absolute",
+		top: "0",
+		right: "100%",
+		width: "max-content",
+		height: "100%",
+		marginRight: gap === "normal" ? "0" : gap,
+		transform: "none",
+	});
+
+	if (getComputedStyle(track).position === "static") track.style.position = "relative";
+
+	track.append(lead);
+	animate(lead, { opacity: [0, 1] }, config.lead);
+
+	return lead;
 }
 
 // Collection Lists arrive wrapped in display:contents, which has no box to
