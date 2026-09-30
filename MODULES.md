@@ -116,6 +116,14 @@ Runs the tabbed capabilities section (`.tcp`): one stage at a time, and one pane
 
 Switches the team section between its groups, cross-fading with a view transition where the browser has one.
 
+### `ticker.js`
+
+Runs every `[data-ticker]` strip: it drifts left at `data-ticker-velocity` rem a second, slows to `data-ticker-hover` times that under the pointer, stays under a dragging finger, and carries a flick before easing back into the drift. The Designer holds the real items in `[data-ticker-track]`, laid out as the strip first paints; this appends hidden copies after them and moves the track with a transform, so starting moves nothing on screen. Pauses off screen; reduced motion stops the drift but keeps the drag.
+
+### `wave.js`
+
+Waves a hand beside the pointer for as long as it is over the element holding it, after FigJam's waving hand; on the site, the big "Discuss a project" button. The Designer puts `[data-wave-hand]` inside that element, with one div inside it for the hand: the outer div follows the pointer and the inner one grows in, rocks from the wrist on a loop and fades out on leaving. The hand is whatever the inner div holds, an emoji or an SVG. Skipped without a fine pointer; a visitor who asks for reduced motion gets the hand as a plain fade, without the wave.
+
 ### `work-archive.js`
 
 Adds the two things Finsweet does not do on the work archive: a second click on the active sector clears it, and the sector tag on each card is itself a filter control.

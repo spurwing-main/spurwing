@@ -20,6 +20,8 @@ import { initRtFlow } from "./rt-flow.js";
 import { initStick } from "./stick.js";
 import { initTabbed } from "./tabbed.js";
 import { initTeamSwitch } from "./team-switch.js";
+import { initTicker } from "./ticker.js";
+import { initWave } from "./wave.js";
 import { initWorkArchive } from "./work-archive.js";
 import { initWorkSlide } from "./work-slide.js";
 
@@ -42,6 +44,7 @@ export const modules = [
 	{ name: "insight-toc", init: initInsightToc },
 	{ name: "tabbed", init: initTabbed },
 	{ name: "team-switch", init: initTeamSwitch },
+	{ name: "wave", init: initWave },
 	{ name: "stick", init: initStick },
 	{ name: "work-archive", init: initWorkArchive },
 
@@ -49,6 +52,7 @@ export const modules = [
 	{ name: "rightway", init: initRightway },
 	{ name: "work-slide", init: initWorkSlide },
 	{ name: "quote-fade", init: initQuoteFade },
+	{ name: "ticker", init: initTicker },
 	{ name: "card-reveal", init: initCardReveal },
 	{ name: "anim", init: initAnim },
 	{ name: "approach-hero", init: initApproachHero },
