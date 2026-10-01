@@ -123,7 +123,10 @@
 
   async function getSource() {
     if (environment === "live") return { url: liveUrl, kind: "live", localUp: null };
-    if (environment === "auto" && !devMode) {
+    // Auto checks for a local build only on localhost itself. From any other
+    // host, Webflow staging included, a request to localhost makes Chrome ask
+    // the visitor for local network access, so there it takes ?env=local.
+    if (environment === "auto" && location.hostname !== "localhost") {
       return { url: liveUrl, kind: "live", localUp: null };
     }
 

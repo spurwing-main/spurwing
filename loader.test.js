@@ -62,20 +62,12 @@ describe("loader", () => {
     expect(bundles[1].src).toContain("@1234567890abcdef/dist/bundle.js");
   });
 
-  it("shows the panel on staging when the local server responds", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+  it("never checks the local server on staging unless the link asks", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
     await runLoader();
 
-    expect(document.head.querySelector('script[type="module"]').src).toBe(
-      "http://localhost:5500/bundle.js"
-    );
-    expect(document.querySelector("[data-loader-panel]")).not.toBeNull();
-  });
-
-  it("hides the panel on staging when the local server does not respond", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
-    await runLoader();
-
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(document.head.querySelector('script[type="module"]').src).toContain(
       "@1234567890abcdef/dist/bundle.js"
     );

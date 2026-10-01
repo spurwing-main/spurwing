@@ -90,7 +90,7 @@ The loader supports 3 environment values:
 
 | Value   | Result                                                                                |
 | ------- | ------------------------------------------------------------------------------------- |
-| `auto`  | Checks locally on localhost and Webflow staging. Uses the live bundle on other hosts. |
+| `auto`  | Checks locally on localhost only. Uses the live bundle on every other host.           |
 | `local` | Checks the local server on all hosts. Uses the live bundle if the check fails.        |
 | `live`  | Loads the live bundle without a local check.                                          |
 
@@ -107,8 +107,8 @@ The loader uses this source logic:
 | `live`                                | No check       | Live bundle  |
 | `local`                               | Success        | Local bundle |
 | `local`                               | Failure        | Live bundle  |
-| `auto` on localhost or `*.webflow.io` | Success        | Local bundle |
-| `auto` on localhost or `*.webflow.io` | Failure        | Live bundle  |
+| `auto` on localhost                   | Success        | Local bundle |
+| `auto` on localhost                   | Failure        | Live bundle  |
 | `auto` on another host                | No check       | Live bundle  |
 
 The local check stops after `probeTimeout`. The default timeout is 900 milliseconds.
@@ -117,7 +117,7 @@ If the local check succeeds but the module request fails, the loader requests th
 
 ### Development panel
 
-With the default `auto` environment, localhost and Webflow staging show the panel only when the local bundle responds.
+With the default `auto` environment, localhost shows the panel only when the local bundle responds. Webflow staging shows it only with an override, such as `?env=local`.
 
 If the local bundle does not respond, the loader gets the live bundle. It does not show the panel when no override is active.
 
@@ -183,9 +183,9 @@ npm run dev
 
 The server makes a new bundle for each request. It serves the bundle at `http://localhost:5500/bundle.js`.
 
-On localhost and Webflow staging, the loader checks the local server. It uses the live bundle if the local server is off.
+On localhost, the loader checks the local server. It uses the live bundle if the local server is off. On Webflow staging it checks only with `?env=local`, because a request from a public site to localhost makes Chrome ask the visitor for local network access.
 
-Use `?env=local` to make the loader do the local check on another domain. Use `?env=live` to skip the check.
+Use `?env=local` to make the loader do the local check on staging or another domain. Use `?env=live` to skip the check.
 
 Set `data-local-base` on the loader tag if you use an HTTPS tunnel:
 
