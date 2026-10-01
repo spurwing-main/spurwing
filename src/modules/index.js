@@ -10,7 +10,6 @@ import { initFaq } from "./faq.js";
 import { initImageFade } from "./image-fade.js";
 import { initImpactSlider } from "./impact-slider.js";
 import { initInsightToc } from "./insight-toc.js";
-import { initIslandReveal } from "./island-reveal.js";
 import { initMenuToggle } from "./menu-toggle.js";
 import { initNavAutoHide } from "./nav-auto-hide.js";
 import { initNavPanel } from "./nav-panel.js";
@@ -29,7 +28,6 @@ import { initWorkSlide } from "./work-slide.js";
 // what they produced. Order matters nowhere else: each runs independently, and
 // a module that throws does not stop the next.
 export const modules = [
-	{ name: "island-reveal", init: initIslandReveal },
 	{ name: "cms-counts", init: initCmsCounts },
 	{ name: "rt-flow", init: initRtFlow },
 	{ name: "impact-slider", init: initImpactSlider },

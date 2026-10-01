@@ -89,10 +89,7 @@ describe("routeTarget", () => {
 
 describe("initPageTransition", () => {
 	beforeEach(() => {
-		// jsdom has neither, and the router needs both to get past its own guards.
-		Element.prototype.setHTMLUnsafe = function (html) {
-			this.innerHTML = html;
-		};
+		// jsdom has no matchMedia, and the router reads it on start.
 		vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {} }));
 		document.body.innerHTML =
 			'<div class="page-wrap"><nav class="nav"></nav>' +
@@ -102,15 +99,9 @@ describe("initPageTransition", () => {
 	afterEach(() => {
 		document.body.innerHTML = "";
 		document.querySelectorAll("[data-pt-style]").forEach((node) => node.remove());
-		delete Element.prototype.setHTMLUnsafe;
 		vi.unstubAllGlobals();
 	});
 
-	// Moving main takes every <code-island> in it out of the document and puts it
-	// back, which runs connectedCallback again. At DOMContentLoaded a component's
-	// first mount is still in flight, so Webflow mounted it twice and appended a
-	// second copy: the approach hero ran two tickers at once. The container is
-	// built on the first navigation instead, when nothing is mid-mount.
 	it("leaves the page's own structure alone until a navigation starts", () => {
 		initPageTransition();
 

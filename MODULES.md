@@ -6,7 +6,7 @@ Every module is called as `init(root, { signal })`. The signal is fresh on each 
 
 `boot.js` owns running each module once per page, so a module does not guard itself for that reason. Several guard for a different one: during a transition the outgoing and incoming pages are both in the DOM, so a module that queries the document finds the old page's elements too and would set them up a second time. `impact-slider.js`, `quote-fade.js` and `rt-flow.js` consume the markup they build from and would read their own output; `approach-slider.js`, `caps.js`, `copy-to-clipboard.js` and `work-slide.js` use `claimOnce` from `src/dom.js` to leave a claim on each element they take. A lookup that must not cross pages scopes itself to `[data-pt-container]` — `faq.js` and `insight-toc.js` both do.
 
-Anything that hides content must be able to reveal it again after its run has been aborted. A page transition aborts the previous signal, so a reveal that depends on a listener carrying that signal can be taken away mid-flight, and the next run will skip an element already marked as handled. That has shipped twice — once in `image-fade.js` and once, unnoticed, in `island-reveal.js`. `src/dom.js` also holds `press` and `keyActivates` for elements styled to look like buttons, and `freezeAndDestroy` for tearing a carousel down without moving it while the old page is still on screen.
+Anything that hides content must be able to reveal it again after its run has been aborted. A page transition aborts the previous signal, so a reveal that depends on a listener carrying that signal can be taken away mid-flight, and the next run will skip an element already marked as handled. That has shipped before, in `image-fade.js`. `src/dom.js` also holds `press` and `keyActivates` for elements styled to look like buttons, and `freezeAndDestroy` for tearing a carousel down without moving it while the old page is still on screen.
 
 Embla, Motion and Swiper are ordinary npm imports, bundled by esbuild; `src/swiper.js` registers the Swiper modules the site uses and is what the sliders import. GSAP is still a global that Webflow's own head loads, as is Swiper's stylesheet. Tests mock the npm packages (`vi.mock("motion", …)`) rather than injecting a loader.
 
@@ -66,10 +66,6 @@ Reads the impact cards out of one Rich Text block — a title, a body and an opt
 
 Positions the sidebar indicator against the current Finsweet table-of-contents link, holding its last position through the gaps where Finsweet drops its `w--current` class.
 
-### `island-reveal.js`
-
-Holds a Webflow code component's wrapper at zero opacity until the component has rendered, then fades it in. Webflow serves these as an empty shell, so the hero media on `/approach` was a blank gap for around 600ms and then snapped in. It leaves alone a component that had already rendered, and any wrapper holding more than the component, and reveals regardless after 2.5s so a failed component CDN is late rather than blank.
-
 ### `menu-toggle.js`
 
 Opens and closes the mobile menu across the nav layout, menu and trigger together. It closes itself when a navigation starts, which releases the body scroll lock before the router scrolls anything.
@@ -84,9 +80,9 @@ The navigation dropdowns: open and close state on one attribute, `inert` on what
 
 ### `page-transition.js`
 
-Crossfades `main` and the footer through a brief white hold while the nav stays untouched, so nothing in it rebuilds or flashes. It fetches the next page, waits for that page's stylesheet, webfonts and above-the-fold images, then swaps with `setHTMLUnsafe` so Webflow code components keep their shadow DOM. A different shell, a failed fetch or a missing `setHTMLUnsafe` falls back to an ordinary navigation. It owns navigation for the whole session, so it starts once from `src/index.js` rather than through the registry, and carries its own CSS.
+Crossfades `main` and the footer through a brief white hold while the nav stays untouched, so nothing in it rebuilds or flashes. It fetches the next page, waits for that page's stylesheet, webfonts and above-the-fold images, then swaps them in. A different shell or a failed fetch falls back to an ordinary navigation. It owns navigation for the whole session, so it starts once from `src/index.js` rather than through the registry, and carries its own CSS.
 
-The container it fades is built on the first navigation, never on load. Moving `main` takes every `<code-island>` out of the document and puts it back, and doing that while a component's first mount is still in flight makes Webflow mount it twice and append a second copy. `page-transition.test.js` holds that line.
+The container it fades is built on the first navigation, never on load, so the page as served is the page as designed until someone clicks a link.
 
 ### `quote-fade.js`
 

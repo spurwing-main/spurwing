@@ -1,19 +1,13 @@
 /*
    Crossfades main + footer through a brief white hold. The nav is never touched.
 
-   Two decisions worth knowing before changing anything:
+   One decision worth knowing before changing anything:
 
-   1. Not View Transitions. They rebuild the nav on every navigation and hide it
+   Not View Transitions. They rebuild the nav on every navigation and hide it
       behind a snapshot, so stability depends on the browser's snapshot timing.
       With two self-hosted webfonts on font-display:auto and no preload, the new
       document can reach first render — when the snapshot is taken — before the
       fonts apply. That is the "text changes" flash.
-
-   2. Not Barba. Webflow code components (<code-island>) ship as declarative
-      shadow DOM (<template shadowrootmode="open">). innerHTML, which is how
-      Barba builds its container, silently drops those templates: the element
-      upgrades with an empty shadow root and renders nothing, while
-      el.shadowRoot still reads truthy. Only setHTMLUnsafe() attaches them.
 
    This file assumes every module cleans up with the signal boot.js hands it.
    That assumption is what keeps it short: no script-lifecycle compensation, no
@@ -129,10 +123,7 @@ export function routeTarget(link, event, here = location) {
 export function initPageTransition(root = document) {
 	const html = root.documentElement;
 
-	// setHTMLUnsafe is the whole reason the code components survive a swap, and
-	// nothing can polyfill attaching a declarative shadow root. Without it, and
-	// in the Designer, every link stays an ordinary navigation.
-	if (typeof Element.prototype.setHTMLUnsafe !== "function") return;
+	// In the Designer and the Editor every link stays an ordinary navigation.
 	if (html.classList.contains("wf-design-mode")) return;
 	if (html.classList.contains("w-editor")) return;
 
@@ -177,14 +168,8 @@ export function initPageTransition(root = document) {
 	// both. Built at runtime, so the Designer and published markup are untouched
 	// and the pages still work with JavaScript off.
 	//
-	// Called on the first navigation, never on load. Moving main takes every
-	// <code-island> in it out of the document and puts it back, which runs
-	// connectedCallback again. Do that while a component's first mount is still
-	// in flight — which is exactly where DOMContentLoaded falls — and Webflow
-	// mounts it twice, appending a second copy beside the first instead of
-	// reconciling: the approach hero ran two tickers, 34ms apart, stacked. By
-	// the time anyone clicks a link, every component has finished mounting and
-	// the same move is harmless.
+	// Called on the first navigation, never on load, so the page as served is
+	// the page as designed until someone clicks a link.
 	function wrapCurrent() {
 		const parts = pageTransitionConfig.swap
 			.map((selector) => root.querySelector(selector))
@@ -306,7 +291,7 @@ export function initPageTransition(root = document) {
 
 	const SKIP = /^(application\/(ld\+json|json)|text\/template|speculationrules)$/i;
 
-	// setHTMLUnsafe inserts <script> inert, so each is recreated to make it run.
+	// innerHTML inserts <script> inert, so each is recreated to make it run.
 	// What is left in swapped content is Webflow's own and the analytics
 	// vendors'; everything of ours is in this bundle.
 	function runScripts(container) {
@@ -459,7 +444,7 @@ export function initPageTransition(root = document) {
 			next.setAttribute("data-pt-container", "");
 			next.setAttribute("data-pt-state", "in");
 			wrapper.insertBefore(next, current);
-			next.setHTMLUnsafe(htmlOf(doc));
+			next.innerHTML = htmlOf(doc);
 
 			jumpTo(targetY);
 			await whenPaintable(next, targetY);
