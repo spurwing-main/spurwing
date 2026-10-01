@@ -353,9 +353,12 @@ export function initPageTransition(root = document) {
 	// Committing the end state is the invariant: however the transition ends, the
 	// incoming page finishes at opacity 1 with nothing pending, so it can never
 	// be left half-faded.
-	function crossfade(from, to) {
+	// The outgoing page starts fading the moment the link is clicked (leave
+	// below), so the incoming page waits only for what is left of out + hold.
+	function crossfade(from, to, leftAt) {
 		const commit = () => {
 			to.removeAttribute("data-pt-state");
+			to.style.transitionDelay = "";
 			from.setAttribute("data-pt-state", "out");
 		};
 
@@ -367,6 +370,10 @@ export function initPageTransition(root = document) {
 			return Promise.resolve();
 		}
 
+		const css = getComputedStyle(html);
+		const lead = parseFloat(css.getPropertyValue("--pt-out")) + parseFloat(css.getPropertyValue("--pt-hold"));
+
+		to.style.transitionDelay = `${Math.max(0, lead - (performance.now() - leftAt))}ms`;
 		from.setAttribute("data-pt-state", "out");
 		to.setAttribute("data-pt-state", "on");
 
@@ -398,6 +405,15 @@ export function initPageTransition(root = document) {
 		// closes itself and releases body { overflow: hidden }.
 		announce("spw:leave", { url });
 
+		// The page answers the click, not the network: it starts fading out now,
+		// and the fetch, stylesheet and images load behind it. Without motion
+		// there is no fade to hide the wait behind, so the page stays up until the
+		// swap instead of going blank.
+		current ??= wrapCurrent();
+		if (!reduceMotion.matches) current?.setAttribute("data-pt-state", "out");
+
+		const leftAt = performance.now();
+
 		try {
 			const doc = await load(url);
 
@@ -419,8 +435,6 @@ export function initPageTransition(root = document) {
 				rememberScroll();
 				history.pushState({ y: targetY }, "", url);
 			}
-
-			current ??= wrapCurrent();
 
 			// Freeze the outgoing page where the eye sees it. Taking it out of flow
 			// hands the document height to the incoming page, so moving the scroll
@@ -482,7 +496,7 @@ export function initPageTransition(root = document) {
 				log("Finsweet restart skipped", error);
 			}
 
-			await crossfade(current, next);
+			await crossfade(current, next, leftAt);
 
 			current.remove();
 			current = next;
@@ -560,7 +574,21 @@ export function initPageTransition(root = document) {
 			const warm = (event) => {
 				const url = routeTarget(event.target.closest?.("a[href]"), null);
 
-				if (url && url !== "self" && !cache.has(url.href)) load(url.href).catch(() => {});
+				if (!url || url === "self" || cache.has(url.href)) return;
+
+				// Each page has its own stylesheet, and the swap waits for it, so it
+				// is fetched now as well and is in cache by the click.
+				load(url.href)
+					.then((doc) => {
+						doc.head.querySelectorAll("link[rel=stylesheet][href]").forEach((incoming) => {
+							if (document.querySelector(`link[href="${incoming.href}"]`)) return;
+
+							document.head.append(
+								Object.assign(document.createElement("link"), { rel: "preload", as: "style", href: incoming.href }),
+							);
+						});
+					})
+					.catch(() => {});
 			};
 
 			["mouseover", "focusin", "touchstart"].forEach((type) =>

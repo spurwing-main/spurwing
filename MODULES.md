@@ -80,7 +80,7 @@ The navigation dropdowns: open and close state on one attribute, `inert` on what
 
 ### `page-transition.js`
 
-Crossfades `main` and the footer through a brief white hold while the nav stays untouched, so nothing in it rebuilds or flashes. It fetches the next page, waits for that page's stylesheet, webfonts and above-the-fold images, then swaps them in. A different shell or a failed fetch falls back to an ordinary navigation. It owns navigation for the whole session, so it starts once from `src/index.js` rather than through the registry, and carries its own CSS.
+Crossfades `main` and the footer through a brief white hold while the nav stays untouched, so nothing in it rebuilds or flashes. The outgoing page starts fading the moment a link is clicked, and the next page loads behind it: its HTML and stylesheet are already fetched when the pointer rests on the link, and the swap waits for its webfonts and above-the-fold images before fading it in. A different shell or a failed fetch falls back to an ordinary navigation. It owns navigation for the whole session, so it starts once from `src/index.js` rather than through the registry, and carries its own CSS.
 
 The container it fades is built on the first navigation, never on load, so the page as served is the page as designed until someone clicks a link.
 
