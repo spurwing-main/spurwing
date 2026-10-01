@@ -1,4 +1,4 @@
-import { animate, cancelFrame, frame } from "motion";
+import { animate, cancelFrame, frame, hover, inView, motionValue, wrap } from "motion";
 
 import { claimOnce } from "../dom.js";
 
@@ -11,28 +11,37 @@ import { claimOnce } from "../dom.js";
  *
  * It replaces Webflow's Motion Ticker code component, and moves the way that
  * component was set up on this site: leftwards at data-ticker-velocity rem per
- * second, times data-ticker-hover while the pointer is over it. A drag holds
- * the strip under the finger; a flick carries on at the speed it was let go
- * and eases back into the drift, which is always leftwards again.
+ * second, easing to data-ticker-hover times that while the pointer is over it.
+ * A drag holds the strip under the finger; a flick carries on at the speed it
+ * was let go and eases back into the drift, which is always leftwards again.
  *
  * The Designer holds the real items, laid out in a row, so the page paints the
- * strip exactly where it will sit once this takes over. This only adds copies
- * beside them and moves the track with a transform, so nothing already on
- * screen moves when it starts.
+ * strip exactly where it will sit once this takes over. One offset, a motion
+ * value, says how far the strip has travelled, and the row moves by it with
+ * `translate`. An item that leaves the left edge is moved on by one loop's
+ * length, past the right edge, the way Motion's own Ticker does it, so the real
+ * items are usually all the strip needs, and each is written to only when it
+ * goes round. Copies are added only when one set is too short for the screen.
  */
 
 const config = {
 	velocity: 3,
 	hover: 1,
+	// The hover slow-down eases in and out rather than snapping.
+	ease: { duration: 0.4, ease: "easeOut" },
 	// How quickly a flick settles back into the drift. The component's "glide"
 	// preset, at the release carry and settle time the site had, works out to
 	// this time constant.
 	settle: 0.286,
 	// A release slower than this, in px/s, simply resumes the drift.
 	flick: 2,
-	// A pointer that stopped for this long before letting go was not flicking.
+	// The pointer's speed at release is read over this last stretch of the drag,
+	// and a pointer that stopped for longer than `still` was not flicking.
+	window: 100,
 	still: 80,
-	lead: { duration: 0.6, ease: "easeOut" },
+	// A stalled frame catches the strip up rather than freezing it, up to this.
+	stall: 250,
+	reveal: { duration: 0.6, ease: "easeOut" },
 };
 
 export function initTicker(root = document, { signal } = {}) {
@@ -51,60 +60,91 @@ function run(ticker, track, signal) {
 	const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 	const originals = [...track.children];
-	const sets = [];
-	const lead = leader(track);
-	let leading = 0;
+	const offset = motionValue(0);
+	const factor = motionValue(1);
 
-	let x = 0;
+	let items = [];
 	let period = 0;
+	let rem = 16;
 	let speed = 0;
 	let releasing = false;
-	let hovered = false;
+	let last = 0;
 	let drag = null;
-	let rem = 16;
+	let painted = false;
 
-	// One set's length, gap included, is how far the first copy sits from the
-	// first original. Copies follow the originals to the right edge of the
-	// screen, and lead them leftwards across whatever room the page leaves before
-	// the track: the client strip starts at the text column, but the page, not
-	// the strip, clips it, so on a wide screen that room is on show.
+	// Where each item sits in the row, untouched, and how long one loop is. An
+	// item is drawn somewhere in the stretch that starts just off the left edge
+	// of the screen and runs one loop to the right, so a loop has to be at least
+	// a screen plus an item long; anything shorter gets another set of copies.
 	const measure = () => {
 		rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
 
-		const left = firstBox(originals[0]).getBoundingClientRect().left - x;
+		for (;;) {
+			const placed = boxes(track).map((element) => {
+				const shift = items.find((item) => item.element === element)?.shift ?? 0;
+				const box = element.getBoundingClientRect();
 
-		if (!sets.length) sets.push(copy(originals, track));
+				return { element, left: box.left - shift - offset.get(), width: box.width, shift };
+			});
 
-		period = firstBox(sets[0][0]).getBoundingClientRect().left - x - left;
+			if (placed.length < 1) return;
 
-		if (period <= 0) return;
+			const first = placed[0];
+			const end = Math.max(...placed.map((item) => item.left + item.width));
+			const gap = placed[1] ? placed[1].left - first.left - first.width : 0;
+			const widest = Math.max(...placed.map((item) => item.width));
 
-		while ((sets.length + 1) * period < window.innerWidth - left + period) sets.push(copy(originals, track));
-		for (; leading * period < left + period; leading++) copy(originals, lead);
+			items = placed;
+			period = end - first.left + gap;
 
-		x = wrap(x);
+			if (period <= 0 || period >= window.innerWidth + widest + gap) break;
+
+			copy(originals, track);
+		}
+
 		paint();
 	};
 
-	// Copies on both sides make every position one set apart look the same, so
-	// the strip can jump back a set whenever it has travelled one.
-	const wrap = (value) => {
-		if (period <= 0) return value;
-		while (value <= -period) value += period;
-		while (value > 0) value -= period;
-		return value;
-	};
-
 	const paint = () => {
-		track.style.transform = `translate3d(${x}px, 0, 0)`;
+		if (period <= 0) return;
+
+		const travelled = offset.get();
+		const entering = [];
+
+		track.style.translate = `${travelled}px 0`;
+
+		for (const item of items) {
+			// Whole loops only, so an item that needs no moving gets exactly 0, and
+			// an item is written to only on the frame it goes round.
+			const shift = -Math.floor((item.left + travelled + item.width) / period) * period;
+
+			if (shift === item.shift) continue;
+
+			// Before this ran, nothing sat left of the row. On a wide screen the
+			// client strip shows that room, and the first paint fills it, so what
+			// arrives there fades in rather than appearing.
+			if (!painted && item.left + travelled + shift < window.innerWidth) entering.push(item.element);
+
+			item.shift = shift;
+			item.element.style.translate = `${shift}px 0`;
+		}
+
+		if (entering.length) animate(entering, { opacity: [0, 1] }, config.reveal);
+
+		painted = true;
 	};
 
-	const drift = () => (still ? 0 : -velocity * rem * (hovered ? hoverFactor : 1));
+	offset.on("change", () => frame.render(paint));
 
-	const tick = ({ delta }) => {
-		if (drag || period <= 0) return;
+	const drift = () => (still ? 0 : -velocity * rem * factor.get());
 
-		const dt = Math.min(delta, 64) / 1000;
+	const tick = ({ timestamp }) => {
+		const dt = last ? Math.min(timestamp - last, config.stall) / 1000 : 0;
+
+		last = timestamp;
+
+		if (drag || period <= 0 || dt === 0) return;
+
 		const base = drift();
 
 		if (releasing) {
@@ -114,56 +154,51 @@ function run(ticker, track, signal) {
 			speed = base;
 		}
 
-		if (speed === 0) return;
-
-		x = wrap(x + speed * dt);
-		paint();
+		if (speed !== 0) offset.set(wrap(-period, 0, offset.get() + speed * dt));
 	};
 
-	const start = () => frame.update(tick, true);
-	const stop = () => cancelFrame(tick);
+	const start = () => {
+		last = 0;
+		frame.update(tick, true);
+
+		return () => cancelFrame(tick);
+	};
 
 	measure();
 
-	const resize = new ResizeObserver(measure);
+	const resize = new ResizeObserver(() => measure());
 
+	// The root font size follows the window width, and the strip does too, so
+	// watching the strip catches the drift's rem changing as well.
+	resize.observe(ticker);
 	resize.observe(track);
+	document.fonts?.ready.then(() => signal?.aborted || measure());
 
-	// The root font size follows the window width, and the drift is in rem.
-	window.addEventListener("resize", measure, { signal });
+	const stopView = inView(ticker, start);
+	const stopHover = hover(ticker, () => {
+		animate(factor, hoverFactor, config.ease);
 
-	const view = new IntersectionObserver(([entry]) => {
-		if (entry.isIntersecting) start();
-		else stop();
+		return () => animate(factor, 1, config.ease);
 	});
-
-	view.observe(ticker);
 
 	signal?.addEventListener("abort", () => {
-		stop();
+		cancelFrame(tick);
+		stopView();
+		stopHover();
 		resize.disconnect();
-		view.disconnect();
+		offset.destroy();
+		factor.destroy();
 	});
-
-	ticker.addEventListener(
-		"pointerenter",
-		(event) => {
-			if (event.pointerType === "mouse") hovered = true;
-		},
-		{ signal },
-	);
-
-	ticker.addEventListener("pointerleave", () => (hovered = false), { signal });
 
 	ticker.addEventListener(
 		"pointerdown",
 		(event) => {
-			if (event.button !== 0 || period <= 0) return;
+			if (!event.isPrimary || event.button !== 0 || period <= 0) return;
 
 			ticker.setPointerCapture(event.pointerId);
 			ticker.style.cursor = "grabbing";
 			releasing = false;
-			drag = { from: event.clientX - x, last: event.clientX, at: event.timeStamp, velocity: 0 };
+			drag = { from: offset.get() - event.clientX, samples: [[event.timeStamp, event.clientX]] };
 		},
 		{ signal },
 	);
@@ -171,29 +206,25 @@ function run(ticker, track, signal) {
 	ticker.addEventListener(
 		"pointermove",
 		(event) => {
-			if (!drag) return;
+			if (!drag || !event.isPrimary) return;
 
-			const dt = (event.timeStamp - drag.at) / 1000;
-
-			if (dt > 0) {
-				const sample = (event.clientX - drag.last) / dt;
-				drag.velocity = 0.65 * drag.velocity + 0.35 * sample;
+			for (const sample of event.getCoalescedEvents?.() ?? [event]) {
+				drag.samples.push([sample.timeStamp, sample.clientX]);
 			}
 
-			drag.last = event.clientX;
-			drag.at = event.timeStamp;
+			const newest = drag.samples.at(-1)[0];
 
-			x = wrap(event.clientX - drag.from);
-			drag.from = event.clientX - x;
-			paint();
+			while (newest - drag.samples[0][0] > config.window) drag.samples.shift();
+
+			offset.set(drag.from + event.clientX);
 		},
 		{ signal },
 	);
 
 	const release = (event) => {
-		if (!drag) return;
+		if (!drag || !event.isPrimary) return;
 
-		const flung = event.timeStamp - drag.at < config.still ? drag.velocity : 0;
+		const flung = event.type === "pointerup" ? flick(drag.samples, event.timeStamp) : 0;
 
 		ticker.style.cursor = "";
 		drag = null;
@@ -205,64 +236,55 @@ function run(ticker, track, signal) {
 	ticker.addEventListener("pointercancel", release, { signal });
 }
 
+// The pointer's speed over the last stretch of the drag, in px/s: the distance
+// between the oldest and newest samples kept, over the time between them. One
+// pair of events is too noisy to trust, and how many arrive depends on the
+// device.
+function flick(samples, now) {
+	const [newestAt, newestX] = samples.at(-1);
+	const [oldestAt, oldestX] = samples[0];
+
+	if (now - newestAt > config.still || newestAt <= oldestAt) return 0;
+
+	return ((newestX - oldestX) / (newestAt - oldestAt)) * 1000;
+}
+
 // A copy of every original, hidden from assistive technology and the keyboard.
 // Images copy whatever image-fade had marked them with, and it never watches an
 // image already marked, so the copies drop the mark and get watched afresh.
-function copy(originals, parent) {
-	return originals.map((original) => {
+function copy(originals, track) {
+	for (const original of originals) {
 		const clone = original.cloneNode(true);
 
 		clone.setAttribute("aria-hidden", "true");
 		clone.inert = true;
 
-		for (const image of clone.querySelectorAll("img")) {
-			image.removeAttribute("data-img");
-			image.loading = "eager";
+		for (const image of clone.querySelectorAll("img")) image.removeAttribute("data-img");
+
+		// A copy is placed afresh, not where the item it came from had got to.
+		for (const element of [clone, ...clone.querySelectorAll("[style]")]) {
+			element.style.removeProperty("translate");
+			element.style.removeProperty("opacity");
 		}
 
-		parent.append(clone);
-
-		return clone;
-	});
+		track.append(clone);
+	}
 }
 
-// The copies left of the originals. They sit outside the row, so adding them
-// moves nothing, in a second row styled like the track and ending one gap short
-// of it. The room they fill was empty before this ran, so they fade in rather
-// than appear.
-function leader(track) {
-	const lead = track.cloneNode(false);
-	const gap = getComputedStyle(track).columnGap;
+// The items the strip moves: the elements in the row that have a box.
+// Collection Lists arrive wrapped in display:contents, so this looks through
+// those, and passes over anything not drawn at all, like a style embed.
+function boxes(parent) {
+	const found = [];
 
-	lead.removeAttribute("data-ticker-track");
-	lead.setAttribute("aria-hidden", "true");
-	lead.inert = true;
-	Object.assign(lead.style, {
-		position: "absolute",
-		top: "0",
-		right: "100%",
-		width: "max-content",
-		height: "100%",
-		marginRight: gap === "normal" ? "0" : gap,
-		transform: "none",
-	});
+	for (const child of parent.children) {
+		const display = getComputedStyle(child).display;
 
-	if (getComputedStyle(track).position === "static") track.style.position = "relative";
+		if (display === "contents") found.push(...boxes(child));
+		else if (display !== "none") found.push(child);
+	}
 
-	track.append(lead);
-	animate(lead, { opacity: [0, 1] }, config.lead);
-
-	return lead;
-}
-
-// Collection Lists arrive wrapped in display:contents, which has no box to
-// measure, so this finds the first element inside that has one.
-function firstBox(element) {
-	let current = element;
-
-	while (current && !current.getClientRects().length) current = current.firstElementChild;
-
-	return current ?? element;
+	return found;
 }
 
 function number(element, attribute, fallback) {
