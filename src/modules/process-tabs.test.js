@@ -66,12 +66,12 @@ describe("initProcessTabs", () => {
 
 	const onScreen = () => motion.inView.mock.calls.at(-1)[1]();
 
-	it("makes one numbered tab per step and shows only the first step", () => {
+	it("makes one tab per step, named by its title, and shows only the first step", () => {
 		document.body.innerHTML = section(4);
 
 		initProcessTabs();
 
-		expect(tabs().map((tab) => tab.firstElementChild.textContent)).toEqual(["01", "02", "03", "04"]);
+		expect(tabs().map((tab) => tab.firstElementChild.textContent)).toEqual(["Step 1", "Step 2", "Step 3", "Step 4"]);
 		expect(steps().map((step) => step.hidden)).toEqual([false, true, true, true]);
 		expect(tabs()[0].classList.contains("is-active")).toBe(true);
 		expect(tabs()[0].getAttribute("aria-selected")).toBe("true");
@@ -90,7 +90,6 @@ describe("initProcessTabs", () => {
 		expect(tab.getAttribute("aria-controls")).toBe(step.id);
 		expect(step.getAttribute("role")).toBe("tabpanel");
 		expect(step.getAttribute("aria-labelledby")).toBe(tab.id);
-		expect(tab.getAttribute("aria-label")).toBe("Step 1");
 	});
 
 	it("moves to the next step when the progress line fills on screen", async () => {
@@ -174,6 +173,14 @@ describe("initProcessTabs", () => {
 
 		expect(motion.animate).not.toHaveBeenCalled();
 		expect(steps()[0].hidden).toBe(false);
+	});
+
+	it("numbers a tab whose step has no title", () => {
+		document.body.innerHTML = section(2).replace("<h3>Step 2</h3>", "");
+
+		initProcessTabs();
+
+		expect(tabs().map((tab) => tab.firstElementChild.textContent)).toEqual(["Step 1", "02"]);
 	});
 
 	it("leaves a single step as it is", () => {

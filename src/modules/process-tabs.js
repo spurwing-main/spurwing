@@ -3,21 +3,22 @@ import { animate, inView } from "motion";
 import { claimOnce, press } from "../dom.js";
 
 /**
- * Process tabs: one step showing at a time, numbered tabs underneath, and one
- * track under the tabs that fills across all the steps, a step's share at a
- * time, before the next step comes up.
+ * Process tabs: one step showing at a time, a tab per step underneath named by
+ * the step's title, and one track under the tabs that fills across all the
+ * steps, a step's share at a time, before the next step comes up.
  *
  *   <section data-process-tabs>
  *     …<div data-process-step>…</div> × n (the Steps slot)
  *     <div role="tablist">
- *       <div data-process-tab><div>01</div></div>
+ *       <div data-process-tab><div>Discovery</div></div>
  *     </div>
  *     <div class="process-tabs_track"><div data-process-progress></div></div>
  *   </section>
  *
  * The Designer holds every step and one tab. This copies the tab once per step
- * and numbers it, so the tabs always match the steps in the slot. Before it
- * runs, and without JavaScript, every step reads in order down the page.
+ * and names it after the step's heading, so the tabs always match the steps in
+ * the slot. Before it runs, and without JavaScript, every step reads in order
+ * down the page.
  *
  * Steps are hidden with the `hidden` attribute, so a step's own class must not
  * set display. The active tab takes the `is-active` combo class the Designer
@@ -54,8 +55,10 @@ function run(section, steps, template, signal) {
 
 		if (index > 0) template.parentElement.append(tab);
 
-		const number = tab.firstElementChild;
-		if (number) number.textContent = String(index + 1).padStart(2, "0");
+		// Each tab reads as its step's title; a step without one falls back to its number.
+		const title = step.querySelector("h1, h2, h3, h4, h5, h6");
+		const label = tab.firstElementChild;
+		if (label) label.textContent = title?.textContent.trim() || String(index + 1).padStart(2, "0");
 
 		const tabId = `process-tab-${key}-${index}`;
 		const panelId = `process-step-${key}-${index}`;
@@ -66,9 +69,6 @@ function run(section, steps, template, signal) {
 		step.id = panelId;
 		step.setAttribute("role", "tabpanel");
 		step.setAttribute("aria-labelledby", tabId);
-
-		const title = step.querySelector("h1, h2, h3, h4, h5, h6");
-		if (title) tab.setAttribute("aria-label", title.textContent.trim());
 
 		return tab;
 	});
