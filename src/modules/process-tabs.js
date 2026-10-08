@@ -4,8 +4,8 @@ import { claimOnce, press } from "../dom.js";
 
 /**
  * Process tabs: one step showing at a time, a tab per step underneath named by
- * the step's title, and one track under the tabs that fills across all the
- * steps, a step's share at a time, before the next step comes up.
+ * the step's title, and one line under the tabs that fills over the step
+ * showing before the next step comes up.
  *
  *   <section data-process-tabs>
  *     …<div data-process-step>…</div> × n (the Steps slot)
@@ -23,13 +23,16 @@ import { claimOnce, press } from "../dom.js";
  * Steps are hidden with the `hidden` attribute, so a step's own class must not
  * set display. The active tab takes the `is-active` combo class the Designer
  * styles. The steps move on by themselves only while the section is on screen,
- * and stop for good once a visitor picks a tab; the track then shows how far
- * through the steps the chosen one is. Reduced motion never moves them.
+ * and stop for good once a visitor picks a tab. Whenever the step changes the
+ * line fades out and starts again from empty, so it never jumps or runs back.
+ * Reduced motion never moves them, and the line stays empty.
  */
 
 const config = {
 	step: 7, // seconds each step shows before the next
 	ease: "linear",
+	fade: 0.4, // seconds the line takes to fade out when the step changes
+	fadeEase: "easeOut",
 	activeClass: "is-active",
 };
 
@@ -76,22 +79,80 @@ function run(section, steps, template, signal) {
 	let active = 0;
 	let auto = !reduced;
 	let onScreen = false;
-	let progress = null;
+	let filled = 0;
+	let filling = null;
+	let fading = null;
 
 	const fill = section.querySelector("[data-process-progress]");
 
-	// value is how far through the active step: 0 as it comes up, 1 when done.
+	// Motion counts and this writes the line. Animating the line itself let
+	// Motion write its finished value back after the next step had redrawn it.
 	const draw = (value) => {
-		if (fill) fill.style.transform = `scaleX(${(active + value) / steps.length})`;
+		filled = value;
+		if (fill) fill.style.transform = `scaleX(${value})`;
 	};
 
-	const stopProgress = () => {
-		progress?.stop();
-		progress = null;
+	const stopFilling = () => {
+		filling?.stop();
+		filling = null;
+	};
+
+	// The line fills over one step, then the next step comes up. Off screen it
+	// waits where it is and carries on from there.
+	const play = () => {
+		stopFilling();
+
+		if (!auto || !onScreen || fading) return;
+
+		const current = animate(filled, 1, {
+			duration: config.step * (1 - filled),
+			ease: config.ease,
+			onUpdate: draw,
+		});
+
+		filling = current;
+
+		// A stopped run can still settle; only the run that is current moves on.
+		current.finished.then(() => {
+			if (filling === current && auto && onScreen) show((active + 1) % steps.length);
+		});
+	};
+
+	// A new step starts from an empty line. A line with anything in it fades
+	// out first, then empties out of sight.
+	const empty = () => {
+		stopFilling();
+		fading?.stop();
+		fading = null;
+
+		if (!fill || !filled || reduced) {
+			draw(0);
+			if (fill) fill.style.opacity = "";
+			play();
+			return;
+		}
+
+		const current = animate(Number(fill.style.opacity || 1), 0, {
+			duration: config.fade,
+			ease: config.fadeEase,
+			onUpdate: (value) => {
+				fill.style.opacity = String(value);
+			},
+		});
+
+		fading = current;
+
+		current.finished.then(() => {
+			if (fading !== current) return;
+
+			fading = null;
+			draw(0);
+			fill.style.opacity = "";
+			play();
+		});
 	};
 
 	const show = (index, { focus = false } = {}) => {
-		stopProgress();
 		active = index;
 
 		steps.forEach((step, i) => {
@@ -106,43 +167,13 @@ function run(section, steps, template, signal) {
 			tab.tabIndex = selected ? 0 : -1;
 		});
 
-		// A chosen step stays put, so the track shows it whole.
-		draw(auto ? 0 : 1);
-
 		if (focus) tabs[index].focus();
 
-		play();
-	};
-
-	// The track fills by the active step's share over one step; when that share
-	// is full the next step comes up. Off screen it waits where it is.
-	const play = () => {
-		stopProgress();
-
-		if (!auto || !onScreen) return;
-
-		const done = () => show((active + 1) % steps.length);
-
-		// Motion counts from 0 to 1 and this writes the track. Animating the
-		// track itself let Motion write its finished value back after the next
-		// step had redrawn it.
-		const current = animate(0, 1, {
-			duration: config.step,
-			ease: config.ease,
-			onUpdate: draw,
-		});
-
-		progress = current;
-
-		// A stopped run can still settle; only the run that is current moves on.
-		current.finished.then(() => {
-			if (progress === current && auto && onScreen) done();
-		});
+		empty();
 	};
 
 	const choose = (index, options) => {
 		auto = false;
-		stopProgress();
 		show(index, options);
 	};
 
@@ -175,14 +206,16 @@ function run(section, steps, template, signal) {
 		onScreen = true;
 		play();
 
+		// A fade finishes on its own; only the filling waits.
 		return () => {
 			onScreen = false;
-			stopProgress();
+			stopFilling();
 		};
 	});
 
 	signal?.addEventListener("abort", () => {
-		stopProgress();
+		stopFilling();
+		fading?.stop();
 		stopWatching();
 	});
 }

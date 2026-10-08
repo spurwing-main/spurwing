@@ -121,37 +121,70 @@ describe("initProcessTabs", () => {
 		expect(runs.length).toBe(1);
 	});
 
-	it("fills the one track by each step's share as the steps move on", async () => {
+	it("fills the line over the step showing, then fades it out as the next comes up", async () => {
 		document.body.innerHTML = section(4);
 
 		initProcessTabs();
-		const track = document.querySelector("[data-process-progress]");
-		expect(track.style.transform).toBe("scaleX(0)");
+		const line = document.querySelector("[data-process-progress]");
+		expect(line.style.transform).toBe("scaleX(0)");
 
 		onScreen();
 		const [from, to, options] = motion.animate.mock.calls.at(-1);
 
-		// Motion only counts; the track is written here, so nothing else can
-		// write a value back after the step has moved on.
-		expect([from, to]).toEqual([0, 1]);
+		expect([from, to, options.duration]).toEqual([0, 1, 7]);
 		options.onUpdate(0.5);
-		expect(track.style.transform).toBe("scaleX(0.125)");
+		expect(line.style.transform).toBe("scaleX(0.5)");
+		options.onUpdate(1);
 
 		runs.at(-1).finish();
 		await Promise.resolve();
 
-		expect(track.style.transform).toBe("scaleX(0.25)");
-		motion.animate.mock.calls.at(-1)[2].onUpdate(1);
-		expect(track.style.transform).toBe("scaleX(0.5)");
+		// The next step is up and the full line fades rather than running back.
+		expect(steps()[1].hidden).toBe(false);
+		const [fadeFrom, fadeTo, fade] = motion.animate.mock.calls.at(-1);
+		expect([fadeFrom, fadeTo]).toEqual([1, 0]);
+		fade.onUpdate(0.5);
+		expect(line.style.opacity).toBe("0.5");
+		expect(line.style.transform).toBe("scaleX(1)");
+
+		runs.at(-1).finish();
+		await Promise.resolve();
+
+		expect(line.style.transform).toBe("scaleX(0)");
+		expect(line.style.opacity).toBe("");
+		expect(motion.animate.mock.calls.at(-1).slice(0, 2)).toEqual([0, 1]);
 	});
 
-	it("shows a picked step's whole share of the track", () => {
+	it("fades the line out when a tab is picked and leaves it empty", async () => {
 		document.body.innerHTML = section(4);
 
 		initProcessTabs();
-		tabs()[2].click();
+		onScreen();
+		const [first] = runs;
+		motion.animate.mock.calls.at(-1)[2].onUpdate(0.6);
 
-		expect(document.querySelector("[data-process-progress]").style.transform).toBe("scaleX(0.75)");
+		tabs()[2].click();
+		expect(first.stop).toHaveBeenCalled();
+		expect(motion.animate.mock.calls.at(-1).slice(0, 2)).toEqual([1, 0]);
+
+		runs.at(-1).finish();
+		await Promise.resolve();
+
+		expect(document.querySelector("[data-process-progress]").style.transform).toBe("scaleX(0)");
+		expect(motion.animate).toHaveBeenCalledTimes(2);
+	});
+
+	it("carries on from where the line stopped when it comes back on screen", () => {
+		document.body.innerHTML = section(3);
+
+		initProcessTabs();
+		const leave = onScreen();
+		motion.animate.mock.calls.at(-1)[2].onUpdate(0.25);
+		leave();
+		onScreen();
+
+		const [from, to, options] = motion.animate.mock.calls.at(-1);
+		expect([from, to, options.duration]).toEqual([0.25, 1, 5.25]);
 	});
 
 	it("moves between tabs with the arrow keys", () => {
