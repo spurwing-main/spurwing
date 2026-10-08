@@ -4,6 +4,7 @@ import { initApproachSlider } from "./approach-slider.js";
 import { initBookingDetails } from "./booking-details.js";
 import { initCaps } from "./caps.js";
 import { initCardReveal } from "./card-reveal.js";
+import { initClientLogos } from "./client-logos.js";
 import { initCmsCounts } from "./cms-counts.js";
 import { initCopyToClipboard } from "./copy-to-clipboard.js";
 import { initFaq } from "./faq.js";
@@ -51,6 +52,7 @@ export const modules = [
 	{ name: "work-slide", init: initWorkSlide },
 	{ name: "quote-fade", init: initQuoteFade },
 	{ name: "ticker", init: initTicker },
+	{ name: "client-logos", init: initClientLogos },
 	{ name: "card-reveal", init: initCardReveal },
 	{ name: "anim", init: initAnim },
 	{ name: "approach-hero", init: initApproachHero },

@@ -38,6 +38,10 @@ Runs the capability carousels built on the shared `.embla` markup: dots, and aut
 
 Reveals work and team cards as they enter the viewport, staggering each grid so the cards arrive on a diagonal. Reduced motion opts every card out instead.
 
+### `client-logos.js`
+
+Cycles the logos in `[data-client-logos]`, a Collection List laid out as a grid. The Designer sets the column count on the grid, four on desktop and two on a phone, and collapses every row after the first, so the first logos paint in place before this runs. This reads that column count and the number of logos, gives logo n to column n mod columns, and every five seconds each column with more than one logo moves on to its next, one column after another. Any number of logos works; a column with one logo stays still. Every logo stays in the list for a screen reader. Pauses off screen; reduced motion keeps the first row still.
+
 ### `cms-counts.js`
 
 Counts the items in each Collection from a hidden page and writes the numbers into `[data-cms-count-target]`. It runs in the background so it cannot delay the other modules.
