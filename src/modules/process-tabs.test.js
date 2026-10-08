@@ -18,8 +18,9 @@ function section(count) {
 		<section data-process-tabs>
 			<div>${steps}</div>
 			<div role="tablist">
-				<div class="process-tabs_tab" data-process-tab><div>01</div><div class="process-tabs_progress"></div></div>
+				<div class="process-tabs_tab" data-process-tab><div>01</div></div>
 			</div>
+			<div class="process-tabs_track"><div data-process-progress></div></div>
 		</section>
 	`;
 }
@@ -121,24 +122,37 @@ describe("initProcessTabs", () => {
 		expect(runs.length).toBe(1);
 	});
 
-	it("fills the active line itself and empties it when the next step comes up", async () => {
-		document.body.innerHTML = section(3);
+	it("fills the one track by each step's share as the steps move on", async () => {
+		document.body.innerHTML = section(4);
 
 		initProcessTabs();
+		const track = document.querySelector("[data-process-progress]");
+		expect(track.style.transform).toBe("scaleX(0)");
+
 		onScreen();
 		const [from, to, options] = motion.animate.mock.calls.at(-1);
-		const line = tabs()[0].querySelector(".process-tabs_progress");
 
-		// Motion only counts; the line is written here, so nothing else can
-		// write a full line back after the step has moved on.
+		// Motion only counts; the track is written here, so nothing else can
+		// write a value back after the step has moved on.
 		expect([from, to]).toEqual([0, 1]);
-		options.onUpdate(1);
-		expect(line.style.transform).toBe("scaleX(1)");
+		options.onUpdate(0.5);
+		expect(track.style.transform).toBe("scaleX(0.125)");
 
 		runs.at(-1).finish();
 		await Promise.resolve();
 
-		expect(line.style.transform).toBe("scaleX(0)");
+		expect(track.style.transform).toBe("scaleX(0.25)");
+		motion.animate.mock.calls.at(-1)[2].onUpdate(1);
+		expect(track.style.transform).toBe("scaleX(0.5)");
+	});
+
+	it("shows a picked step's whole share of the track", () => {
+		document.body.innerHTML = section(4);
+
+		initProcessTabs();
+		tabs()[2].click();
+
+		expect(document.querySelector("[data-process-progress]").style.transform).toBe("scaleX(0.75)");
 	});
 
 	it("moves between tabs with the arrow keys", () => {

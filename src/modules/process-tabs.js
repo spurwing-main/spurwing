@@ -3,14 +3,16 @@ import { animate, inView } from "motion";
 import { claimOnce, press } from "../dom.js";
 
 /**
- * Process tabs: one step showing at a time, numbered tabs underneath, and a
- * line along the active tab that fills before the next step comes up.
+ * Process tabs: one step showing at a time, numbered tabs underneath, and one
+ * track under the tabs that fills across all the steps, a step's share at a
+ * time, before the next step comes up.
  *
  *   <section data-process-tabs>
  *     …<div data-process-step>…</div> × n (the Steps slot)
  *     <div role="tablist">
- *       <div data-process-tab><div>01</div><div class="process-tabs_progress"></div></div>
+ *       <div data-process-tab><div>01</div></div>
  *     </div>
+ *     <div class="process-tabs_track"><div data-process-progress></div></div>
  *   </section>
  *
  * The Designer holds every step and one tab. This copies the tab once per step
@@ -20,7 +22,8 @@ import { claimOnce, press } from "../dom.js";
  * Steps are hidden with the `hidden` attribute, so a step's own class must not
  * set display. The active tab takes the `is-active` combo class the Designer
  * styles. The steps move on by themselves only while the section is on screen,
- * and stop for good once a visitor picks a tab. Reduced motion never moves them.
+ * and stop for good once a visitor picks a tab; the track then shows how far
+ * through the steps the chosen one is. Reduced motion never moves them.
  */
 
 const config = {
@@ -75,7 +78,12 @@ function run(section, steps, template, signal) {
 	let onScreen = false;
 	let progress = null;
 
-	const fill = (tab) => tab.querySelector(".process-tabs_progress");
+	const fill = section.querySelector("[data-process-progress]");
+
+	// value is how far through the active step: 0 as it comes up, 1 when done.
+	const draw = (value) => {
+		if (fill) fill.style.transform = `scaleX(${(active + value) / steps.length})`;
+	};
 
 	const stopProgress = () => {
 		progress?.stop();
@@ -96,35 +104,32 @@ function run(section, steps, template, signal) {
 			tab.classList.toggle(config.activeClass, selected);
 			tab.setAttribute("aria-selected", String(selected));
 			tab.tabIndex = selected ? 0 : -1;
-
-			const line = fill(tab);
-			if (line) line.style.transform = "scaleX(0)";
 		});
+
+		// A chosen step stays put, so the track shows it whole.
+		draw(auto ? 0 : 1);
 
 		if (focus) tabs[index].focus();
 
 		play();
 	};
 
-	// The line along the active tab fills over one step; when it is full the
-	// next step comes up. Off screen it waits where it is.
+	// The track fills by the active step's share over one step; when that share
+	// is full the next step comes up. Off screen it waits where it is.
 	const play = () => {
 		stopProgress();
 
 		if (!auto || !onScreen) return;
 
-		const line = fill(tabs[active]);
 		const done = () => show((active + 1) % steps.length);
 
-		// Motion counts from 0 to 1 and this writes the line. Animating the line
-		// itself let Motion write the finished value back after the next step had
-		// emptied it, leaving a full line under the previous tab.
+		// Motion counts from 0 to 1 and this writes the track. Animating the
+		// track itself let Motion write its finished value back after the next
+		// step had redrawn it.
 		const current = animate(0, 1, {
 			duration: config.step,
 			ease: config.ease,
-			onUpdate: (value) => {
-				if (line) line.style.transform = `scaleX(${value})`;
-			},
+			onUpdate: draw,
 		});
 
 		progress = current;
