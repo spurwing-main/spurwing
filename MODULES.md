@@ -88,6 +88,10 @@ Crossfades `main` and the footer through a brief white hold while the nav stays 
 
 The container it fades is built on the first navigation, never on load, so the page as served is the page as designed until someone clicks a link.
 
+### `process-tabs.js`
+
+Runs `[data-process-tabs]`: one `[data-process-step]` showing at a time, with numbered tabs underneath. The Designer holds every step in the section's Steps slot and a single `[data-process-tab]`; this copies that tab once per step and numbers it, so the tabs always match the steps. Steps are hidden with the `hidden` attribute, so a step's own class sets no display; the active tab takes the `is-active` combo class. While the section is on screen the line along the active tab fills over seven seconds and the next step comes up; picking a tab, with a click or the arrow keys, stops that for good. Without JavaScript every step reads in order, and reduced motion never moves them on.
+
 ### `quote-fade.js`
 
 Turns a testimonial Collection List into a cross-fading, auto-advancing quote, and reports the autoplay's progress as `--quote-progress` for the rule under the card. A single quote is left as static markup, and reduced motion gets an instant slider with no autoplay and no rule.

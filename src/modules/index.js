@@ -14,6 +14,7 @@ import { initInsightToc } from "./insight-toc.js";
 import { initMenuToggle } from "./menu-toggle.js";
 import { initNavAutoHide } from "./nav-auto-hide.js";
 import { initNavPanel } from "./nav-panel.js";
+import { initProcessTabs } from "./process-tabs.js";
 import { initQuoteFade } from "./quote-fade.js";
 import { initRightway } from "./rightway.js";
 import { initRtFlow } from "./rt-flow.js";
@@ -53,6 +54,7 @@ export const modules = [
 	{ name: "quote-fade", init: initQuoteFade },
 	{ name: "ticker", init: initTicker },
 	{ name: "client-logos", init: initClientLogos },
+	{ name: "process-tabs", init: initProcessTabs },
 	{ name: "card-reveal", init: initCardReveal },
 	{ name: "anim", init: initAnim },
 	{ name: "approach-hero", init: initApproachHero },
