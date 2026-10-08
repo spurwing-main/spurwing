@@ -7,8 +7,15 @@ import { claimOnce } from "../dom.js";
  * logos, one column after another.
  *
  *   <div data-client-logos>
- *     …Collection List: .w-dyn-items > .w-dyn-item > img…
+ *     <div data-client-logos-list>
+ *       <div><img></div> × n (the Logos slot, one Client logo each)
+ *     </div>
  *   </div>
+ *
+ * Each logo is sized to the same area as the others, so a long wordmark runs
+ * wide and low and a compact mark stands taller. CSS does the sizing from
+ * --logo-ratio, the logo's width over its height, which this writes once the
+ * image has loaded. That only works for a logo cropped to its edges.
  *
  * The Designer sets how many columns show — four on desktop, two on a phone —
  * on the list's grid, and lets every row after the first collapse to nothing,
@@ -36,10 +43,22 @@ export function initClientLogos(root = document, { signal } = {}) {
 	for (const logos of root.querySelectorAll("[data-client-logos]")) {
 		if (!claimOnce(logos, "data-client-logos-claimed")) continue;
 
-		const list = logos.querySelector(".w-dyn-items");
+		for (const img of logos.querySelectorAll("img")) measure(img, signal);
+
+		const list = logos.querySelector("[data-client-logos-list]");
 
 		if (list?.children.length) run(logos, list, signal);
 	}
+}
+
+// The CSS sizes the logo from its shape, which is only known once it loads.
+function measure(img, signal) {
+	const write = () => {
+		if (img.naturalWidth && img.naturalHeight) img.style.setProperty("--logo-ratio", (img.naturalWidth / img.naturalHeight).toFixed(3));
+	};
+
+	if (img.complete) write();
+	else img.addEventListener("load", write, { once: true, signal });
 }
 
 function run(logos, list, signal) {

@@ -11,12 +11,12 @@ import { initClientLogos } from "./client-logos.js";
 
 function logoRow(count) {
 	const items = Array.from({ length: count })
-		.map((_, index) => `<div class="w-dyn-item"><img alt="Logo ${index + 1}"></div>`)
+		.map((_, index) => `<div class="client-logos_item"><img alt="Logo ${index + 1}"></div>`)
 		.join("");
 
 	return `
 		<div data-client-logos>
-			<div class="w-dyn-list"><div class="w-dyn-items">${items}</div></div>
+			<div class="client-logos_list" data-client-logos-list>${items}</div>
 		</div>
 	`;
 }
@@ -27,7 +27,7 @@ function stubColumns(count) {
 	vi.spyOn(window, "getComputedStyle").mockImplementation((element) => {
 		const style = real(element);
 
-		if (!element.classList?.contains("w-dyn-items")) return style;
+		if (!element.hasAttribute?.("data-client-logos-list")) return style;
 
 		return { ...style, gridTemplateColumns: Array.from({ length: count }, () => "120px").join(" ") };
 	});
@@ -45,7 +45,7 @@ function onScreen() {
 	return enter();
 }
 
-const items = () => [...document.querySelectorAll(".w-dyn-item")];
+const items = () => [...document.querySelectorAll(".client-logos_item")];
 
 describe("initClientLogos", () => {
 	beforeEach(() => {
@@ -166,6 +166,28 @@ describe("initClientLogos", () => {
 		vi.advanceTimersByTime(20000);
 
 		expect(motion.animate).not.toHaveBeenCalled();
+	});
+
+	it("gives each logo its shape once it has loaded, so CSS can size it", () => {
+		document.body.innerHTML = logoRow(2);
+		const [wide, square] = document.querySelectorAll("img");
+		for (const [img, width, height] of [
+			[wide, 234, 34],
+			[square, 92, 100],
+		]) {
+			Object.defineProperty(img, "naturalWidth", { value: width });
+			Object.defineProperty(img, "naturalHeight", { value: height });
+		}
+		Object.defineProperty(square, "complete", { value: false });
+
+		initClientLogos();
+
+		expect(wide.style.getPropertyValue("--logo-ratio")).toBe("6.882");
+		expect(square.style.getPropertyValue("--logo-ratio")).toBe("");
+
+		square.dispatchEvent(new Event("load"));
+
+		expect(square.style.getPropertyValue("--logo-ratio")).toBe("0.920");
 	});
 
 	it("does not start twice on the same row", () => {

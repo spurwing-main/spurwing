@@ -40,7 +40,7 @@ Reveals work and team cards as they enter the viewport, staggering each grid so 
 
 ### `client-logos.js`
 
-Cycles the logos in `[data-client-logos]`, a Collection List laid out as a grid. The Designer sets the column count on the grid, four on desktop and two on a phone, and collapses every row after the first, so the first logos paint in place before this runs. This reads that column count and the number of logos, gives logo n to column n mod columns, and every five seconds each column with more than one logo moves on to its next, one column after another. Any number of logos works; a column with one logo stays still. Every logo stays in the list for a screen reader. Pauses off screen; reduced motion keeps the first row still.
+Cycles the logos in `[data-client-logos]`, whose `[data-client-logos-list]` grid holds one Client logo per logo, filled into the component's Logos slot. Each logo also gets `--logo-ratio`, its width over its height, once it loads; the header CSS uses it to give every logo the same area, so they read at the same size. That needs logos cropped to their edges. The Designer sets the column count on the grid, four on desktop and two on a phone, and collapses every row after the first, so the first logos paint in place before this runs. This reads that column count and the number of logos, gives logo n to column n mod columns, and every five seconds each column with more than one logo moves on to its next, one column after another. Any number of logos works; a column with one logo stays still. Every logo stays in the list for a screen reader. Pauses off screen; reduced motion keeps the first row still.
 
 ### `cms-counts.js`
 
