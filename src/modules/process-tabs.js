@@ -22,10 +22,12 @@ import { claimOnce, press } from "../dom.js";
  *
  * Steps are hidden with the `hidden` attribute, so a step's own class must not
  * set display. The active tab takes the `is-active` combo class the Designer
- * styles. The steps move on by themselves only while the section is on screen,
- * and stop for good once a visitor picks a tab. Whenever the step changes the
- * line fades out and starts again from empty, so it never jumps or runs back.
- * Reduced motion never moves them, and the line stays empty.
+ * styles. The steps move on by themselves while the section is on screen, and
+ * a picked tab starts from its own step. Whenever the step changes the line
+ * fades out and starts again from empty, so it never jumps or runs back, and
+ * the step that comes up plays the site's reveal again: the sweep its blocks
+ * carry as data-anim in the Designer. Reduced motion never moves them, and the
+ * line stays empty.
  */
 
 const config = {
@@ -34,6 +36,8 @@ const config = {
 	fade: 0.4, // seconds the line takes to fade out when the step changes
 	fadeEase: "easeOut",
 	activeClass: "is-active",
+	// The site's reveal keyframes, from the Global motion CSS.
+	reveal: /^anim-/,
 };
 
 export function initProcessTabs(root = document, { signal } = {}) {
@@ -77,7 +81,7 @@ function run(section, steps, template, signal) {
 	});
 
 	let active = 0;
-	let auto = !reduced;
+	const auto = !reduced;
 	let onScreen = false;
 	let filled = 0;
 	let filling = null;
@@ -152,12 +156,27 @@ function run(section, steps, template, signal) {
 		});
 	};
 
-	const show = (index, { focus = false } = {}) => {
+	// The reveal is CSS; a step coming up again only rewinds it to the start.
+	const reveal = (step) => {
+		if (reduced) return;
+
+		for (const animation of step.getAnimations({ subtree: true })) {
+			if (!config.reveal.test(animation.animationName)) continue;
+
+			animation.currentTime = 0;
+			animation.play();
+		}
+	};
+
+	const show = (index, { focus = false, first = false } = {}) => {
 		active = index;
 
 		steps.forEach((step, i) => {
 			step.hidden = i !== index;
 		});
+
+		// The first step reveals as it scrolls in, like everything else.
+		if (!first) reveal(steps[index]);
 
 		tabs.forEach((tab, i) => {
 			const selected = i === index;
@@ -172,13 +191,8 @@ function run(section, steps, template, signal) {
 		empty();
 	};
 
-	const choose = (index, options) => {
-		auto = false;
-		show(index, options);
-	};
-
 	tabs.forEach((tab, index) => {
-		press(tab, () => choose(index), signal);
+		press(tab, () => show(index), signal);
 
 		tab.addEventListener(
 			"keydown",
@@ -194,13 +208,13 @@ function run(section, steps, template, signal) {
 				if (next === undefined) return;
 
 				event.preventDefault();
-				choose(next, { focus: true });
+				show(next, { focus: true });
 			},
 			{ signal },
 		);
 	});
 
-	show(0);
+	show(0, { first: true });
 
 	const stopWatching = inView(section, () => {
 		onScreen = true;

@@ -16,6 +16,10 @@ import { animate, motionValue, springValue, styleEffect } from "motion";
  * pointer through, and hides the inner one with its transform origin at the
  * wrist. The outer div follows the pointer and the inner one shows and waves,
  * so the two never fight over one transform.
+ *
+ * The Button component's Large variant waves too. Its hand is added here, so
+ * the one Button needs no hidden hand in every other variant; the header CSS
+ * places it by the same attribute.
  */
 
 const config = {
@@ -27,12 +31,22 @@ const config = {
 	// Three rocks from the wrist, a breath, and again.
 	wave: { duration: 1.1, ease: "easeInOut", repeat: Infinity, repeatDelay: 0.4 },
 	fade: { duration: 0.2, ease: "easeOut" },
+	// The Large button's hand, added by script.
+	large: '[data-wf--button--variant="large"]',
+	hand: '<div data-wave-hand aria-hidden="true"><div>👋</div></div>',
 };
 
 export function initWave(root = document, { signal } = {}) {
-	const hands = root.querySelectorAll("[data-wave-hand]");
+	const large = root.querySelectorAll(config.large);
 	// Only a pointer that can hover; anyone else sees the button as it is.
-	if (!hands.length || !matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+	if (!large.length && !root.querySelector("[data-wave-hand]")) return;
+	if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+
+	for (const button of large) {
+		if (!button.querySelector("[data-wave-hand]")) button.insertAdjacentHTML("beforeend", config.hand);
+	}
+
+	const hands = root.querySelectorAll("[data-wave-hand]");
 
 	// A visitor who asked for less motion still gets the hand, as a fade that
 	// sits by the pointer: nothing trails, bounces or waves.

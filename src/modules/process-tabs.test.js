@@ -56,10 +56,13 @@ describe("initProcessTabs", () => {
 		motion.inView.mockReset();
 		motion.inView.mockReturnValue(() => {});
 		stubReducedMotion(false);
+		// jsdom has no Web Animations; a step with nothing animating returns none.
+		Element.prototype.getAnimations = () => [];
 	});
 
 	afterEach(() => {
 		document.body.innerHTML = "";
+		delete Element.prototype.getAnimations;
 		vi.unstubAllGlobals();
 		vi.restoreAllMocks();
 	});
@@ -105,7 +108,7 @@ describe("initProcessTabs", () => {
 		expect(steps().map((step) => step.hidden)).toEqual([true, false, true]);
 	});
 
-	it("stops moving on by itself once a tab is picked", async () => {
+	it("starts from a picked tab's step and moves on from there", async () => {
 		document.body.innerHTML = section(3);
 
 		initProcessTabs();
@@ -118,7 +121,27 @@ describe("initProcessTabs", () => {
 
 		expect(steps().map((step) => step.hidden)).toEqual([true, true, false]);
 		expect(first.stop).toHaveBeenCalled();
-		expect(runs.length).toBe(1);
+		expect(runs.length).toBe(2);
+
+		runs.at(-1).finish();
+		await Promise.resolve();
+
+		expect(steps().map((step) => step.hidden)).toEqual([false, true, true]);
+	});
+
+	it("plays the step's reveal again when it comes up", () => {
+		document.body.innerHTML = section(3);
+		const sweep = { animationName: "anim-shimmer", currentTime: 900, play: vi.fn() };
+		const hover = { animationName: undefined, currentTime: 100, play: vi.fn() };
+		steps()[1].getAnimations = vi.fn(() => [sweep, hover]);
+
+		initProcessTabs();
+		tabs()[1].click();
+
+		expect(steps()[1].getAnimations).toHaveBeenCalledWith({ subtree: true });
+		expect(sweep.currentTime).toBe(0);
+		expect(sweep.play).toHaveBeenCalled();
+		expect(hover.play).not.toHaveBeenCalled();
 	});
 
 	it("fills the line over the step showing, then fades it out as the next comes up", async () => {
@@ -155,7 +178,7 @@ describe("initProcessTabs", () => {
 		expect(motion.animate.mock.calls.at(-1).slice(0, 2)).toEqual([0, 1]);
 	});
 
-	it("fades the line out when a tab is picked and leaves it empty", async () => {
+	it("fades the line out when a tab is picked, then fills it again", async () => {
 		document.body.innerHTML = section(4);
 
 		initProcessTabs();
@@ -171,7 +194,8 @@ describe("initProcessTabs", () => {
 		await Promise.resolve();
 
 		expect(document.querySelector("[data-process-progress]").style.transform).toBe("scaleX(0)");
-		expect(motion.animate).toHaveBeenCalledTimes(2);
+		expect(motion.animate).toHaveBeenCalledTimes(3);
+		expect(motion.animate.mock.calls.at(-1).slice(0, 2)).toEqual([0, 1]);
 	});
 
 	it("carries on from where the line stopped when it comes back on screen", () => {
