@@ -121,20 +121,21 @@ describe("initProcessTabs", () => {
 		expect(runs.length).toBe(1);
 	});
 
-	it("leaves no finished line behind when the next step comes up", async () => {
+	it("fills the active line itself and empties it when the next step comes up", async () => {
 		document.body.innerHTML = section(3);
 
 		initProcessTabs();
 		onScreen();
-		const first = runs.at(-1);
+		const [from, to, options] = motion.animate.mock.calls.at(-1);
 		const line = tabs()[0].querySelector(".process-tabs_progress");
 
-		// Motion's stop writes the animation's last value to the element.
-		first.stop.mockImplementation(() => {
-			line.style.transform = "scaleX(1)";
-		});
+		// Motion only counts; the line is written here, so nothing else can
+		// write a full line back after the step has moved on.
+		expect([from, to]).toEqual([0, 1]);
+		options.onUpdate(1);
+		expect(line.style.transform).toBe("scaleX(1)");
 
-		first.finish();
+		runs.at(-1).finish();
 		await Promise.resolve();
 
 		expect(line.style.transform).toBe("scaleX(0)");

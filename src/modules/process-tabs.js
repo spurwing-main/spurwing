@@ -83,8 +83,6 @@ function run(section, steps, template, signal) {
 	};
 
 	const show = (index, { focus = false } = {}) => {
-		// Stopping an animation writes its last value to the element, so the
-		// old line has to stop before every line is emptied, not after.
 		stopProgress();
 		active = index;
 
@@ -118,9 +116,16 @@ function run(section, steps, template, signal) {
 		const line = fill(tabs[active]);
 		const done = () => show((active + 1) % steps.length);
 
-		const current = line
-			? animate(line, { transform: ["scaleX(0)", "scaleX(1)"] }, { duration: config.step, ease: config.ease })
-			: animate(0, 1, { duration: config.step, ease: config.ease });
+		// Motion counts from 0 to 1 and this writes the line. Animating the line
+		// itself let Motion write the finished value back after the next step had
+		// emptied it, leaving a full line under the previous tab.
+		const current = animate(0, 1, {
+			duration: config.step,
+			ease: config.ease,
+			onUpdate: (value) => {
+				if (line) line.style.transform = `scaleX(${value})`;
+			},
+		});
 
 		progress = current;
 
