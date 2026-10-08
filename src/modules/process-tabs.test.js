@@ -121,6 +121,25 @@ describe("initProcessTabs", () => {
 		expect(runs.length).toBe(1);
 	});
 
+	it("leaves no finished line behind when the next step comes up", async () => {
+		document.body.innerHTML = section(3);
+
+		initProcessTabs();
+		onScreen();
+		const first = runs.at(-1);
+		const line = tabs()[0].querySelector(".process-tabs_progress");
+
+		// Motion's stop writes the animation's last value to the element.
+		first.stop.mockImplementation(() => {
+			line.style.transform = "scaleX(1)";
+		});
+
+		first.finish();
+		await Promise.resolve();
+
+		expect(line.style.transform).toBe("scaleX(0)");
+	});
+
 	it("moves between tabs with the arrow keys", () => {
 		document.body.innerHTML = section(3);
 

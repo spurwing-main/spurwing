@@ -83,6 +83,9 @@ function run(section, steps, template, signal) {
 	};
 
 	const show = (index, { focus = false } = {}) => {
+		// Stopping an animation writes its last value to the element, so the
+		// old line has to stop before every line is emptied, not after.
+		stopProgress();
 		active = index;
 
 		steps.forEach((step, i) => {
