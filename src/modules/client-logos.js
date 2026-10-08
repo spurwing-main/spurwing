@@ -25,6 +25,9 @@ import { claimOnce } from "../dom.js";
  * stays still. All the logos stay in the list for a screen reader; the cycle
  * only changes which one each column shows.
  *
+ * A list whose later rows show — the Static variant — is a still grid of every
+ * logo, so it is left as it is.
+ *
  * The cycle pauses off screen. Reduced motion keeps the first row still.
  */
 
@@ -63,6 +66,7 @@ function measure(img, signal) {
 
 function run(logos, list, signal) {
 	if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+	if (getComputedStyle(list).gridAutoRows !== "0px") return;
 
 	const items = [...list.children];
 

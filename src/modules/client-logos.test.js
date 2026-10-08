@@ -21,7 +21,7 @@ function logoRow(count) {
 	`;
 }
 
-function stubColumns(count) {
+function stubColumns(count, autoRows = "0px") {
 	const real = window.getComputedStyle;
 
 	vi.spyOn(window, "getComputedStyle").mockImplementation((element) => {
@@ -29,7 +29,7 @@ function stubColumns(count) {
 
 		if (!element.hasAttribute?.("data-client-logos-list")) return style;
 
-		return { ...style, gridTemplateColumns: Array.from({ length: count }, () => "120px").join(" ") };
+		return { ...style, gridTemplateColumns: Array.from({ length: count }, () => "120px").join(" "), gridAutoRows: autoRows };
 	});
 }
 
@@ -188,6 +188,17 @@ describe("initClientLogos", () => {
 		square.dispatchEvent(new Event("load"));
 
 		expect(square.style.getPropertyValue("--logo-ratio")).toBe("0.920");
+	});
+
+	it("leaves a list whose later rows show as a still grid", () => {
+		vi.restoreAllMocks();
+		stubColumns(2, "auto");
+		document.body.innerHTML = logoRow(4);
+
+		initClientLogos();
+
+		expect(items().every((item) => item.style.gridArea === "")).toBe(true);
+		expect(motion.inView).not.toHaveBeenCalled();
 	});
 
 	it("does not start twice on the same row", () => {

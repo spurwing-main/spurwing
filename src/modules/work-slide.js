@@ -257,10 +257,14 @@ function initSlider(section, signal) {
 }
 
 // Each slide is a link, and a drag that starts on one would otherwise follow it
-// on release. Swallow the click when the pointer travelled.
+// on release. Swallow the click when the pointer travelled. A mouse pressed on
+// a card's link or image would also start the browser's own drag of it, which
+// takes the pointer away from Swiper and leaves the rail where it was.
 function keepLinksFromFiringOnDrag(viewport, signal) {
 	let start = null;
 	let dragged = false;
+
+	viewport.addEventListener("dragstart", (event) => event.preventDefault(), { signal });
 
 	viewport.addEventListener(
 		"pointerdown",

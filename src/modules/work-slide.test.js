@@ -147,6 +147,17 @@ describe("initWorkSlide", () => {
 		expect(createSwiper.mock.calls[0][1].navigation).toBe(false);
 	});
 
+	it("stops the browser dragging a card's link or image away from the slider", () => {
+		document.body.innerHTML = section();
+
+		initWorkSlide();
+
+		const drag = new Event("dragstart", { bubbles: true, cancelable: true });
+		document.querySelector(".work-slide_item").dispatchEvent(drag);
+
+		expect(drag.defaultPrevented).toBe(true);
+	});
+
 	it("does nothing when the page has no work slider", () => {
 		initWorkSlide();
 
