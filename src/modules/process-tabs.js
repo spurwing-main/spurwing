@@ -197,7 +197,10 @@ function run(section, steps, template, signal) {
 	};
 
 	tabs.forEach((tab, index) => {
-		press(tab, () => show(index), signal);
+		press(tab, (event) => {
+			focused = event.type === "keydown" || tab.matches(":focus-visible");
+			show(index);
+		}, signal);
 
 		tab.addEventListener(
 			"keydown",
@@ -213,6 +216,7 @@ function run(section, steps, template, signal) {
 				if (next === undefined) return;
 
 				event.preventDefault();
+			focused = true;
 				show(next, { focus: true });
 			},
 			{ signal },
@@ -220,11 +224,19 @@ function run(section, steps, template, signal) {
 	});
 
 	const syncPlayback = () => canPlay() ? play() : stopFilling();
-	section.addEventListener("pointerenter", () => { hovered = true; syncPlayback(); }, { signal });
+	section.addEventListener("pointerover", (event) => {
+		const reading = !event.target.closest('[role="tablist"]');
+		if (hovered === reading) return;
+		hovered = reading;
+		syncPlayback();
+	}, { signal });
 	section.addEventListener("pointerleave", () => { hovered = false; syncPlayback(); }, { signal });
-	section.addEventListener("focusin", () => { focused = true; syncPlayback(); }, { signal });
+	section.addEventListener("focusin", (event) => {
+		focused = event.target.matches(":focus-visible");
+		syncPlayback();
+	}, { signal });
 	section.addEventListener("focusout", (event) => {
-		focused = section.contains(event.relatedTarget);
+		focused = section.contains(event.relatedTarget) && event.relatedTarget.matches(":focus-visible");
 		syncPlayback();
 	}, { signal });
 	if (pause) {
