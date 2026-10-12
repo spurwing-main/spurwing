@@ -86,6 +86,11 @@ function run(section, steps, template, signal) {
 	let filled = 0;
 	let filling = null;
 	let fading = null;
+	let paused = false;
+	let hovered = false;
+	let focused = false;
+	const pause = section.querySelector("[data-process-pause]");
+	const canPlay = () => auto && onScreen && !paused && !hovered && !focused;
 
 	const fill = section.querySelector("[data-process-progress]");
 
@@ -106,7 +111,7 @@ function run(section, steps, template, signal) {
 	const play = () => {
 		stopFilling();
 
-		if (!auto || !onScreen || fading) return;
+		if (!canPlay() || fading) return;
 
 		const current = animate(filled, 1, {
 			duration: config.step * (1 - filled),
@@ -118,7 +123,7 @@ function run(section, steps, template, signal) {
 
 		// A stopped run can still settle; only the run that is current moves on.
 		current.finished.then(() => {
-			if (filling === current && auto && onScreen) show((active + 1) % steps.length);
+			if (filling === current && canPlay()) show((active + 1) % steps.length);
 		});
 	};
 
@@ -213,6 +218,24 @@ function run(section, steps, template, signal) {
 			{ signal },
 		);
 	});
+
+	const syncPlayback = () => canPlay() ? play() : stopFilling();
+	section.addEventListener("pointerenter", () => { hovered = true; syncPlayback(); }, { signal });
+	section.addEventListener("pointerleave", () => { hovered = false; syncPlayback(); }, { signal });
+	section.addEventListener("focusin", () => { focused = true; syncPlayback(); }, { signal });
+	section.addEventListener("focusout", (event) => {
+		focused = section.contains(event.relatedTarget);
+		syncPlayback();
+	}, { signal });
+	if (pause) {
+		pause.hidden = reduced;
+		pause.setAttribute("aria-pressed", "false");
+		press(pause, () => {
+			paused = !paused;
+			pause.setAttribute("aria-pressed", String(paused));
+			syncPlayback();
+		}, signal);
+	}
 
 	show(0, { first: true });
 
