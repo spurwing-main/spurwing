@@ -7,7 +7,7 @@ Source files, generated files, and the loader stay separate.
 ## Structure
 
 ```text
-project/
+project/public/
 ├── src/
 │   ├── index.js             Starts the modules after the DOM is ready.
 │   ├── boot.js              Starts each module with a fresh AbortSignal, and again on each new page.
@@ -25,7 +25,10 @@ project/
 
 Commit `dist/bundle.js`. The CDN reads this file from GitHub.
 
-Do not commit project notes, reports, exports, or client data. Put these files in `local/`.
+Reviewed project records belong in the sibling `../private/` repository.
+Temporary work, raw reports, exports and source copies belong in `../local/`,
+outside both repositories. Do not commit client data or private notes here.
+Run the npm and Git commands below from `public/`.
 
 ## System flow
 

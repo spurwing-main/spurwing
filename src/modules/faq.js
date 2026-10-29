@@ -62,6 +62,9 @@ export function initFaq(root = document, { signal } = {}) {
 			trigger.getAttribute("aria-expanded") === "true";
 
 		item.dataset.accordionOpen = isOpen ? "true" : "false";
+		// Keep the association unique while two pages overlap during navigation.
+		if (!content.id) content.id = `faq-panel-${crypto.randomUUID()}`;
+		trigger.setAttribute("aria-controls", content.id);
 		trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
 		item.classList.toggle("is-open", isOpen);
 
@@ -142,6 +145,7 @@ export function initFaq(root = document, { signal } = {}) {
 		item.dataset.accordionOpen = "true";
 		item.classList.add("is-open");
 		entry.trigger.setAttribute("aria-expanded", "true");
+		entry.content.inert = false;
 
 		if (shouldReduceMotion) {
 			gsap.set(entry.content, { height: "auto", overflow: "hidden" });
@@ -195,6 +199,10 @@ export function initFaq(root = document, { signal } = {}) {
 		item.dataset.accordionOpen = "false";
 		item.classList.remove("is-open");
 		entry.trigger.setAttribute("aria-expanded", "false");
+		// Move focus out before the answer becomes unavailable. Update inert
+		// before either motion branch so interrupted tweens cannot leave it stale.
+		if (entry.content.contains(document.activeElement)) entry.trigger.focus();
+		entry.content.inert = true;
 
 		if (shouldReduceMotion) {
 			gsap.set(entry.content, { height: 0, overflow: "hidden" });
