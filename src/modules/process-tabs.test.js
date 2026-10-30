@@ -38,8 +38,9 @@ function animation() {
 	return { stop: vi.fn(), finished, finish };
 }
 
-function stubReducedMotion(matches) {
-	vi.stubGlobal("matchMedia", vi.fn(() => ({ matches })));
+// Answers the two queries the module asks: reduced motion, and a mouse that hovers.
+function stubMedia({ reduce = false, hover = true } = {}) {
+	vi.stubGlobal("matchMedia", vi.fn((query) => ({ matches: query.includes("reduce") ? reduce : hover })));
 }
 
 describe("initProcessTabs", () => {
@@ -55,7 +56,7 @@ describe("initProcessTabs", () => {
 		});
 		motion.inView.mockReset();
 		motion.inView.mockReturnValue(() => {});
-		stubReducedMotion(false);
+		stubMedia();
 		// jsdom has no Web Animations; a step with nothing animating returns none.
 		Element.prototype.getAnimations = () => [];
 	});
@@ -222,7 +223,18 @@ describe("initProcessTabs", () => {
 	});
 
 	it("never moves on by itself for reduced motion", () => {
-		stubReducedMotion(true);
+		stubMedia({ reduce: true });
+		document.body.innerHTML = section(3);
+
+		initProcessTabs();
+		onScreen();
+
+		expect(motion.animate).not.toHaveBeenCalled();
+		expect(steps()[0].hidden).toBe(false);
+	});
+
+	it("never moves on by itself on a touch screen, where nothing could hold it", () => {
+		stubMedia({ hover: false });
 		document.body.innerHTML = section(3);
 
 		initProcessTabs();

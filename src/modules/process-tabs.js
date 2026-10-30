@@ -22,8 +22,9 @@ import { claimOnce, press } from "../dom.js";
  *
  * Steps are hidden with the `hidden` attribute, so a step's own class must not
  * set display. The active tab takes the `is-active` combo class the Designer
- * styles. The steps move on by themselves while the section is on screen, and
- * a picked tab starts from its own step. Whenever the step changes the line
+ * styles. With a mouse, the steps move on by themselves while the section is
+ * on screen, and a picked tab starts from its own step; on a touch screen they
+ * change only when a tab is picked. Whenever the step changes the line
  * fades out and starts again from empty, so it never jumps or runs back, and
  * the step that comes up plays the site's reveal again: the sweep its blocks
  * carry as data-anim in the Designer. Reduced motion never moves them, and the
@@ -81,7 +82,9 @@ function run(section, steps, template, signal) {
 	});
 
 	let active = 0;
-	const auto = !reduced;
+	// Only where a mouse can hover to hold a step: on a touch screen nothing
+	// could stop them, so the steps change only when a tab is picked.
+	const auto = !reduced && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 	let onScreen = false;
 	let filled = 0;
 	let filling = null;
