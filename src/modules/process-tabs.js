@@ -86,11 +86,9 @@ function run(section, steps, template, signal) {
 	let filled = 0;
 	let filling = null;
 	let fading = null;
-	let paused = false;
 	let hovered = false;
 	let focused = false;
-	const pause = section.querySelector("[data-process-pause]");
-	const canPlay = () => auto && onScreen && !paused && !hovered && !focused;
+	const canPlay = () => auto && onScreen && !hovered && !focused;
 
 	const fill = section.querySelector("[data-process-progress]");
 
@@ -239,16 +237,6 @@ function run(section, steps, template, signal) {
 		focused = section.contains(event.relatedTarget) && event.relatedTarget.matches(":focus-visible");
 		syncPlayback();
 	}, { signal });
-	if (pause) {
-		pause.hidden = reduced;
-		pause.setAttribute("aria-pressed", "false");
-		press(pause, () => {
-			paused = !paused;
-			pause.setAttribute("aria-pressed", String(paused));
-			syncPlayback();
-		}, signal);
-	}
-
 	show(0, { first: true });
 
 	const stopWatching = inView(section, () => {
