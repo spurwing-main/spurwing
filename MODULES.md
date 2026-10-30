@@ -136,6 +136,10 @@ Adds the two things Finsweet does not do on the work archive: a second click on 
 
 Runs the `.section_work-slide` slider: slides all as wide as the widest card, first and last aligned to the page's text column while the track runs full-bleed, dots, arrows marked `aria-disabled` at each end, links that do not fire at the end of a drag, and no browser drag of a card's link or image, which would take the pointer away from the rail.
 
+### `work-slider.js`
+
+Runs `[data-work-slider]`, the agency page's case-study cards: one Embla row made from the first `[role="list"]` inside `[data-work-slider-viewport]` (the Collection List's items, with its wrapper in between), a progress bar and two arrows. The section takes `data-work-slider-ready` once it is a slider; before that, and without JavaScript, the CSS lets the viewport scroll on its own so every card can be reached. `[data-work-slider-progress]` gets `--work-slider-thumb`, the share of the row on screen, and `--work-slider-progress`, how far it has scrolled, both 0 to 1; the CSS makes them the fill's width and position. `[data-work-slider-prev]` and `[data-work-slider-next]` work from the keyboard and take `aria-disabled` at either end, and tabbing to a card that is off screen brings it into view. One card is left as it is.
+
 ## Runtime support
 
 ### `boot.js`

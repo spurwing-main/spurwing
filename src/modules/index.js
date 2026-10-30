@@ -25,6 +25,7 @@ import { initTicker } from "./ticker.js";
 import { initWave } from "./wave.js";
 import { initWorkArchive } from "./work-archive.js";
 import { initWorkSlide } from "./work-slide.js";
+import { initWorkSlider } from "./work-slider.js";
 
 // Modules that build or reveal DOM come before the ones that measure or animate
 // what they produced. Order matters nowhere else: each runs independently, and
@@ -51,6 +52,7 @@ export const modules = [
 	{ name: "caps", init: initCaps },
 	{ name: "rightway", init: initRightway },
 	{ name: "work-slide", init: initWorkSlide },
+	{ name: "work-slider", init: initWorkSlider },
 	{ name: "quote-fade", init: initQuoteFade },
 	{ name: "ticker", init: initTicker },
 	{ name: "client-logos", init: initClientLogos },
