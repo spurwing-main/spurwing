@@ -298,6 +298,18 @@ describe("initProcessTabs", () => {
 		expect([from, to, options.duration]).toEqual([0.25, 1, 5.25]);
 	});
 
+	it("pauses over the text and resumes when the pointer moves to the image", () => {
+		document.body.innerHTML = section(3).replace("<h3>Step 1</h3>", '<div data-process-reading><h3>Step 1</h3></div><div data-process-media></div>');
+		initProcessTabs();
+		onScreen();
+		const running = runs.at(-1);
+		document.querySelector("[data-process-reading] h3").dispatchEvent(new Event("pointerover", { bubbles: true }));
+		expect(running.stop).toHaveBeenCalled();
+		const count = runs.length;
+		document.querySelector("[data-process-media]").dispatchEvent(new Event("pointerover", { bubbles: true }));
+		expect(runs.length).toBe(count + 1);
+	});
+
 	it("moves between tabs with the arrow keys", () => {
 		document.body.innerHTML = section(3);
 

@@ -275,7 +275,7 @@ function run(section, steps, template, signal) {
 
 	const syncPlayback = () => canPlay() ? play() : stopFilling();
 	section.addEventListener("pointerover", (event) => {
-		const reading = !event.target.closest('[role="tablist"]');
+		const reading = Boolean(event.target.closest("[data-process-reading]"));
 		if (hovered === reading) return;
 		hovered = reading;
 		syncPlayback();
