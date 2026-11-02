@@ -28,6 +28,19 @@ function section(count) {
 const steps = () => [...document.querySelectorAll("[data-process-step]")];
 const tabs = () => [...document.querySelectorAll("[data-process-tab]")];
 
+function mediaSection(count) {
+	return section(count).replace(/<h3>Step (\d+)<\/h3>/g, (_, number) =>
+		`<h3>Step ${number}</h3><div data-process-media data-process-fade="700" data-anim="off"><img src="/step-${number}.webp" alt="Step ${number} image"></div>`,
+	);
+}
+
+function loaded(image) {
+	Object.defineProperties(image, {
+		complete: { configurable: true, value: true },
+		naturalWidth: { configurable: true, value: 800 },
+	});
+}
+
 // A controllable animation: the test decides when it finishes.
 function animation() {
 	let finish;
@@ -64,6 +77,7 @@ describe("initProcessTabs", () => {
 	afterEach(() => {
 		document.body.innerHTML = "";
 		delete Element.prototype.getAnimations;
+		delete HTMLImageElement.prototype.animate;
 		vi.unstubAllGlobals();
 		vi.restoreAllMocks();
 	});
@@ -143,6 +157,78 @@ describe("initProcessTabs", () => {
 		expect(sweep.currentTime).toBe(0);
 		expect(sweep.play).toHaveBeenCalled();
 		expect(hover.play).not.toHaveBeenCalled();
+	});
+
+	it("fades the previous image over the new image without exposing a duplicate", () => {
+		document.body.innerHTML = mediaSection(2);
+		for (const image of document.querySelectorAll("[data-process-media] img")) loaded(image);
+		const fade = { cancel: vi.fn(), onfinish: null };
+		HTMLImageElement.prototype.animate = vi.fn(() => fade);
+
+		initProcessTabs();
+		tabs()[1].click();
+
+		const [oldStep, newStep] = steps();
+		const images = newStep.querySelectorAll("[data-process-media] img");
+		expect(oldStep.hidden).toBe(true);
+		expect(newStep.hidden).toBe(false);
+		expect(images).toHaveLength(2);
+		expect(images[1].getAttribute("src")).toContain("step-1.webp");
+		expect(images[1].getAttribute("aria-hidden")).toBe("true");
+		expect(images[1].alt).toBe("");
+		expect(HTMLImageElement.prototype.animate.mock.calls[0][1].duration).toBe(700);
+
+		fade.onfinish();
+		expect(newStep.querySelectorAll("[data-process-media] img")).toHaveLength(1);
+	});
+
+	it("waits for the next image to load before fading the previous one", () => {
+		document.body.innerHTML = mediaSection(2);
+		const [oldImage, newImage] = document.querySelectorAll("[data-process-media] img");
+		loaded(oldImage);
+		Object.defineProperty(newImage, "complete", { configurable: true, value: false });
+		HTMLImageElement.prototype.animate = vi.fn(() => ({ cancel: vi.fn(), onfinish: null }));
+
+		initProcessTabs();
+		tabs()[1].click();
+		expect(steps()[1].querySelectorAll("[data-process-media] img")).toHaveLength(2);
+		expect(HTMLImageElement.prototype.animate).not.toHaveBeenCalled();
+
+		newImage.dispatchEvent(new Event("load"));
+		expect(HTMLImageElement.prototype.animate).toHaveBeenCalledOnce();
+	});
+
+	it("cleans up an interrupted image fade when another tab is picked", () => {
+		document.body.innerHTML = mediaSection(3);
+		for (const image of document.querySelectorAll("[data-process-media] img")) loaded(image);
+		const fades = [];
+		HTMLImageElement.prototype.animate = vi.fn(() => {
+			const fade = { cancel: vi.fn(), onfinish: null };
+			fades.push(fade);
+			return fade;
+		});
+
+		initProcessTabs();
+		tabs()[1].click();
+		tabs()[2].click();
+
+		expect(fades[0].cancel).toHaveBeenCalledOnce();
+		expect(steps()[1].querySelectorAll("[data-process-media] img")).toHaveLength(1);
+		expect(steps()[2].querySelectorAll("[data-process-media] img")).toHaveLength(2);
+	});
+
+	it("changes images without a fade when reduced motion is requested", () => {
+		stubMedia({ reduce: true });
+		document.body.innerHTML = mediaSection(2);
+		for (const image of document.querySelectorAll("[data-process-media] img")) loaded(image);
+		HTMLImageElement.prototype.animate = vi.fn();
+
+		initProcessTabs();
+		tabs()[1].click();
+
+		expect(steps()[1].hidden).toBe(false);
+		expect(steps()[1].querySelectorAll("[data-process-media] img")).toHaveLength(1);
+		expect(HTMLImageElement.prototype.animate).not.toHaveBeenCalled();
 	});
 
 	it("fills the line over the step showing, then fades it out as the next comes up", async () => {

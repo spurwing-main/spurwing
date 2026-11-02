@@ -26,9 +26,10 @@ import { claimOnce, press } from "../dom.js";
  * on screen, and a picked tab starts from its own step; on a touch screen they
  * change only when a tab is picked. Whenever the step changes the line
  * fades out and starts again from empty, so it never jumps or runs back, and
- * the step that comes up plays the site's reveal again: the sweep its blocks
- * carry as data-anim in the Designer. Reduced motion never moves them, and the
- * line stays empty.
+ * the step that comes up plays the text reveal again. The image in
+ * [data-process-media] fades from the previous image instead of sweeping.
+ * Its data-process-fade value sets the fade time in milliseconds in Webflow.
+ * Reduced motion never moves them, and the line stays empty.
  */
 
 const config = {
@@ -91,6 +92,7 @@ function run(section, steps, template, signal) {
 	let fading = null;
 	let hovered = false;
 	let focused = false;
+	let imageFade = null;
 	const canPlay = () => auto && onScreen && !hovered && !focused;
 
 	const fill = section.querySelector("[data-process-progress]");
@@ -174,7 +176,53 @@ function run(section, steps, template, signal) {
 		}
 	};
 
+	const stopImageFade = () => {
+		imageFade?.abort();
+		imageFade = null;
+	};
+
+	const fadeImage = (previousImage, source, step) => {
+		stopImageFade();
+		if (reduced || !previousImage || !source || !previousImage.complete || !previousImage.naturalWidth) return;
+
+		const media = step.querySelector("[data-process-media]");
+		const image = media?.querySelector("img");
+		if (!image) return;
+
+		const overlay = previousImage.cloneNode(false);
+		for (const attribute of ["srcset", "sizes", "data-img", "data-wf-id", "data-w-id", "id"]) {
+			overlay.removeAttribute(attribute);
+		}
+		overlay.src = source;
+		overlay.alt = "";
+		overlay.setAttribute("aria-hidden", "true");
+		media.append(overlay);
+
+		const controller = new AbortController();
+		imageFade = controller;
+		controller.signal.addEventListener("abort", () => overlay.remove(), { once: true });
+		const start = () => {
+			const animation = overlay.animate([{ opacity: 1 }, { opacity: 0 }], {
+				duration: Number(media.dataset.processFade),
+				easing: "ease-in-out",
+			});
+			controller.signal.addEventListener("abort", () => animation.cancel(), { once: true });
+			animation.onfinish = () => controller.abort();
+		};
+
+		if (image.complete) {
+			if (image.naturalWidth) start();
+			else controller.abort();
+		} else {
+			image.addEventListener("load", start, { once: true, signal: controller.signal });
+			image.addEventListener("error", () => controller.abort(), { once: true, signal: controller.signal });
+		}
+	};
+
 	const show = (index, { focus = false, first = false } = {}) => {
+		const changed = !first && active !== index;
+		const previousImage = changed ? steps[active].querySelector("[data-process-media] img") : null;
+		const previousSource = previousImage?.currentSrc || previousImage?.src;
 		active = index;
 
 		steps.forEach((step, i) => {
@@ -183,6 +231,7 @@ function run(section, steps, template, signal) {
 
 		// The first step reveals as it scrolls in, like everything else.
 		if (!first) reveal(steps[index]);
+		if (changed) fadeImage(previousImage, previousSource, steps[index]);
 
 		tabs.forEach((tab, i) => {
 			const selected = i === index;
@@ -256,6 +305,7 @@ function run(section, steps, template, signal) {
 	signal?.addEventListener("abort", () => {
 		stopFilling();
 		fading?.stop();
+		stopImageFade();
 		stopWatching();
 	});
 }
