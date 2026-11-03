@@ -66,6 +66,10 @@ Fades each image up as it decodes, so a picture does not snap from nothing to ev
 
 Reads the impact cards out of one Rich Text block — a title, a body and an optional italic line each — and builds them into the `.section_impact` slider with its arrows.
 
+### `img-parallax.js`
+
+Moves the image in each `[data-img-parallax="section"]` from 15% of its height up to rest as the section scrolls through the screen, driven by the scroll position rather than a timer. Replaces the Webflow "Us Parallax" interaction on the home team section. Reduced motion leaves the image still.
+
 ### `insight-toc.js`
 
 Positions the sidebar indicator against the current Finsweet table-of-contents link, holding its last position through the gaps where Finsweet drops its `w--current` class.

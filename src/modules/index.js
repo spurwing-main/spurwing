@@ -9,6 +9,7 @@ import { initCmsCounts } from "./cms-counts.js";
 import { initCopyToClipboard } from "./copy-to-clipboard.js";
 import { initFaq } from "./faq.js";
 import { initImageFade } from "./image-fade.js";
+import { initImgParallax } from "./img-parallax.js";
 import { initImpactSlider } from "./impact-slider.js";
 import { initInsightToc } from "./insight-toc.js";
 import { initMenuToggle } from "./menu-toggle.js";
@@ -58,6 +59,7 @@ export const modules = [
 	{ name: "client-logos", init: initClientLogos },
 	{ name: "process-tabs", init: initProcessTabs },
 	{ name: "card-reveal", init: initCardReveal },
+	{ name: "img-parallax", init: initImgParallax },
 	{ name: "anim", init: initAnim },
 	{ name: "approach-hero", init: initApproachHero },
 	{ name: "approach-slider", init: initApproachSlider },
