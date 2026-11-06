@@ -15,7 +15,7 @@
  *   error    { message }        something failed; the page offers the team instead
  *   done     {}
  *
- * Every question is logged to D1 and sent to #spurwing-faq-alert as it's asked.
+ * Every question is logged to D1, with the time and page it was asked on.
  */
 import { links, pagesFrom, relay, startAnswer } from "./answer.js";
 import { eventStream } from "./events.js";
@@ -25,6 +25,8 @@ const MAX_QUESTION = 300;
 // The page sends its last two questions and answers, so a follow-up has context.
 const MAX_HISTORY = 4;
 const MAX_TURN = 2000;
+// IDs from the page: the question's, its conversation's and Clarity's.
+const ID = /^[\w-]{1,64}$/;
 
 export default {
 	fetch(request, env, ctx) {
@@ -55,13 +57,23 @@ async function ask(request, env, ctx, cors) {
 	}
 
 	const started = Date.now();
+	const askedAt = new Date(started).toISOString();
 	// When each step finished, in ms, logged with every question to show where
 	// the time goes.
 	const timings = {};
 	const mark = (step) => (timings[step] ??= Date.now() - started);
+	// Everything that ties a logged question to the visit: the page's IDs, and
+	// Cloudflare's request ID (the Ray ID in its logs), country and browser.
+	const visit = {
+		ray: request.headers.get("cf-ray") ?? "",
+		country: request.cf?.country ?? "",
+		userAgent: (request.headers.get("user-agent") ?? "").slice(0, 300),
+		model: env.MODEL,
+	};
 	const log = (outcome) => {
-		console.log({ answered: outcome.answered, ...timings, total: Date.now() - started });
-		ctx.waitUntil(record(env, { ...input, ...outcome, ms: Date.now() - started }));
+		const ms = Date.now() - started;
+		console.log({ id: input.id, ray: visit.ray, answered: outcome.answered, ...timings, total: ms });
+		ctx.waitUntil(record(env, { ...input, ...visit, ...outcome, askedAt, firstWordMs: timings.firstWord ?? null, ms }));
 	};
 
 	// Inside the stream, a failure reaches the page as an `error` event, which it
@@ -105,11 +117,18 @@ async function readInput(request) {
 		.slice(-MAX_HISTORY)
 		.map((turn) => ({ role: turn.role, content: turn.content.slice(0, MAX_TURN) }));
 
+	const id = (value) => (typeof value === "string" && ID.test(value) ? value : "");
+
 	return {
 		question,
 		history,
 		page: typeof body.page === "string" ? body.page.slice(0, 200) : "",
 		token: typeof body.token === "string" ? body.token : "",
+		id: id(body.id) || crypto.randomUUID(),
+		conversation: id(body.conversation),
+		turn: history.filter((turn) => turn.role === "user").length + 1,
+		clarityUser: id(body.clarity?.user),
+		claritySession: id(body.clarity?.session),
 	};
 }
 

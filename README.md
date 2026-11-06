@@ -255,18 +255,18 @@ the site.
 | `worker/src/index.js`           | The routes, the visitor checks and the order an answer runs in.   |
 | `worker/src/answer.js`          | The prompt, Terra's answer, the found and cited pages.            |
 | `worker/src/events.js`          | Server-sent events in from the model and out to the page.         |
-| `worker/src/log.js`             | The D1 question log, the Slack message and the Google Sheet row.  |
-| `worker/google-sheet.gs`        | The script in the questions Google Sheet, with its set-up steps.  |
+| `worker/src/log.js`             | The D1 question log.                                              |
 | `worker/wrangler.jsonc`         | Bindings, the route, the rate limit and the model.                |
 | `worker/schema.sql`             | The `questions` table.                                            |
 | `worker/scripts/index-staging.mjs` | Sends staging's pages to AI Search until it crawls the live site. |
 
 It runs on Spurwing's Cloudflare account: AI Search instance `spurwing-faq`,
 AI Gateway `spurwing` (with the OpenAI key), D1 database `spurwing-faq`,
-Turnstile widget `spurwing-ask`. Its secrets are set with
+Turnstile widget `spurwing-ask`. The question log is read by asking Claude
+through Cloudflare's MCP server (`https://mcp.cloudflare.com/mcp`, D1 Read),
+or in the dashboard. Its secrets are set with
 `npx wrangler secret put NAME --config worker/wrangler.jsonc` and never
-committed: `TURNSTILE_SECRET`, `SLACK_WEBHOOK_URL`, `SHEET_WEBHOOK_URL` and
-`INDEX_KEY`.
+committed: `TURNSTILE_SECRET` and `INDEX_KEY`.
 
 `npm test` covers the Worker with the rest. To ship it, run `npm test`, then
 `npm run worker:deploy`, then ask a question on staging.

@@ -25,7 +25,7 @@ const MAX_CITED = 2;
  * first word comes in well under two seconds, against about five with it. The
  * gateway uses its "default" OpenAI key.
  */
-export function startAnswer({ question, history, page }, pages, env) {
+export function startAnswer({ question, history, page, id }, pages, env) {
 	return env.AI.run(
 		env.MODEL,
 		{
@@ -38,7 +38,8 @@ export function startAnswer({ question, history, page }, pages, env) {
 			reasoning_effort: env.REASONING_EFFORT ?? "none",
 			max_completion_tokens: 400,
 		},
-		{ gateway: { id: env.GATEWAY, metadata: { page } } },
+		// The question's ID finds this answer in the gateway's logs.
+		{ gateway: { id: env.GATEWAY, metadata: { page, question: id } } },
 	);
 }
 

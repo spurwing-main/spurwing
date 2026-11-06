@@ -76,6 +76,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 		const askCard = input.closest(".faq-card");
 		const plus = another.querySelector("svg");
 		const history = [];
+		// Ties this box's follow-ups together in the log; one per page view.
+		const conversation = crypto.randomUUID();
 		let busy = false;
 
 		// Webflow drops an empty `hidden` attribute on publish, so say it here too.
@@ -191,6 +193,11 @@ export function initAiFaq(root = document, { signal } = {}) {
 			if (busy) return;
 			busy = true;
 
+			// Each question's ID is in the log, and tagged in Clarity, so the two
+			// can be matched: filter Clarity's recordings by ai_faq_question_id.
+			const id = crypto.randomUUID();
+			window.clarity?.("set", "ai_faq_question_id", id);
+			window.clarity?.("set", "ai_faq_conversation", conversation);
 			track("ai_faq_ask");
 
 			// The answer card takes the ask card's place, so the question stays
@@ -205,7 +212,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			input.value = "";
 			input.style.height = "";
 
-			const answer = await stream(question, card);
+			const answer = await stream(question, card, id);
 			card.finish();
 			busy = false;
 
@@ -226,7 +233,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			if (hadFocus && lost) another.focus({ preventScroll: true, focusVisible: false });
 		}
 
-		async function stream(question, card) {
+		async function stream(question, card, id) {
 			const controller = new AbortController();
 			const stop = () => controller.abort();
 			signal?.addEventListener("abort", stop);
@@ -237,7 +244,15 @@ export function initAiFaq(root = document, { signal } = {}) {
 				const response = await fetch(config.endpoint, {
 					method: "POST",
 					headers: { "content-type": "application/json" },
-					body: JSON.stringify({ question, history, page: location.pathname, token: await turnstileToken() }),
+					body: JSON.stringify({
+						question,
+						history,
+						page: location.pathname,
+						id,
+						conversation,
+						clarity: clarityIds(),
+						token: await turnstileToken(),
+					}),
 					signal: controller.signal,
 				});
 				if (!response.ok || !response.body) throw new Error(`ask failed: ${response.status}`);
@@ -517,6 +532,20 @@ function pause(ms) {
 // Clarity loads only after cookie consent, so before then there is nothing to tell.
 function track(name) {
 	window.clarity?.("event", name);
+}
+
+// Clarity's own visitor and session IDs, from its cookies (the first part of
+// _clck and _clsk, split on ^ as Clarity writes them today, or |), so a logged question can be found in its recording. Empty
+// until the visitor accepts cookies.
+export function clarityIds() {
+	const first = (name) => {
+		const value = document.cookie
+			.split("; ")
+			.find((cookie) => cookie.startsWith(`${name}=`))
+			?.slice(name.length + 1);
+		return value ? decodeURIComponent(value).split(/[|^]/)[0] : "";
+	};
+	return { user: first("_clck"), session: first("_clsk") };
 }
 
 // Turnstile takes about two seconds to vouch for a visitor. It starts as the

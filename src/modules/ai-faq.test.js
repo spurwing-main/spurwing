@@ -262,6 +262,31 @@ describe("initAiFaq", () => {
 		expect(Element.prototype.animate.mock.calls.at(-1)[0]).toEqual([{ marginTop: "-57px" }, { marginTop: "0px" }]);
 	});
 
+	it("sends each question's ID, its conversation and Clarity's IDs, and tags Clarity with the question's ID", async () => {
+		const clarity = vi.fn();
+		vi.stubGlobal("clarity", clarity);
+		document.cookie = "_clck=1abc2de%5E2%5Egax%5E1%5E2423";
+		document.cookie = "_clsk=9xyz%5E1793975172285%5E31%5E1%5Et.clarity.ms%2Fcollect";
+		const fetch = respondWith(sse([["token", "Yes."]]));
+		initAiFaq();
+
+		ask("First?");
+		await settled();
+		$('[data-ai-faq="another"]').click();
+		fetch.mockImplementation(async () => new Response(sse([["token", "Again."]])));
+		ask("Second?");
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+
+		const [first, second] = fetch.mock.calls.map(([, init]) => JSON.parse(init.body));
+		expect(first.id).toMatch(/^[0-9a-f-]{36}$/);
+		expect(second.id).not.toBe(first.id);
+		expect(second.conversation).toBe(first.conversation);
+		expect(first.clarity).toEqual({ user: "1abc2de", session: "9xyz" });
+		expect(clarity).toHaveBeenCalledWith("set", "ai_faq_question_id", first.id);
+		document.cookie = "_clck=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+		document.cookie = "_clsk=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+	});
+
 	it("brings the ask card back for another question", async () => {
 		respondWith(sse([["token", "Yes."]]));
 		initAiFaq();

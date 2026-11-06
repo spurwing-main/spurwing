@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { citedPages, pagesFrom, relay, SYSTEM_PROMPT } from "./answer.js";
 import worker from "./index.js";
-import { alertText } from "./log.js";
 
 const ORIGIN = "https://spurwing.webflow.io";
 
@@ -141,40 +140,36 @@ describe("worker fetch", () => {
 		expect(upload).toHaveBeenCalledWith("faq.html", "<p>Hi</p>", { metadata: { url: "https://www.spurwing.co.uk/faq", title: "Webflow FAQs" } });
 	});
 
-	it("logs each question and tells Slack as it's asked, without contact details", async () => {
-		const fetch = vi.fn(async () => new Response("ok"));
-		vi.stubGlobal("fetch", fetch);
+	it("logs each question with its time, page and every ID that ties it to the visit, leaving out contact details", async () => {
 		const run = vi.fn(async () => {});
 		const bind = vi.fn(() => ({ run }));
 		const waits = [];
-		const bindings = env({ SLACK_WEBHOOK_URL: "https://hooks.slack.test/x", DB: { prepare: vi.fn(() => ({ bind })) } });
+		const bindings = env({ DB: { prepare: vi.fn(() => ({ bind })) } });
+		const body = {
+			question: "Call me on 07700 900123 about a quote?",
+			page: "/faq",
+			id: "q-1",
+			conversation: "c-1",
+			history: [{ role: "user", content: "Hi" }, { role: "assistant", content: "Hello" }],
+			clarity: { user: "1abc2de", session: "<script>" },
+		};
 
-		await collect((await worker.fetch(ask({ question: "Call me on 07700 900123 about a quote?", page: "/faq" }), bindings, { waitUntil: (p) => waits.push(p) })).body);
+		await collect((await worker.fetch(ask(body, { "cf-ray": "8f00aa-LHR", "user-agent": "Safari" }), bindings, { waitUntil: (p) => waits.push(p) })).body);
 		await Promise.all(waits);
 
-		expect(bind.mock.calls[0][2]).toBe("[removed: contained contact details]");
-		expect(fetch).toHaveBeenCalledOnce();
-		const { text } = JSON.parse(fetch.mock.calls[0][1].body);
-		expect(text).toContain("*New FAQ question* on /faq");
-		expect(text).not.toContain("07700");
-		vi.unstubAllGlobals();
-	});
+		const [askedAt, id, conversation, turn, page, question, answered, , , firstWordMs, ms, clarityUser, claritySession, ray, , userAgent, model] =
+			bind.mock.calls[0];
+		expect(new Date(askedAt).toISOString()).toBe(askedAt);
+		expect([id, conversation, turn, page, answered]).toEqual(["q-1", "c-1", 2, "/faq", 1]);
+		expect(question).toBe("[removed: contained contact details]");
+		expect(firstWordMs).toBeGreaterThanOrEqual(0);
+		expect(ms).toBeGreaterThanOrEqual(firstWordMs);
+		// An ID that isn't one is dropped, not stored.
+		expect([clarityUser, claritySession]).toEqual(["1abc2de", ""]);
+		expect([ray, userAgent, model]).toEqual(["8f00aa-LHR", "Safari", "openai/gpt-6.1-terra"]);
 
-	it("adds each question to the Google Sheet with its time and page, once the sheet is set", async () => {
-		const fetch = vi.fn(async () => new Response("ok"));
-		vi.stubGlobal("fetch", fetch);
-		const waits = [];
-		const bindings = env({ SHEET_WEBHOOK_URL: "https://script.google.test/exec?key=k" });
-
-		await collect((await worker.fetch(ask({ question: "How do you work?", page: "/approach" }), bindings, { waitUntil: (p) => waits.push(p) })).body);
-		await Promise.all(waits);
-
-		const [url, init] = fetch.mock.calls[0];
-		expect(url).toBe("https://script.google.test/exec?key=k");
-		const row = JSON.parse(init.body);
-		expect(row).toMatchObject({ page: "/approach", question: "How do you work?", answered: true, sources: "https://www.spurwing.co.uk/approach" });
-		expect(new Date(row.askedAt).toISOString()).toBe(row.askedAt);
-		vi.unstubAllGlobals();
+		const [, , options] = bindings.AI.run.mock.calls[0];
+		expect(options.gateway.metadata).toEqual({ page: "/faq", question: "q-1" });
 	});
 
 	it("answers the browser's preflight", async () => {
@@ -244,33 +239,5 @@ describe("citedPages", () => {
 		expect(citedPages(pages, "Yes, we worked with Aethos Hotels to bring eight WordPress sites into one, with booking integrations.")).toEqual([
 			{ title: "Aethos Hotels", url: "/work/aethos-hotels" },
 		]);
-	});
-});
-
-describe("alertText", () => {
-	it("shows the question, the answer and its pages", () => {
-		const text = alertText({
-			question: "Have you worked with hotels?",
-			page: "/webflow-agency",
-			answered: true,
-			answer: "Yes, Aethos Hotels.",
-			sources: [{ title: "Aethos Hotels", url: "https://www.spurwing.co.uk/work/aethos-hotels" }],
-		});
-
-		expect(text).toBe(
-			[
-				"*New FAQ question* on /webflow-agency",
-				">Have you worked with hotels?",
-				"Answered: Yes, Aethos Hotels.",
-				"From: <https://www.spurwing.co.uk/work/aethos-hotels|Aethos Hotels>",
-			].join("\n"),
-		);
-	});
-
-	it("says when it handed off, and never lets the visitor ping the channel", () => {
-		const text = alertText({ question: "<!channel> <https://evil.example|click> & go", page: "/", answered: false, answer: "", sources: [] });
-
-		expect(text).toContain(">&lt;!channel&gt; &lt;https://evil.example|click&gt; &amp; go");
-		expect(text).toContain("Couldn't answer from the site; offered the discovery call.");
 	});
 });
