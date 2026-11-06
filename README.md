@@ -16,6 +16,7 @@ project/public/
 │       └── index.js         Lists the modules in their start order.
 ├── dist/
 │   └── bundle.js            Contains the generated production bundle.
+├── worker/                  The ask.spurwing.co.uk Worker behind the FAQ ask box.
 ├── loader.js                Controls the environment, status panel, and bundle load.
 ├── dev.mjs                  Builds and serves the local bundle.
 ├── tag.mjs                  Makes the commit-pinned script tag.
@@ -241,6 +242,33 @@ Keep visual values in Webflow or in an Embed. Use modules only for browser behav
 
 Use `data-*` attributes as the interface between Webflow, CSS, and JS. Do not use style class names as controls.
 
+## The ask Worker
+
+`worker/` is the Cloudflare Worker at `ask.spurwing.co.uk` that answers the
+FAQ ask box (`src/modules/ai-faq.js`). It lives here so the page and the
+service it calls change together, but it ships separately: a push or a
+Webflow publish doesn't touch it, and `npm run worker:deploy` doesn't touch
+the site.
+
+| File                            | Owns                                                              |
+| ------------------------------- | ----------------------------------------------------------------- |
+| `worker/src/index.js`           | The routes, the visitor checks and the order an answer runs in.   |
+| `worker/src/answer.js`          | The prompt, Terra's answer, the found and cited pages.            |
+| `worker/src/events.js`          | Server-sent events in from the model and out to the page.         |
+| `worker/src/log.js`             | The D1 question log and Monday's Slack digest.                    |
+| `worker/wrangler.jsonc`         | Bindings, the route, the rate limit, the cron and the model.      |
+| `worker/schema.sql`             | The `questions` table.                                            |
+| `worker/scripts/index-staging.mjs` | Sends staging's pages to AI Search until it crawls the live site. |
+
+It runs on Spurwing's Cloudflare account: AI Search instance `spurwing-faq`,
+AI Gateway `spurwing` (with the OpenAI key), D1 database `spurwing-faq`,
+Turnstile widget `spurwing-ask`. Its secrets are set with
+`npx wrangler secret put NAME --config worker/wrangler.jsonc` and never
+committed: `TURNSTILE_SECRET`, `SLACK_WEBHOOK_URL` and `INDEX_KEY`.
+
+`npm test` covers the Worker with the rest. To ship it, run `npm test`, then
+`npm run worker:deploy`, then ask a question on staging.
+
 ## Commands
 
 | Command              | Result                                              |
@@ -252,6 +280,8 @@ Use `data-*` attributes as the interface between Webflow, CSS, and JS. Do not us
 | `npm run test:watch` | Does the tests after each file change.              |
 | `npm run tag`        | Makes the script tag for the current commit.        |
 | `npm run tag -- REF` | Makes the script tag for a specified Git reference. |
+| `npm run worker:dev` | Runs the ask Worker locally.                        |
+| `npm run worker:deploy` | Deploys the ask Worker to Cloudflare.            |
 
 ## Release
 

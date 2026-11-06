@@ -9,7 +9,7 @@ import { config, initAiFaq, readEvents } from "./ai-faq.js";
 const markup = `
 	<div data-ai-faq="component">
 		<div data-ai-faq="ask">
-			<svg data-ai-faq="sparkle"></svg>
+			<svg data-ai-faq="sparkle" class="ai-faq_sparkle"><path d="M1 1"/><path d="M2 2"/><path d="M3 3"/></svg>
 			<div class="faq-card"><div class="faq-card_trigger">
 				<textarea data-ai-faq="input"></textarea>
 				<button data-ai-faq="send" type="button"></button>
@@ -42,7 +42,7 @@ describe("initAiFaq", () => {
 	beforeEach(() => {
 		config.minStageMs = 0;
 		config.turnstileSiteKey = "";
-		motion.animate.mockReset().mockReturnValue({ stop: vi.fn() });
+		motion.animate.mockReset().mockReturnValue({ stop: vi.fn(), finished: Promise.resolve() });
 		vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
 		// jsdom has no layout, so no scrollIntoView or IntersectionObserver.
 		Element.prototype.scrollIntoView = vi.fn();
@@ -206,6 +206,40 @@ describe("initAiFaq", () => {
 
 		expect(input.style.height).toBe("");
 		expect(input.value).toBe("");
+	});
+
+	it("opens the answer in the ask card's place, an FAQ card with the sparkle twinkling as its icon", async () => {
+		let finish;
+		vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => (finish = resolve))));
+		initAiFaq();
+
+		ask("Do you build e-commerce?");
+		await vi.waitFor(() => expect($('[data-ai-faq="answer"]')).not.toBeNull());
+
+		const card = $('[data-ai-faq="answer"]');
+		expect(card.nextElementSibling).toBe($('[data-ai-faq="ask"]'));
+		expect([...card.children].map((child) => child.className)).toEqual(["faq-card_trigger", "faq-card_panel"]);
+		const star = card.querySelector(".faq-card_icon svg");
+		expect(star.hasAttribute("data-ai-faq")).toBe(false);
+		expect(star.hasAttribute("class")).toBe(false);
+		const twinkles = motion.animate.mock.calls.filter(([, keyframes]) => keyframes.rotate?.[1] === 45);
+		expect(twinkles.map(([path]) => path)).toEqual([...star.querySelectorAll("path")]);
+		expect(card.querySelector(".rich-text p").textContent).toBe("Reading the site…");
+
+		finish(new Response(sse([["token", "Yes."]])));
+		await settled();
+		expect(card.querySelector(".faq-card_icon svg path").getAttribute("d")).toMatch(/^M56 86/);
+	});
+
+	it("moves focus to Ask another when the text box took it away", async () => {
+		respondWith(sse([["token", "Yes."]]));
+		initAiFaq();
+
+		$('[data-ai-faq="input"]').focus();
+		ask("Keyboard?");
+		await settled();
+
+		expect(document.activeElement).toBe($('[data-ai-faq="another"]'));
 	});
 
 	it("brings the ask card back for another question", async () => {

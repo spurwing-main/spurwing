@@ -1,7 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 
-import worker, { citedPages, digestText, pagesFrom, relay, SYSTEM_PROMPT } from "./index.js";
+import { citedPages, pagesFrom, relay, SYSTEM_PROMPT } from "./answer.js";
+import worker from "./index.js";
+import { digestText } from "./log.js";
 
 const ORIGIN = "https://spurwing.webflow.io";
 
@@ -15,7 +17,6 @@ function upstream(parts) {
 	});
 }
 
-const chunks = (list) => `event: chunks\ndata: ${JSON.stringify(list)}\n\n`;
 const delta = (text) => `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`;
 const done = "data: [DONE]\n\n";
 
@@ -31,7 +32,7 @@ async function collect(stream) {
 }
 
 function model(parts) {
-	return vi.fn(async (name) => (name.startsWith("@cf/meta/llama-guard") ? { response: "safe" } : upstream(parts)));
+	return vi.fn(async () => upstream(parts));
 }
 
 function env(overrides = {}) {
@@ -85,13 +86,14 @@ describe("worker fetch", () => {
 			["done", {}],
 		]);
 
-		const [name, input, options] = bindings.AI.run.mock.calls.find(([called]) => called === "openai/gpt-6.1-terra");
+		const [name, input, options] = bindings.AI.run.mock.calls[0];
 		expect(input.messages[0].content).toContain(SYSTEM_PROMPT);
 		expect(input.messages[0].content).toContain("## Approach (https://www.spurwing.co.uk/approach)");
 		expect(input.messages.at(-1)).toEqual({ role: "user", content: "How do you work?" });
 		expect(input).toMatchObject({ stream: true, reasoning_effort: "none" });
 		expect(options).toMatchObject({ gateway: { id: "spurwing" } });
 		expect(name).toBe("openai/gpt-6.1-terra");
+		expect(bindings.AI_SEARCH.search).toHaveBeenCalledWith(expect.objectContaining({ query: "How do you work?" }));
 	});
 
 	it("refuses other sites, bad input and a visitor over the limit", async () => {
@@ -101,15 +103,6 @@ describe("worker fetch", () => {
 
 		const limited = env({ RATE_LIMIT: { limit: async () => ({ success: false }) } });
 		expect((await worker.fetch(ask({ question: "Hi" }), limited, ctx)).status).toBe(429);
-	});
-
-	it("hands off a question Llama Guard flags, sending none of the answer", async () => {
-		const bindings = env({ AI: { run: vi.fn(async (name) => (name.startsWith("@cf/meta/llama-guard") ? { response: "unsafe\nS1" } : upstream([delta("Never sent."), done]))) } });
-		const response = await worker.fetch(ask({ question: "Something harmful" }), bindings, ctx);
-
-		const sent = await collect(response.body);
-		expect(sent.at(-1)).toEqual(["handoff", { message: "I couldn't find that on our site." }]);
-		expect(sent.some(([event]) => event === "token")).toBe(false);
 	});
 
 	it("sends an error event, not a 500, when AI Search fails", async () => {
@@ -148,6 +141,19 @@ describe("worker fetch", () => {
 		expect(upload).toHaveBeenCalledWith("faq.html", "<p>Hi</p>", { metadata: { url: "https://www.spurwing.co.uk/faq", title: "Webflow FAQs" } });
 	});
 
+	it("only posts the digest on demand with the right index key", async () => {
+		const fetch = vi.fn(async () => new Response("ok"));
+		vi.stubGlobal("fetch", fetch);
+		const bindings = env({ INDEX_KEY: "k", SLACK_WEBHOOK_URL: "https://hooks.slack.test/x" });
+		const post = (key) => new Request("https://ask.spurwing.co.uk/digest", { method: "POST", headers: { "x-index-key": key } });
+
+		expect((await worker.fetch(post("wrong"), bindings, ctx)).status).toBe(404);
+		expect(fetch).not.toHaveBeenCalled();
+		expect(await (await worker.fetch(post("k"), bindings, ctx)).json()).toEqual({ posted: true, status: 200 });
+		expect(JSON.parse(fetch.mock.calls[0][1].body).text).toBe("No questions asked on the website's FAQ this week.");
+		vi.unstubAllGlobals();
+	});
+
 	it("answers the browser's preflight", async () => {
 		const response = await worker.fetch(new Request("https://ask.spurwing.co.uk/ask", { method: "OPTIONS", headers: { origin: ORIGIN } }), env(), ctx);
 
@@ -159,12 +165,9 @@ describe("worker fetch", () => {
 describe("relay", () => {
 	it("turns NO_ANSWER into a hand-off, even when it arrives in pieces", async () => {
 		const sent = [];
-		const result = await relay(upstream([chunks([]), delta("NO_"), delta("ANS"), delta("WER"), done]), (event, data) => sent.push([event, data]));
+		const result = await relay(upstream([delta(" NO_"), delta("ANS"), delta("WER"), done]), (event, data) => sent.push([event, data]));
 
-		expect(sent).toEqual([
-			["sources", []],
-			["handoff", { message: "I couldn't find that on our site." }],
-		]);
+		expect(sent).toEqual([["handoff", { message: "I couldn't find that on our site." }]]);
 		expect(result.answered).toBe(false);
 	});
 
@@ -173,6 +176,14 @@ describe("relay", () => {
 		await relay(upstream([delta("No"), delta(", we don't need a retainer."), done]), (event, data) => sent.push([event, data]));
 
 		expect(sent.filter(([event]) => event === "token").map(([, data]) => data).join("")).toBe("No, we don't need a retainer.");
+	});
+
+	it("hands off as soon as NO_ANSWER is complete, whatever follows it", async () => {
+		const sent = [];
+		const result = await relay(upstream([delta("NO_ANSWER. Sorry, never shown."), done]), (event, data) => sent.push([event, data]));
+
+		expect(sent).toEqual([["handoff", { message: "I couldn't find that on our site." }]]);
+		expect(result).toEqual({ answered: false, answer: "", sources: [] });
 	});
 
 	it("hands off when nothing is said", async () => {
