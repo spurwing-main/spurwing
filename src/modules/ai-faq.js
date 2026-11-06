@@ -111,9 +111,11 @@ export function initAiFaq(root = document, { signal } = {}) {
 		send.addEventListener("click", submit);
 
 		another.addEventListener("click", () => {
+			const freed = room(another);
 			another.hidden = true;
 			ask.hidden = false;
 			fit();
+			makeRoom(ask, freed);
 			rise(ask);
 			input.focus({ preventScroll: true });
 			ask.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
@@ -121,6 +123,22 @@ export function initAiFaq(root = document, { signal } = {}) {
 		if (plus && !reduceMotion) {
 			another.addEventListener("pointerenter", () => animate(plus, { rotate: 90 }, { duration: 0.3, ease: EASE }));
 			another.addEventListener("pointerleave", () => animate(plus, { rotate: 0 }, { duration: 0.3, ease: EASE }));
+		}
+
+		// The space an item takes in the list: its height and the gap above it.
+		function room(element) {
+			return element.getBoundingClientRect().height + (parseFloat(getComputedStyle(component).rowGap) || 0);
+		}
+
+		/**
+		 * Something new in the list takes its room gradually, on the FAQ cards'
+		 * opening ease, so the page below glides down instead of jumping. It starts
+		 * pulled up by the room it needs, less any room `freed` by what it replaced.
+		 */
+		function makeRoom(element, freed = 0) {
+			if (reduceMotion) return;
+			const pull = freed - room(element);
+			if (pull < 0) element.animate([{ marginTop: `${pull}px` }, { marginTop: "0px" }], OPEN);
 		}
 
 		function fit() {
@@ -199,6 +217,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			if (signal?.aborted) return;
 			prepareToken();
 			another.hidden = false;
+			makeRoom(another);
 			rise(another);
 			// Focus went with the hidden ask card; unless the reader has moved on,
 			// it comes back on the next thing to do.

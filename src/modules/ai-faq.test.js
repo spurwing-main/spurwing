@@ -243,6 +243,25 @@ describe("initAiFaq", () => {
 		expect(document.activeElement).toBe($('[data-ai-faq="another"]'));
 	});
 
+	it("lets Ask another, then the new ask card, take their room gradually so the page below glides", async () => {
+		respondWith(sse([["token", "Yes."]]));
+		initAiFaq();
+		$('[data-ai-faq="component"]').style.rowGap = "20px";
+		const another = $('[data-ai-faq="another"]');
+		const askCard = $('[data-ai-faq="ask"]');
+		another.getBoundingClientRect = () => ({ height: 22 });
+		askCard.getBoundingClientRect = () => ({ height: 79 });
+
+		ask("Smooth?");
+		await settled();
+		expect(Element.prototype.animate.mock.contexts.at(-1)).toBe(another);
+		expect(Element.prototype.animate.mock.calls.at(-1)[0]).toEqual([{ marginTop: "-42px" }, { marginTop: "0px" }]);
+
+		another.click();
+		expect(Element.prototype.animate.mock.contexts.at(-1)).toBe(askCard);
+		expect(Element.prototype.animate.mock.calls.at(-1)[0]).toEqual([{ marginTop: "-57px" }, { marginTop: "0px" }]);
+	});
+
 	it("brings the ask card back for another question", async () => {
 		respondWith(sse([["token", "Yes."]]));
 		initAiFaq();
