@@ -51,7 +51,7 @@ export const config = {
 // Spurwing's ease, from the design prototype.
 const EASE = [0.2, 0.7, 0.2, 1];
 // The FAQ cards' own opening (faq.js), so an answer opens like one.
-const OPEN = { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] };
+const OPEN = { duration: 400, easing: "cubic-bezier(0.25, 0.1, 0.25, 1)" };
 
 const TICK =
 	'<svg viewBox="34 35 60 60" width="100%" height="100%" fill="none" aria-hidden="true"><path d="M56 86L36 66.16L42.36 60L56 73.4L85.64 44L92 50.32L56 86Z" fill="currentColor"/></svg>';
@@ -314,13 +314,28 @@ export function initAiFaq(root = document, { signal } = {}) {
 				}
 			}
 
-			stage(0);
+			show(0);
 
 			// Opens like an FAQ answer, the first words rising into it.
 			function open() {
-				if (reduceMotion) return;
-				animate(panel, { height: [0, panel.offsetHeight] }, OPEN).finished.then(() => panel.style.removeProperty("height"));
+				resize(() => {}, 0);
 				rise(text, 0.1);
+			}
+
+			/**
+			 * Every change in the card's height eases like an FAQ answer opening: a
+			 * new line, the hand-off, the sources. The panel goes from the height it
+			 * shows now to the one its content needs. This is the browser's own
+			 * animation, which starts on the frame it's asked for; a Motion height
+			 * tween showed the card fully open for a frame, then fell behind and
+			 * snapped.
+			 */
+			function resize(change, from = panel.getBoundingClientRect().height) {
+				change();
+				if (reduceMotion) return;
+				const to = content.offsetHeight;
+				if (Math.abs(to - from) < 1) return;
+				panel.animate([{ height: `${from}px` }, { height: `${to}px` }], OPEN);
 			}
 
 			// Waits out the stage on screen first, so a fast answer doesn't flicker
@@ -328,10 +343,15 @@ export function initAiFaq(root = document, { signal } = {}) {
 			async function stage(index, count = pages.length) {
 				await settle();
 				if (writing) return;
-				const first = !shownAt;
+				show(index, count);
+				if (!reduceMotion) animate(text, { opacity: [0.3, 1] }, { duration: 0.3 });
+			}
+
+			// Straight away, not after a wait, so the first stage is in place before
+			// the card measures itself to open.
+			function show(index, count = pages.length) {
 				text.textContent = config.stages[index].replace("{n}", count);
 				startShimmer();
-				if (!first && !reduceMotion) animate(text, { opacity: [0.3, 1] }, { duration: 0.3 });
 				shownAt = Date.now();
 			}
 
@@ -360,23 +380,26 @@ export function initAiFaq(root = document, { signal } = {}) {
 			}
 
 			async function write(piece) {
-				if (!writing) {
+				const first = !writing;
+				if (first) {
 					await settle();
 					writing = true;
 					stopShimmer();
-					text.textContent = "";
 				}
 				// A blank line in the answer starts a new paragraph.
-				piece.split(/\n{2,}/).forEach((part, index) => {
-					if (index) {
-						paragraph = node("p");
-						body.append(paragraph);
-					}
-					if (!part) return;
-					const words = node("span");
-					words.textContent = part;
-					paragraph.append(words);
-					if (!reduceMotion) animate(words, { opacity: [0, 1] }, { duration: 0.25 });
+				resize(() => {
+					if (first) text.textContent = "";
+					piece.split(/\n{2,}/).forEach((part, index) => {
+						if (index) {
+							paragraph = node("p");
+							body.append(paragraph);
+						}
+						if (!part) return;
+						const words = node("span");
+						words.textContent = part;
+						paragraph.append(words);
+						if (!reduceMotion) animate(words, { opacity: [0, 1] }, { duration: 0.25 });
+					});
 				});
 			}
 
@@ -393,8 +416,10 @@ export function initAiFaq(root = document, { signal } = {}) {
 				link.href = `${config.handoffPath}?notes=${encodeURIComponent(asked)}`;
 				link.textContent = config.handoffLink;
 				link.addEventListener("click", () => track("ai_faq_handoff"));
-				text.textContent = `${message} `;
-				text.append(link, ".");
+				resize(() => {
+					text.textContent = `${message} `;
+					text.append(link, ".");
+				});
 				rise(text);
 			}
 
@@ -417,7 +442,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 					link.textContent = page.title;
 					from.append(...(index ? [", ", link] : [link]));
 				});
-				body.append(from);
+				resize(() => body.append(from));
 				rise(from);
 			}
 

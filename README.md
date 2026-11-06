@@ -255,8 +255,8 @@ the site.
 | `worker/src/index.js`           | The routes, the visitor checks and the order an answer runs in.   |
 | `worker/src/answer.js`          | The prompt, Terra's answer, the found and cited pages.            |
 | `worker/src/events.js`          | Server-sent events in from the model and out to the page.         |
-| `worker/src/log.js`             | The D1 question log and Monday's Slack digest.                    |
-| `worker/wrangler.jsonc`         | Bindings, the route, the rate limit, the cron and the model.      |
+| `worker/src/log.js`             | The D1 question log and the Slack message for each question.      |
+| `worker/wrangler.jsonc`         | Bindings, the route, the rate limit and the model.                |
 | `worker/schema.sql`             | The `questions` table.                                            |
 | `worker/scripts/index-staging.mjs` | Sends staging's pages to AI Search until it crawls the live site. |
 

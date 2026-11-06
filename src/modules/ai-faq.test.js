@@ -46,6 +46,7 @@ describe("initAiFaq", () => {
 		vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
 		// jsdom has no layout, so no scrollIntoView or IntersectionObserver.
 		Element.prototype.scrollIntoView = vi.fn();
+		Element.prototype.animate = vi.fn();
 		vi.stubGlobal("IntersectionObserver", class { observe() {} disconnect() {} });
 		document.body.innerHTML = markup;
 	});

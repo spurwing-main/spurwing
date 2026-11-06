@@ -15,11 +15,11 @@
  *   error    { message }        something failed; the page offers the team instead
  *   done     {}
  *
- * Every question is logged to D1 for Monday's digest in #spurwing-faq-alert.
+ * Every question is logged to D1 and sent to #spurwing-faq-alert as it's asked.
  */
 import { links, pagesFrom, relay, startAnswer } from "./answer.js";
 import { eventStream } from "./events.js";
-import { digest, record } from "./log.js";
+import { record } from "./log.js";
 
 const MAX_QUESTION = 300;
 // The page sends its last two questions and answers, so a follow-up has context.
@@ -35,15 +35,9 @@ export default {
 		if (request.method !== "POST") return notFound(cors);
 		if (pathname === "/ask") return ask(request, env, ctx, cors);
 
-		// Two routes for us, locked by INDEX_KEY. Without the key they don't exist.
-		if (!unlocked(request, env)) return notFound(cors);
-		if (pathname === "/index") return indexPage(request, env);
-		if (pathname === "/digest") return digestNow(env);
+		// Ours alone, locked by INDEX_KEY. Without the key it doesn't exist.
+		if (pathname === "/index" && unlocked(request, env)) return indexPage(request, env);
 		return notFound(cors);
-	},
-
-	scheduled(controller, env, ctx) {
-		ctx.waitUntil(digest(env));
 	},
 };
 
@@ -154,12 +148,6 @@ async function indexPage(request, env) {
 	const { key, html, url, title } = await request.json();
 	const item = await env.AI_SEARCH.items.upload(key, html, { metadata: { url, title } });
 	return Response.json({ key, id: item?.id ?? null });
-}
-
-/** Post the weekly digest now, to check Slack without waiting for Monday. */
-async function digestNow(env) {
-	const status = await digest(env);
-	return Response.json({ posted: status === 200, status });
 }
 
 function json(data, status, headers) {

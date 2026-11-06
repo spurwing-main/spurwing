@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { citedPages, pagesFrom, relay, SYSTEM_PROMPT } from "./answer.js";
 import worker from "./index.js";
-import { digestText } from "./log.js";
+import { alertText } from "./log.js";
 
 const ORIGIN = "https://spurwing.webflow.io";
 
@@ -141,16 +141,22 @@ describe("worker fetch", () => {
 		expect(upload).toHaveBeenCalledWith("faq.html", "<p>Hi</p>", { metadata: { url: "https://www.spurwing.co.uk/faq", title: "Webflow FAQs" } });
 	});
 
-	it("only posts the digest on demand with the right index key", async () => {
+	it("logs each question and tells Slack as it's asked, without contact details", async () => {
 		const fetch = vi.fn(async () => new Response("ok"));
 		vi.stubGlobal("fetch", fetch);
-		const bindings = env({ INDEX_KEY: "k", SLACK_WEBHOOK_URL: "https://hooks.slack.test/x" });
-		const post = (key) => new Request("https://ask.spurwing.co.uk/digest", { method: "POST", headers: { "x-index-key": key } });
+		const run = vi.fn(async () => {});
+		const bind = vi.fn(() => ({ run }));
+		const waits = [];
+		const bindings = env({ SLACK_WEBHOOK_URL: "https://hooks.slack.test/x", DB: { prepare: vi.fn(() => ({ bind })) } });
 
-		expect((await worker.fetch(post("wrong"), bindings, ctx)).status).toBe(404);
-		expect(fetch).not.toHaveBeenCalled();
-		expect(await (await worker.fetch(post("k"), bindings, ctx)).json()).toEqual({ posted: true, status: 200 });
-		expect(JSON.parse(fetch.mock.calls[0][1].body).text).toBe("No questions asked on the website's FAQ this week.");
+		await collect((await worker.fetch(ask({ question: "Call me on 07700 900123 about a quote?", page: "/faq" }), bindings, { waitUntil: (p) => waits.push(p) })).body);
+		await Promise.all(waits);
+
+		expect(bind.mock.calls[0][2]).toBe("[removed: contained contact details]");
+		expect(fetch).toHaveBeenCalledOnce();
+		const { text } = JSON.parse(fetch.mock.calls[0][1].body);
+		expect(text).toContain("*New FAQ question* on /faq");
+		expect(text).not.toContain("07700");
 		vi.unstubAllGlobals();
 	});
 
@@ -224,16 +230,30 @@ describe("citedPages", () => {
 	});
 });
 
-describe("digestText", () => {
-	it("lists the most asked and the unanswered questions", () => {
-		const text = digestText([
-			{ question: "How much?", answered: 1 },
-			{ question: "How much?", answered: 1 },
-			{ question: "Do you build apps?", answered: 0 },
-		]);
+describe("alertText", () => {
+	it("shows the question, the answer and its pages", () => {
+		const text = alertText({
+			question: "Have you worked with hotels?",
+			page: "/webflow-agency",
+			answered: true,
+			answer: "Yes, Aethos Hotels.",
+			sources: [{ title: "Aethos Hotels", url: "https://www.spurwing.co.uk/work/aethos-hotels" }],
+		});
 
-		expect(text).toContain("FAQ questions this week: 3* (2 answered)");
-		expect(text).toContain("• How much? (2)");
-		expect(text).toContain("• Do you build apps?");
+		expect(text).toBe(
+			[
+				"*New FAQ question* on /webflow-agency",
+				">Have you worked with hotels?",
+				"Answered: Yes, Aethos Hotels.",
+				"From: <https://www.spurwing.co.uk/work/aethos-hotels|Aethos Hotels>",
+			].join("\n"),
+		);
+	});
+
+	it("says when it handed off, and never lets the visitor ping the channel", () => {
+		const text = alertText({ question: "<!channel> <https://evil.example|click> & go", page: "/", answered: false, answer: "", sources: [] });
+
+		expect(text).toContain(">&lt;!channel&gt; &lt;https://evil.example|click&gt; &amp; go");
+		expect(text).toContain("Couldn't answer from the site; offered the discovery call.");
 	});
 });

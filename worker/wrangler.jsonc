@@ -15,8 +15,6 @@
 	"d1_databases": [{ "binding": "DB", "database_name": "spurwing-faq", "database_id": "93e6f900-ced5-43ad-acea-dae8e906ae9b" }],
 	// Per visitor: 5 questions a minute. Approximate by design, which is enough to stop abuse.
 	"ratelimits": [{ "name": "RATE_LIMIT", "namespace_id": "1101", "simple": { "limit": 5, "period": 60 } }],
-	// Monday 08:00 UTC: the week's digest to #spurwing-faq-alert.
-	"triggers": { "crons": ["0 8 * * 1"] },
 	"vars": {
 		"MODEL": "openai/gpt-6.1-terra",
 		"REASONING_EFFORT": "none",
