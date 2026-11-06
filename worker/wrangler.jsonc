@@ -21,5 +21,5 @@
 		"GATEWAY": "spurwing",
 		"ALLOWED_ORIGINS": "https://www.spurwing.co.uk,https://spurwing.co.uk,https://spurwing.webflow.io"
 	}
-	// Secrets, set with `wrangler secret put`: TURNSTILE_SECRET, SLACK_WEBHOOK_URL, INDEX_KEY.
+	// Secrets, set with `wrangler secret put`: TURNSTILE_SECRET, SLACK_WEBHOOK_URL, SHEET_WEBHOOK_URL, INDEX_KEY.
 }

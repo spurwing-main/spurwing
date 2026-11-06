@@ -160,6 +160,23 @@ describe("worker fetch", () => {
 		vi.unstubAllGlobals();
 	});
 
+	it("adds each question to the Google Sheet with its time and page, once the sheet is set", async () => {
+		const fetch = vi.fn(async () => new Response("ok"));
+		vi.stubGlobal("fetch", fetch);
+		const waits = [];
+		const bindings = env({ SHEET_WEBHOOK_URL: "https://script.google.test/exec?key=k" });
+
+		await collect((await worker.fetch(ask({ question: "How do you work?", page: "/approach" }), bindings, { waitUntil: (p) => waits.push(p) })).body);
+		await Promise.all(waits);
+
+		const [url, init] = fetch.mock.calls[0];
+		expect(url).toBe("https://script.google.test/exec?key=k");
+		const row = JSON.parse(init.body);
+		expect(row).toMatchObject({ page: "/approach", question: "How do you work?", answered: true, sources: "https://www.spurwing.co.uk/approach" });
+		expect(new Date(row.askedAt).toISOString()).toBe(row.askedAt);
+		vi.unstubAllGlobals();
+	});
+
 	it("answers the browser's preflight", async () => {
 		const response = await worker.fetch(new Request("https://ask.spurwing.co.uk/ask", { method: "OPTIONS", headers: { origin: ORIGIN } }), env(), ctx);
 
