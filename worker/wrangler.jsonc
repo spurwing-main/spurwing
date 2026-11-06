@@ -1,0 +1,23 @@
+{
+	// ask.spurwing.co.uk: answers the FAQ lists' "Ask your own question" box.
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "spurwing-ask",
+	"account_id": "032e5f9e7e67211a4e2fba8efc6a334d",
+	"main": "src/index.js",
+	"compatibility_date": "2026-11-01",
+	"workers_dev": true,
+	"routes": [{ "pattern": "ask.spurwing.co.uk", "custom_domain": true }],
+	"ai": { "binding": "AI" },
+	"ai_search": [{ "binding": "AI_SEARCH", "instance_name": "spurwing-faq" }],
+	// The question log (schema.sql).
+	"d1_databases": [{ "binding": "DB", "database_name": "spurwing-faq", "database_id": "93e6f900-ced5-43ad-acea-dae8e906ae9b" }],
+	// Per visitor: 5 questions a minute. Approximate by design, which is enough to stop abuse.
+	"ratelimits": [{ "name": "RATE_LIMIT", "namespace_id": "1101", "simple": { "limit": 5, "period": 60 } }],
+	// Monday 08:00 UTC: the week's digest to #spurwing-faq-alert.
+	"triggers": { "crons": ["0 8 * * 1"] },
+	"vars": {
+		"MODEL": "openai/gpt-6.1-terra",
+		"ALLOWED_ORIGINS": "https://www.spurwing.co.uk,https://spurwing.co.uk,https://spurwing.webflow.io"
+	}
+	// Secrets, set with `wrangler secret put`: TURNSTILE_SECRET, SLACK_WEBHOOK_URL.
+}
