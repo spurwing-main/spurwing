@@ -40,6 +40,7 @@ export default {
 
 		if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
 		if (new URL(request.url).pathname === "/index") return indexPage(request, env);
+		if (new URL(request.url).pathname === "/digest") return digestNow(request, env);
 		if (request.method !== "POST" || new URL(request.url).pathname !== "/ask") {
 			return new Response("Not found", { status: 404, headers: cors });
 		}
@@ -128,6 +129,15 @@ async function indexPage(request, env) {
 	const { key, html, url, title } = await request.json();
 	const item = await env.AI_SEARCH.items.upload(key, html, { metadata: { url, title } });
 	return Response.json({ key, id: item?.id ?? null });
+}
+
+/** Post the weekly digest now, to check Slack without waiting for Monday. Locked like /index. */
+async function digestNow(request, env) {
+	if (!env.INDEX_KEY || request.method !== "POST" || request.headers.get("x-index-key") !== env.INDEX_KEY) {
+		return new Response("Not found", { status: 404 });
+	}
+	const status = await digest(env);
+	return Response.json({ posted: status === 200, status });
 }
 
 /**
@@ -395,11 +405,12 @@ export async function digest(env) {
 		.bind(since)
 		.all();
 
-	await fetch(env.SLACK_WEBHOOK_URL, {
+	const response = await fetch(env.SLACK_WEBHOOK_URL, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
 		body: JSON.stringify({ text: digestText(results) }),
 	});
+	return response.status;
 }
 
 export function digestText(rows) {

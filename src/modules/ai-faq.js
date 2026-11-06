@@ -81,6 +81,13 @@ export function initAiFaq(root = document, { signal } = {}) {
 		// Webflow drops an empty `hidden` attribute on publish, so say it here too.
 		another.hidden = true;
 
+		// The ask box reveals with the site's scroll animation (data-anim on it in
+		// the Designer). Its turn comes after the cards above it, the way each card
+		// follows the one before.
+		const wrap = component.parentElement;
+		const cardsAbove = wrap ? wrap.querySelectorAll(".w-dyn-item, .faqs-new_extra > *").length : 0;
+		component.style.setProperty("--anim-i", String(Math.min(cardsAbove, 6)));
+
 		const fit = () => {
 			input.style.height = "auto";
 			input.style.height = `${input.scrollHeight}px`;
@@ -106,6 +113,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		another.addEventListener("click", () => {
 			another.hidden = true;
 			ask.hidden = false;
+			fit();
 			rise(ask);
 			input.focus({ preventScroll: true });
 			ask.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
@@ -131,8 +139,10 @@ export function initAiFaq(root = document, { signal } = {}) {
 			ask.before(card.element);
 			ask.hidden = true;
 			rise(card.element);
+			// Measured while hidden, the box would collapse to nothing and come
+			// back unusable; clear the size and measure again when it returns.
 			input.value = "";
-			fit();
+			input.style.height = "";
 
 			const answer = await stream(question, card);
 
@@ -273,13 +283,13 @@ export function initAiFaq(root = document, { signal } = {}) {
 			if (reduceMotion || shimmer) return;
 			Object.assign(text.style, {
 				backgroundImage:
-					"linear-gradient(90deg, var(--_color---grey-700) 40%, var(--_color---grey-950) 50%, var(--_color---grey-700) 60%)",
-				backgroundSize: "250% 100%",
+					"linear-gradient(90deg, var(--_color---grey-500) 0%, var(--_color---grey-500) 38%, var(--_color---grey-950) 50%, var(--_color---grey-500) 62%, var(--_color---grey-500) 100%)",
+				backgroundSize: "300% 100%",
 				backgroundClip: "text",
 				webkitBackgroundClip: "text",
 				color: "transparent",
 			});
-			shimmer = animate(text, { backgroundPosition: ["100% 0", "-50% 0"] }, { duration: 1.6, ease: "linear", repeat: Infinity });
+			shimmer = animate(text, { backgroundPosition: ["100% 0", "0% 0"] }, { duration: 1.2, ease: "linear", repeat: Infinity });
 		}
 
 		function stopShimmer() {

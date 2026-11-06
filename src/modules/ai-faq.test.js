@@ -156,6 +156,18 @@ describe("initAiFaq", () => {
 		]);
 	});
 
+	it("brings the text box back usable: never sized while hidden", async () => {
+		respondWith(sse([["token", "Yes."]]));
+		initAiFaq();
+		const input = $('[data-ai-faq="input"]');
+
+		ask("Do you offer training?");
+		await settled();
+
+		expect(input.style.height).toBe("");
+		expect(input.value).toBe("");
+	});
+
 	it("brings the ask card back for another question", async () => {
 		respondWith(sse([["token", "Yes."]]));
 		initAiFaq();
