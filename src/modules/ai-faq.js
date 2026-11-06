@@ -38,7 +38,7 @@ export const config = {
 	turnstileSiteKey: "0x4AAAAAAF2LSWTlSOLzJuaH",
 	stages: ["Reading the site…", "Checking {n} pages…", "Writing an answer…"],
 	// Each stage stays at least this long, so a fast answer doesn't flicker.
-	minStageMs: 600,
+	minStageMs: 300,
 	timeoutMs: 15000,
 	// Earlier questions and answers sent along, so a follow-up has its context.
 	historyTurns: 2,
@@ -81,17 +81,54 @@ export function initAiFaq(root = document, { signal } = {}) {
 		// Webflow drops an empty `hidden` attribute on publish, so say it here too.
 		another.hidden = true;
 
-		// The ask box reveals with the site's scroll animation (data-anim on it in
-		// the Designer). Its turn comes after the cards above it, the way each card
-		// follows the one before.
+		// The ask card reveals with the site's scroll animation, like the FAQ
+		// cards, on the next turn after the cards above it. The site's rule sets
+		// --anim-i on every data-anim element, so the turn goes on the card itself.
+		// The sparkle sits outside the card, where the reveal's mask would hide
+		// it, so it fades in alongside instead.
+		const card = input.closest(".faq-card");
 		const wrap = component.parentElement;
-		const cardsAbove = wrap ? wrap.querySelectorAll(".w-dyn-item, .faqs-new_extra > *").length : 0;
-		component.style.setProperty("--anim-i", String(Math.min(cardsAbove, 6)));
+		const turn = Math.min(wrap ? wrap.querySelectorAll(".w-dyn-item, .faqs-new_extra > *").length : 0, 6);
+		if (card && !card.hasAttribute("data-anim")) card.setAttribute("data-anim", "card");
+		card?.style.setProperty("--anim-i", String(turn));
+		revealSparkleWith(card, turn);
+
+		// Vouch for the visitor before they ask, not after.
+		const near = new IntersectionObserver(
+			([entry]) => {
+				if (!entry.isIntersecting) return;
+				near.disconnect();
+				prepareToken();
+			},
+			{ rootMargin: "600px 0px" },
+		);
+		near.observe(component);
+		signal?.addEventListener("abort", () => near.disconnect());
+		input.addEventListener("focus", prepareToken);
 
 		const fit = () => {
 			input.style.height = "auto";
 			input.style.height = `${input.scrollHeight}px`;
 		};
+
+		// Hidden until the card's reveal starts, then faded in on the same beat.
+		// Without the site's scroll animation (reduced motion, or its safety net
+		// switched it off) the sparkle is simply there.
+		function revealSparkleWith(card, turn) {
+			const html = document.documentElement;
+			if (!sparkle || !card || reduceMotion || !html.hasAttribute("data-anim-ready")) return;
+			sparkle.style.opacity = "0";
+			const show = () => {
+				watch.disconnect();
+				animate(sparkle, { opacity: 1, scale: [0.6, 1] }, { duration: 0.5, delay: turn * 0.06 + 0.2, ease: EASE });
+			};
+			const watch = new MutationObserver(() => {
+				if (card.getAttribute("data-anim-state") === "in" || html.hasAttribute("data-anim-panic")) show();
+			});
+			watch.observe(card, { attributes: true, attributeFilter: ["data-anim-state"] });
+			watch.observe(html, { attributes: true, attributeFilter: ["data-anim-panic"] });
+			signal?.addEventListener("abort", () => watch.disconnect());
+		}
 
 		const showSparkle = (visible) => {
 			if (!sparkle) return;
@@ -155,6 +192,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			}
 
 			if (signal?.aborted) return;
+			prepareToken();
 			another.hidden = false;
 			rise(another);
 		}
@@ -404,10 +442,31 @@ function track(name) {
 }
 
 let turnstile;
+let ready = null;
+
+// Turnstile takes about two seconds to vouch for a visitor. It starts as the
+// box comes near the screen and again after each question, so a token is
+// waiting by the time anyone presses Enter. Tokens are single-use and last five
+// minutes; an older one is fetched again.
+const TOKEN_LIFE_MS = 4 * 60 * 1000;
+
+export function prepareToken() {
+	if (!config.turnstileSiteKey) return;
+	if (ready && Date.now() - ready.at < TOKEN_LIFE_MS) return;
+	const token = fetchToken();
+	token.catch(() => {});
+	ready = { token, at: Date.now() };
+}
 
 function turnstileToken() {
 	if (!config.turnstileSiteKey) return Promise.resolve("");
+	prepareToken();
+	const { token } = ready;
+	ready = null;
+	return token;
+}
 
+function fetchToken() {
 	turnstile ??= new Promise((resolve, reject) => {
 		const script = document.createElement("script");
 		script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";

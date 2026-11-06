@@ -107,7 +107,9 @@ describe("worker fetch", () => {
 		const bindings = env({ AI: { run: vi.fn(async (name) => (name.startsWith("@cf/meta/llama-guard") ? { response: "unsafe\nS1" } : upstream([delta("Never sent."), done]))) } });
 		const response = await worker.fetch(ask({ question: "Something harmful" }), bindings, ctx);
 
-		expect(await collect(response.body)).toEqual([["handoff", { message: "I couldn't find that on our site." }]]);
+		const sent = await collect(response.body);
+		expect(sent.at(-1)).toEqual(["handoff", { message: "I couldn't find that on our site." }]);
+		expect(sent.some(([event]) => event === "token")).toBe(false);
 	});
 
 	it("sends an error event, not a 500, when AI Search fails", async () => {

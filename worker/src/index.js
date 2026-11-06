@@ -79,20 +79,16 @@ export default {
 		});
 
 		return events(cors, async (send) => {
-			const [isSafe, results] = await Promise.all([safe, found]);
-			if (!isSafe) {
-				send("handoff", { message: HANDOFF });
-				log({ answered: false, answer: "", sources: [] });
-				return;
-			}
-
-			const pages = pagesFrom(chunksOf(results));
+			// The pages go out as soon as the search returns, and Terra starts
+			// writing straight away; the question check only has to finish before
+			// the first word is shown.
+			const pages = pagesFrom(chunksOf(await found));
 			send("sources", pages.map(({ title, url }) => ({ title, url })));
 
 			// AI Search finds the pages; the answer is written here so GPT-6.1 Terra
 			// can run without reasoning, which took its first word from about five
 			// seconds to well under two. The gateway uses the "default" OpenAI key.
-			const upstream = await env.AI.run(
+			const answering = env.AI.run(
 				env.MODEL,
 				{
 					messages: [
@@ -106,6 +102,15 @@ export default {
 				},
 				{ gateway: { id: env.GATEWAY, metadata: { page: input.page } } },
 			);
+
+			if (!(await safe)) {
+				answering.then((stream) => (stream?.cancel ? stream.cancel() : stream?.body?.cancel())).catch(() => {});
+				send("handoff", { message: HANDOFF });
+				log({ answered: false, answer: "", sources: [] });
+				return;
+			}
+
+			const upstream = await answering;
 			const result = await relay(upstream instanceof Response ? upstream.body : upstream, send, pages);
 			log(result);
 		});

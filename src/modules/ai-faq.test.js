@@ -44,8 +44,9 @@ describe("initAiFaq", () => {
 		config.turnstileSiteKey = "";
 		motion.animate.mockReset().mockReturnValue({ stop: vi.fn() });
 		vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
-		// jsdom has no layout, so no scrollIntoView.
+		// jsdom has no layout, so no scrollIntoView or IntersectionObserver.
 		Element.prototype.scrollIntoView = vi.fn();
+		vi.stubGlobal("IntersectionObserver", class { observe() {} disconnect() {} });
 		document.body.innerHTML = markup;
 	});
 
@@ -76,6 +77,45 @@ describe("initAiFaq", () => {
 		expect(card.hasAttribute("aria-busy")).toBe(false);
 		expect($('[data-ai-faq="ask"]').hidden).toBe(true);
 		expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ question: "How many people work at Spurwing?", history: [] });
+	});
+
+	it("fetches the Turnstile token on focus and uses it when the question is sent", async () => {
+		config.turnstileSiteKey = "site-key";
+		let issued = 0;
+		const render = vi.fn((holder, options) => options.callback(`token-${++issued}`));
+		vi.stubGlobal("turnstile", { render });
+		const append = HTMLHeadElement.prototype.append;
+		vi.spyOn(HTMLHeadElement.prototype, "append").mockImplementation(function (script) {
+			if (script.src?.includes("turnstile")) return queueMicrotask(() => script.onload());
+			return append.call(this, script);
+		});
+		const fetch = respondWith(sse([["token", "Yes."]]));
+		initAiFaq();
+
+		$('[data-ai-faq="input"]').dispatchEvent(new Event("focus"));
+		await vi.waitFor(() => expect(render).toHaveBeenCalledOnce());
+		ask("Hi?");
+		await settled();
+
+		expect(JSON.parse(fetch.mock.calls[0][1].body).token).toBe("token-1");
+		// …and the next question's token is already on its way.
+		expect(render).toHaveBeenCalledTimes(2);
+	});
+
+	it("reveals the ask card with the FAQ cards and fades the sparkle in with it", async () => {
+		document.documentElement.setAttribute("data-anim-ready", "");
+		initAiFaq();
+		const card = $(".faq-card");
+		const sparkle = $('[data-ai-faq="sparkle"]');
+
+		expect(card.getAttribute("data-anim")).toBe("card");
+		expect(sparkle.style.opacity).toBe("0");
+
+		card.setAttribute("data-anim-state", "in");
+		await vi.waitFor(() =>
+			expect(motion.animate).toHaveBeenCalledWith(sparkle, { opacity: 1, scale: [0.6, 1] }, expect.objectContaining({ duration: 0.5 })),
+		);
+		document.documentElement.removeAttribute("data-anim-ready");
 	});
 
 	it("hides Ask another question until there is an answer", () => {
