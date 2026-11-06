@@ -17,6 +17,8 @@
 	"triggers": { "crons": ["0 8 * * 1"] },
 	"vars": {
 		"MODEL": "openai/gpt-6.1-terra",
+		"REASONING_EFFORT": "none",
+		"GATEWAY": "spurwing",
 		"ALLOWED_ORIGINS": "https://www.spurwing.co.uk,https://spurwing.co.uk,https://spurwing.webflow.io"
 	}
 	// Secrets, set with `wrangler secret put`: TURNSTILE_SECRET, SLACK_WEBHOOK_URL.

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 
-import worker, { digestText, pagesFrom, relay, SYSTEM_PROMPT } from "./index.js";
+import worker, { citedPages, digestText, pagesFrom, relay, SYSTEM_PROMPT } from "./index.js";
 
 const ORIGIN = "https://spurwing.webflow.io";
 
@@ -30,16 +30,25 @@ async function collect(stream) {
 		});
 }
 
+function model(parts) {
+	return vi.fn(async (name) => (name.startsWith("@cf/meta/llama-guard") ? { response: "safe" } : upstream(parts)));
+}
+
 function env(overrides = {}) {
 	return {
 		ALLOWED_ORIGINS: `${ORIGIN},https://www.spurwing.co.uk`,
 		MODEL: "openai/gpt-6.1-terra",
+		REASONING_EFFORT: "none",
+		GATEWAY: "spurwing",
 		RATE_LIMIT: { limit: vi.fn(async () => ({ success: true })) },
-		AI: { run: vi.fn(async () => ({ response: "safe" })) },
+		AI: { run: model([delta("We work "), delta("in clear stages, from discovery to launch."), done]) },
 		AI_SEARCH: {
-			chatCompletions: vi.fn(async () =>
-				upstream([chunks([{ item: { key: "approach.html", metadata: {} } }]), delta("We work "), delta("in stages."), done]),
-			),
+			search: vi.fn(async () => ({
+				chunks: [
+					{ item: { key: "approach.html", metadata: {} }, text: "We work in clear stages: discovery, design, build and launch." },
+					{ item: { key: "contact.html", metadata: {} }, text: "Email hello@spurwing.co.uk to start." },
+				],
+			})),
 		},
 		DB: { prepare: vi.fn(() => ({ bind: () => ({ run: async () => {}, all: async () => ({ results: [] }) }) })) },
 		...overrides,
@@ -57,22 +66,32 @@ function ask(body, headers = {}) {
 }
 
 describe("worker fetch", () => {
-	it("streams the pages, then the answer, from AI Search with the answer rules", async () => {
+	it("streams the pages from AI Search, then Terra's answer written from them without reasoning", async () => {
 		const bindings = env();
 		const response = await worker.fetch(ask({ question: "How do you work?", history: [], page: "/faq" }), bindings, ctx);
 
 		expect(response.headers.get("access-control-allow-origin")).toBe(ORIGIN);
 		expect(await collect(response.body)).toEqual([
-			["sources", [{ title: "Approach", url: "https://www.spurwing.co.uk/approach" }]],
+			[
+				"sources",
+				[
+					{ title: "Approach", url: "https://www.spurwing.co.uk/approach" },
+					{ title: "Contact", url: "https://www.spurwing.co.uk/contact" },
+				],
+			],
 			["token", "We work "],
-			["token", "in stages."],
+			["token", "in clear stages, from discovery to launch."],
+			["cited", [{ title: "Approach", url: "https://www.spurwing.co.uk/approach" }]],
 			["done", {}],
 		]);
 
-		const call = bindings.AI_SEARCH.chatCompletions.mock.calls[0][0];
-		expect(call.messages[0]).toEqual({ role: "system", content: SYSTEM_PROMPT });
-		expect(call.messages.at(-1)).toEqual({ role: "user", content: "How do you work?" });
-		expect(call).toMatchObject({ model: "openai/gpt-6.1-terra", stream: true });
+		const [name, input, options] = bindings.AI.run.mock.calls.find(([called]) => called === "openai/gpt-6.1-terra");
+		expect(input.messages[0].content).toContain(SYSTEM_PROMPT);
+		expect(input.messages[0].content).toContain("## Approach (https://www.spurwing.co.uk/approach)");
+		expect(input.messages.at(-1)).toEqual({ role: "user", content: "How do you work?" });
+		expect(input).toMatchObject({ stream: true, reasoning_effort: "none" });
+		expect(options).toMatchObject({ gateway: { id: "spurwing" } });
+		expect(name).toBe("openai/gpt-6.1-terra");
 	});
 
 	it("refuses other sites, bad input and a visitor over the limit", async () => {
@@ -84,17 +103,16 @@ describe("worker fetch", () => {
 		expect((await worker.fetch(ask({ question: "Hi" }), limited, ctx)).status).toBe(429);
 	});
 
-	it("hands off a question Llama Guard flags, without asking AI Search", async () => {
-		const bindings = env({ AI: { run: async () => ({ response: "unsafe\nS1" }) } });
+	it("hands off a question Llama Guard flags, sending none of the answer", async () => {
+		const bindings = env({ AI: { run: vi.fn(async (name) => (name.startsWith("@cf/meta/llama-guard") ? { response: "unsafe\nS1" } : upstream([delta("Never sent."), done]))) } });
 		const response = await worker.fetch(ask({ question: "Something harmful" }), bindings, ctx);
 
 		expect(await collect(response.body)).toEqual([["handoff", { message: "I couldn't find that on our site." }]]);
-		expect(bindings.AI_SEARCH.chatCompletions).not.toHaveBeenCalled();
 	});
 
 	it("sends an error event, not a 500, when AI Search fails", async () => {
 		vi.spyOn(console, "error").mockImplementation(() => {});
-		const bindings = env({ AI_SEARCH: { chatCompletions: async () => Promise.reject(new Error("AiSearchError: Internal Error")) } });
+		const bindings = env({ AI_SEARCH: { search: async () => Promise.reject(new Error("AiSearchError: Internal Error")) } });
 		const response = await worker.fetch(ask({ question: "Where are you based?" }), bindings, ctx);
 
 		expect(response.status).toBe(200);
@@ -164,19 +182,31 @@ describe("relay", () => {
 });
 
 describe("pagesFrom", () => {
-	it("gives each page once, with live URLs and titles, best three first", () => {
+	it("gives each page once, with live URLs and short titles, keeping all its text", () => {
 		const pages = pagesFrom([
-			{ item: { key: "work__roam-charging.html", metadata: { title: "Roam Charging" } } },
-			{ item: { key: "work__roam-charging.html", metadata: {} } },
-			{ item: { key: "index.html", metadata: {} } },
-			{ item: { key: "https://www.spurwing.co.uk/faq", metadata: {} } },
-			{ item: { key: "about.html", metadata: {} } },
+			{ item: { key: "work__roam-charging.html", metadata: { title: "Roam Charging | Case study" } }, text: "A" },
+			{ item: { key: "work__roam-charging.html", metadata: {} }, text: "B" },
+			{ item: { key: "index.html", metadata: {} }, text: "C" },
+			{ item: { key: "https://www.spurwing.co.uk/faq", metadata: {} }, text: "D" },
 		]);
 
 		expect(pages).toEqual([
-			{ title: "Roam Charging", url: "https://www.spurwing.co.uk/work/roam-charging" },
-			{ title: "Home", url: "https://www.spurwing.co.uk" },
-			{ title: "Faq", url: "https://www.spurwing.co.uk/faq" },
+			{ title: "Roam Charging", url: "https://www.spurwing.co.uk/work/roam-charging", text: "A\nB" },
+			{ title: "Home", url: "https://www.spurwing.co.uk", text: "C" },
+			{ title: "Faq", url: "https://www.spurwing.co.uk/faq", text: "D" },
+		]);
+	});
+});
+
+describe("citedPages", () => {
+	it("cites the pages the answer drew on, not the ones search ranked first", () => {
+		const pages = [
+			{ title: "Discovery call", url: "/discovery-call", text: "Book a thirty minute call about your website plans." },
+			{ title: "Aethos Hotels", url: "/work/aethos-hotels", text: "Aethos Hotels: eight WordPress sites brought into one Webflow site with booking integrations." },
+		];
+
+		expect(citedPages(pages, "Yes, we worked with Aethos Hotels to bring eight WordPress sites into one, with booking integrations.")).toEqual([
+			{ title: "Aethos Hotels", url: "/work/aethos-hotels" },
 		]);
 	});
 });

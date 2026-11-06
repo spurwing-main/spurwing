@@ -15,7 +15,7 @@ const markup = `
 				<button data-ai-faq="send" type="button"></button>
 			</div></div>
 		</div>
-		<button data-ai-faq="another" type="button" hidden></button>
+		<button data-ai-faq="another" type="button"><svg></svg></button>
 	</div>
 `;
 
@@ -44,6 +44,8 @@ describe("initAiFaq", () => {
 		config.turnstileSiteKey = "";
 		motion.animate.mockReset().mockReturnValue({ stop: vi.fn() });
 		vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+		// jsdom has no layout, so no scrollIntoView.
+		Element.prototype.scrollIntoView = vi.fn();
 		document.body.innerHTML = markup;
 	});
 
@@ -74,6 +76,34 @@ describe("initAiFaq", () => {
 		expect(card.hasAttribute("aria-busy")).toBe(false);
 		expect($('[data-ai-faq="ask"]').hidden).toBe(true);
 		expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ question: "How many people work at Spurwing?", history: [] });
+	});
+
+	it("hides Ask another question until there is an answer", () => {
+		initAiFaq();
+
+		expect($('[data-ai-faq="another"]').hidden).toBe(true);
+	});
+
+	it("cites the pages the finished answer drew on, and keeps paragraphs", async () => {
+		respondWith(
+			sse([
+				["sources", [{ title: "Discovery call", url: "/discovery-call" }, { title: "Aethos Hotels", url: "/work/aethos-hotels" }]],
+				["token", "Yes, Aethos Hotels.\n\nWe brought eight sites into one."],
+				["cited", [{ title: "Aethos Hotels", url: "/work/aethos-hotels" }]],
+				["done", {}],
+			]),
+		);
+		initAiFaq();
+
+		ask("Have you worked with any hotels?");
+		await settled();
+
+		const card = $('[data-ai-faq="answer"]');
+		expect([...card.querySelectorAll(".rich-text p")].map((p) => p.textContent)).toEqual([
+			"Yes, Aethos Hotels.",
+			"We brought eight sites into one.",
+			"From: Aethos Hotels",
+		]);
 	});
 
 	it("is never marked up as a published FAQ or an accordion item", async () => {

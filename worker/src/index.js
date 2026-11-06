@@ -3,12 +3,13 @@
  *
  * The browser (src/modules/ai-faq.js) posts { question, history, page, token }.
  * This Worker checks the visitor (Turnstile, a per-visitor rate limit), screens
- * the question (Llama Guard), then asks AI Search, which finds the matching
- * pages of spurwing.co.uk and writes the answer through the AI Gateway with
- * OpenAI. It streams the result back as server-sent events:
+ * the question (Llama Guard), asks AI Search for the matching pages of
+ * spurwing.co.uk, then has OpenAI write the answer from them through the AI
+ * Gateway. It streams the result back as server-sent events:
  *
  *   sources  [{ title, url }]   the pages AI Search found, before any words
  *   token    "text"             the next piece of the answer
+ *   cited    [{ title, url }]   the pages the finished answer drew on
  *   handoff  { message }        the site doesn't answer it
  *   error    { message }        it couldn't answer at all
  *   done     {}
@@ -29,7 +30,7 @@ export const SYSTEM_PROMPT = [
 const NO_ANSWER = "NO_ANSWER";
 const HANDOFF = "I couldn't find that on our site.";
 const MAX_QUESTION = 300;
-const MAX_SOURCES = 3;
+const MAX_SOURCES = 2;
 const CONTACT_DETAILS = /[\w.+-]+@[\w-]+\.[\w.]+|(?:\+?\d[\s-]?){9,}/;
 
 export default {
@@ -58,28 +59,53 @@ export default {
 		const started = Date.now();
 		const log = (entry) => ctx.waitUntil(record(env, { ...input, ...entry, ms: Date.now() - started }));
 
-		if (!(await questionIsSafe(input.question, env))) {
-			log({ answered: false, answer: "", sources: [] });
-			return events(cors, async (send) => send("handoff", { message: HANDOFF }));
-		}
-
 		// Inside the stream, so a failure reaches the visitor as an `error` event,
 		// which the page turns into the hand-off, rather than a bare 500.
+		// The question check runs alongside the search rather than before it; an
+		// unsafe question is handed off before any of the answer is sent.
+		const safe = questionIsSafe(input.question, env);
+		const found = env.AI_SEARCH.search({
+			messages: [{ role: "user", content: input.question }],
+			ai_search_options: {
+				retrieval: { max_num_results: 8, context_expansion: 1, match_threshold: 0.3, keyword_match_mode: "or" },
+				// Reranking orders the pages; its default 0.4 cut-off dropped every
+				// result for "you" questions ("Where are you based?").
+				reranking: { enabled: true, match_threshold: 0 },
+				// Rewriting runs a second model before the search and added seconds;
+				// the looser keyword matching above finds the "you" questions without it.
+				query_rewrite: { enabled: false },
+			},
+		});
+
 		return events(cors, async (send) => {
-			const upstream = await env.AI_SEARCH.chatCompletions({
-				messages: [{ role: "system", content: SYSTEM_PROMPT }, ...input.history, { role: "user", content: input.question }],
-				model: env.MODEL,
-				stream: true,
-				ai_search_options: {
-					retrieval: { max_num_results: 8, context_expansion: 1, match_threshold: 0.3, keyword_match_mode: "or" },
-					query_rewrite: { enabled: true },
-					// Reranking orders the pages; its default 0.4 cut-off dropped every
-					// result for "you" questions ("Where are you based?").
-					reranking: { enabled: true, match_threshold: 0 },
+			const [isSafe, results] = await Promise.all([safe, found]);
+			if (!isSafe) {
+				send("handoff", { message: HANDOFF });
+				log({ answered: false, answer: "", sources: [] });
+				return;
+			}
+
+			const pages = pagesFrom(chunksOf(results));
+			send("sources", pages.map(({ title, url }) => ({ title, url })));
+
+			// AI Search finds the pages; the answer is written here so GPT-6.1 Terra
+			// can run without reasoning, which took its first word from about five
+			// seconds to well under two. The gateway uses the "default" OpenAI key.
+			const upstream = await env.AI.run(
+				env.MODEL,
+				{
+					messages: [
+						{ role: "system", content: `${SYSTEM_PROMPT}\n\nWebsite pages:\n\n${context(pages)}` },
+						...input.history,
+						{ role: "user", content: input.question },
+					],
+					stream: true,
+					reasoning_effort: env.REASONING_EFFORT ?? "none",
+					max_completion_tokens: 400,
 				},
-			});
-			// The docs describe both a ReadableStream and a Response for a streamed answer.
-			const result = await relay(upstream instanceof Response ? upstream.body : upstream, send);
+				{ gateway: { id: env.GATEWAY, metadata: { page: input.page } } },
+			);
+			const result = await relay(upstream instanceof Response ? upstream.body : upstream, send, pages);
 			log(result);
 		});
 	},
@@ -110,8 +136,8 @@ async function indexPage(request, env) {
  * held back until it's clear they aren't NO_ANSWER, so a hand-off never shows
  * a half-written answer first.
  */
-export async function relay(upstream, send) {
-	let pages = [];
+export async function relay(upstream, send, found = []) {
+	let pages = found;
 	let held = "";
 	let answer = "";
 	let decided = false;
@@ -119,7 +145,7 @@ export async function relay(upstream, send) {
 	for await (const { event, data } of readEvents(upstream)) {
 		if (event === "chunks") {
 			pages = pagesFrom(JSON.parse(data));
-			send("sources", pages);
+			send("sources", pages.map(({ title, url }) => ({ title, url })));
 			continue;
 		}
 		if (data === "[DONE]") break;
@@ -149,8 +175,50 @@ export async function relay(upstream, send) {
 		return { answered: false, answer: "", sources: [] };
 	}
 
+	const cited = citedPages(pages, answer);
+	send("cited", cited);
 	send("done", {});
-	return { answered: true, answer, sources: pages };
+	return { answered: true, answer, sources: cited };
+}
+
+// Words too common on this site to say which page an answer came from.
+const COMMON = new Set(
+	"webflow website websites spurwing project projects which their about there would could should where while these those other through including design development support marketing teams".split(" "),
+);
+const wordsOf = (text) => new Set((text.toLowerCase().match(/[a-z][a-z'’-]{4,}/g) ?? []).filter((word) => !COMMON.has(word)));
+
+/**
+ * The pages the answer actually drew on, not just the ones search ranked
+ * highest: each page scores by the distinctive words it shares with the
+ * answer. "Aethos Hotels" in the answer cites the Aethos case study, even when
+ * the search put the discovery call page first.
+ */
+export function citedPages(pages, answer) {
+	const said = wordsOf(answer);
+	const scored = pages
+		.map((page) => ({ page, score: [...wordsOf(page.text ?? "")].filter((word) => said.has(word)).length }))
+		.filter(({ score }) => score >= 2)
+		.sort((a, b) => b.score - a.score);
+	const best = scored[0]?.score ?? 0;
+	return scored
+		.filter(({ score }) => score >= best / 2)
+		.slice(0, MAX_SOURCES)
+		.map(({ page: { title, url } }) => ({ title, url }));
+}
+
+/** AI Search chunks, whether the binding returns `chunks` or the older `data` shape. */
+function chunksOf(results) {
+	if (Array.isArray(results?.chunks)) return results.chunks;
+	return (results?.data ?? []).map((row) => ({
+		item: { key: row.filename, metadata: row.attributes ?? {} },
+		text: (row.content ?? []).map((part) => part.text).join("\n"),
+		score: row.score,
+	}));
+}
+
+/** The pages as the model reads them: title and address, then the text. */
+function context(pages) {
+	return pages.map((page) => `## ${page.title} (${page.url})\n${page.text}`).join("\n\n");
 }
 
 /** One entry per page, best first, with a title and a URL on the live site. */
@@ -158,12 +226,25 @@ export function pagesFrom(chunks) {
 	const seen = new Map();
 	for (const chunk of chunks ?? []) {
 		const key = chunk?.item?.key;
-		if (!key || seen.has(key)) continue;
+		if (!key) continue;
+		if (seen.has(key)) {
+			seen.get(key).text += `\n${chunk.text ?? ""}`;
+			continue;
+		}
 		const meta = chunk.item.metadata ?? {};
 		const path = meta.url ? new URL(meta.url).pathname : pathFromKey(key);
-		seen.set(key, { title: meta.title || titleFromPath(path), url: `https://www.spurwing.co.uk${path === "/" ? "" : path}` });
+		seen.set(key, {
+			title: shortTitle(meta.title || titleFromPath(path)),
+			url: `https://www.spurwing.co.uk${path === "/" ? "" : path}`,
+			text: chunk.text ?? "",
+		});
 	}
-	return [...seen.values()].slice(0, MAX_SOURCES);
+	return [...seen.values()];
+}
+
+// "Webflow Agency UK | Design, Development & Migration" reads as "Webflow Agency UK".
+function shortTitle(title) {
+	return title.split(/\s[|–-]\s/)[0].trim();
 }
 
 // Uploaded pages are keyed like "work__roam-charging.html"; crawled ones by URL.
