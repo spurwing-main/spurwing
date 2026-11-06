@@ -33,9 +33,9 @@ import { claimOnce, requireElement } from "../dom.js";
 
 export const config = {
 	endpoint: "https://ask.spurwing.co.uk/ask",
-	// The invisible Turnstile widget's site key. Questions are sent without a
-	// token until it is set, and the Worker refuses those once it checks them.
-	turnstileSiteKey: "",
+	// The "spurwing-ask" Turnstile widget (invisible, spurwing.co.uk and
+	// spurwing.webflow.io). Public by design; its secret lives only in the Worker.
+	turnstileSiteKey: "0x4AAAAAAF2LSWTlSOLzJuaH",
 	stages: ["Reading the site…", "Checking {n} pages…", "Writing an answer…"],
 	// Each stage stays at least this long, so a fast answer doesn't flicker.
 	minStageMs: 600,
@@ -381,7 +381,6 @@ function turnstileToken() {
 				document.body.append(holder);
 				api.render(holder, {
 					sitekey: config.turnstileSiteKey,
-					size: "invisible",
 					callback: (token) => {
 						holder.remove();
 						resolve(token);

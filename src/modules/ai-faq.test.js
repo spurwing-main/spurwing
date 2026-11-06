@@ -41,6 +41,7 @@ const settled = () => vi.waitFor(() => expect($('[data-ai-faq="another"]').hidde
 describe("initAiFaq", () => {
 	beforeEach(() => {
 		config.minStageMs = 0;
+		config.turnstileSiteKey = "";
 		motion.animate.mockReset().mockReturnValue({ stop: vi.fn() });
 		vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
 		document.body.innerHTML = markup;
