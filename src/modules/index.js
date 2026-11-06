@@ -1,3 +1,4 @@
+import { initAiFaq } from "./ai-faq.js";
 import { initAnim } from "./anim.js";
 import { initApproachHero } from "./approach-hero.js";
 import { initApproachSlider } from "./approach-slider.js";
@@ -43,6 +44,7 @@ export const modules = [
 	{ name: "nav-panel", init: initNavPanel },
 	{ name: "copy-to-clipboard", init: initCopyToClipboard },
 	{ name: "faq", init: initFaq },
+	{ name: "ai-faq", init: initAiFaq },
 	{ name: "insight-toc", init: initInsightToc },
 	{ name: "tabbed", init: initTabbed },
 	{ name: "team-switch", init: initTeamSwitch },

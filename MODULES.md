@@ -14,6 +14,10 @@ Most modules have a test beside them. `src/modules/index.test.js` reads this dir
 
 ## Behaviour modules
 
+### `ai-faq.js`
+
+"Ask your own question" at the end of every FAQ list. The Designer holds the ask card (`[data-ai-faq="component"]`) built from a curated FAQ card's classes, with a real textarea, a send button and a hidden "Ask another question" button. The module sends the question to the Worker at `config.endpoint` and reads its server-sent events (`sources`, `token`, `handoff`, `error`). The answer is built from the same FAQ card classes so it reads as one more card, and it is never marked up as an accordion item or a published FAQ. Motion owns all the movement: the sparkle stepping aside on focus, its twinkle while thinking, the shimmer on the stage words ("Checking 6 pages…") and each streamed piece fading in; reduced motion gets none of it. A hand-off links to the discovery call with the question in the booking notes. The previous two questions and answers go with a follow-up. Questions carry a Turnstile token once `config.turnstileSiteKey` is set.
+
 ### `anim.js`
 
 The site's one reveal system. Flips `data-anim-state="in"` when an element tagged in the Designer arrives in the viewport, and guards against anything left invisible. Every duration, distance and easing lives in the "Global — motion" embed; this file only decides when. Reveals immediately, rather than skipping, anything inside a subtree a scroll reveal cannot reach — a closed nav panel, a carousel slide parked off to the side.
