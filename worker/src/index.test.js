@@ -255,6 +255,7 @@ describe("notes", () => {
 				name: "What we don't do",
 				date_updated: 2,
 				content: ops([
+					{ insert: "For the team: write answers under the questions.\n" },
 					{ insert: "Shopify themes" },
 					{ insert: "\n", attributes: { header: 2 } },
 					{ insert: "We don't build Shopify themes, but we connect Shopify stores to Webflow sites.\nSee: " },
@@ -269,7 +270,7 @@ describe("notes", () => {
 					{ insert: "\n", attributes: { header: 2 } },
 					{ insert: "TBC\n" },
 				]),
-				pages: [{ id: "p-rates", name: "Rates", date_updated: 3, content: ops([{ insert: "Day rates are on request.\nSee: " }, { insert: "ClickUp", attributes: { link: "https://app.clickup.com/x" } }, { insert: "\n" }]) }],
+				pages: [{ id: "p-rates", name: "Rates", date_updated: 3, content: ops([{ insert: "Day rates" }, { insert: "\n", attributes: { header: 2 } }, { insert: "Day rates are on request.\nSee: " }, { insert: "ClickUp", attributes: { link: "https://app.clickup.com/x" } }, { insert: "\n" }]) }],
 			},
 		],
 	};
@@ -287,7 +288,7 @@ describe("notes", () => {
 		};
 	}
 
-	it("loads a note per heading on each page but the how-to and known gaps, keeps See links only for this site, and removes deleted ones", async () => {
+	it("loads a note per heading, skipping text above the first heading and the team pages, keeps See links only for this site, and removes deleted ones", async () => {
 		vi.stubGlobal("fetch", vi.fn(async () => Response.json(doc)));
 		const env = bindings([
 			{ id: "i-old", key: "notes__p-gone--0.md", metadata: { updated: "1" } },

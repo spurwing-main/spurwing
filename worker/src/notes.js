@@ -4,7 +4,8 @@
  * NOTES_URL secret, so the link stays out of this repo) and loads each page
  * into AI Search beside the site's pages.
  *
- * Each heading on a page starts its own note, so one page can hold many topics.
+ * Each heading starts its own note, usually a buyer's question with the answer
+ * under it. Text above a page's first heading is for the team and never read.
  * A note answers like a page but is never shown as a link. A line under a
  * heading like "See: [About Spurwing](https://www.spurwing.co.uk/about)" gives
  * answers drawn from that note that public link instead. The pages for the team
@@ -62,11 +63,12 @@ function flatten(pages) {
 }
 
 /**
- * One Doc page as notes for AI Search: one per heading (and one for any text
- * before the first), each with its "See:" link lifted out as metadata.
+ * One Doc page as notes for AI Search: one per heading, each with its "See:"
+ * link lifted out as metadata. Text above the first heading is skipped.
  */
 export function toNotes(page) {
 	return sections(lines(JSON.parse(page.content || '{"ops":[]}').ops ?? []))
+		.filter((section) => section[0]?.header)
 		.map((section) => fromSection(section, page.name))
 		.filter(({ text }) => text)
 		.map(({ name, text, see }, index) => ({
