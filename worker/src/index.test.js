@@ -259,6 +259,11 @@ describe("notes", () => {
 					{ insert: "We don't build Shopify themes, but we connect Shopify stores to Webflow sites.\nSee: " },
 					{ insert: "Greggs", attributes: { link: "https://www.spurwing.co.uk/work/greggs-baked-in-gold" } },
 					{ insert: "\n" },
+					{ insert: "Printed brochures" },
+					{ insert: "\n", attributes: { header: 2 } },
+					{ insert: "We don't design print.\n" },
+					{ insert: "Empty heading" },
+					{ insert: "\n", attributes: { header: 2 } },
 				]),
 				pages: [{ id: "p-rates", name: "Rates", date_updated: 3, content: ops([{ insert: "Day rates are on request.\nSee: " }, { insert: "ClickUp", attributes: { link: "https://app.clickup.com/x" } }, { insert: "\n" }]) }],
 			},
@@ -278,20 +283,22 @@ describe("notes", () => {
 		};
 	}
 
-	it("loads each page but the how-to, keeps the See link only for this site, and removes deleted pages", async () => {
+	it("loads a note per heading on each page but the how-to, keeps See links only for this site, and removes deleted ones", async () => {
 		vi.stubGlobal("fetch", vi.fn(async () => Response.json(doc)));
 		const env = bindings([
-			{ id: "i-old", key: "notes__p-gone.md", metadata: { updated: "1" } },
-			{ id: "i-rates", key: "notes__p-rates.md", metadata: { updated: "3" } },
+			{ id: "i-old", key: "notes__p-gone--0.md", metadata: { updated: "1" } },
+			{ id: "i-rates", key: "notes__p-rates--0.md", metadata: { updated: "3" } },
 		]);
 
 		const result = await syncNotes(env);
 
-		expect(result).toEqual({ notes: 2, uploaded: ["notes__p-shopify.md"], removed: ["notes__p-gone.md"] });
-		const [key, text, { metadata }] = env.AI_SEARCH.items.upload.mock.calls[0];
-		expect(key).toBe("notes__p-shopify.md");
+		expect(result).toEqual({ notes: 3, uploaded: ["notes__p-shopify--0.md", "notes__p-shopify--1.md"], removed: ["notes__p-gone--0.md"] });
+		const [[key, text, { metadata }], [, printText, { metadata: printMeta }]] = env.AI_SEARCH.items.upload.mock.calls;
+		expect(key).toBe("notes__p-shopify--0.md");
 		expect(text).toBe("# What we don't do\n\n## Shopify themes\nWe don't build Shopify themes, but we connect Shopify stores to Webflow sites.");
-		expect(metadata).toEqual({ note: "What we don't do", title: "Greggs", url: "https://www.spurwing.co.uk/work/greggs-baked-in-gold", updated: "2" });
+		expect(metadata).toEqual({ note: "Shopify themes", title: "Greggs", url: "https://www.spurwing.co.uk/work/greggs-baked-in-gold", updated: "2" });
+		expect(printText).toBe("# What we don't do\n\n## Printed brochures\nWe don't design print.");
+		expect(printMeta).toEqual({ note: "Printed brochures", title: "Printed brochures", url: "", updated: "2" });
 		expect(env.AI_SEARCH.items.delete).toHaveBeenCalledWith("i-old");
 		vi.unstubAllGlobals();
 	});
@@ -328,6 +335,20 @@ describe("notes", () => {
 		expect(events[0]).toEqual(["sources", []]);
 		expect(events.find(([event]) => event === "cited")).toEqual(["cited", []]);
 		expect(JSON.stringify(events)).not.toContain("notes__");
+		expect(JSON.stringify(events)).not.toContain("clickup");
 		expect(bind.mock.calls[0][8]).toBe(JSON.stringify(["note: What we don't do"]));
+	});
+});
+
+describe("links", () => {
+	it("lists each public page once, even when a note points at it too", async () => {
+		const { links } = await import("./answer.js");
+		expect(
+			links([
+				{ title: "About Spurwing", url: "https://www.spurwing.co.uk/about", note: "Team" },
+				{ title: "About Spurwing", url: "https://www.spurwing.co.uk/about" },
+				{ title: "Rates", url: null, note: "Rates" },
+			]),
+		).toEqual([{ title: "About Spurwing", url: "https://www.spurwing.co.uk/about" }]);
 	});
 });

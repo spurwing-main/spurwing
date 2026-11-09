@@ -4,9 +4,11 @@
  * NOTES_URL secret, so the link stays out of this repo) and loads each page
  * into AI Search beside the site's pages.
  *
- * A note answers like a page but is never shown as a link. A line on the page
- * like "See: [About Spurwing](https://www.spurwing.co.uk/about)" gives answers
- * drawn from it that public link instead. "How to use this doc" is never read.
+ * Each heading on a page starts its own note, so one page can hold many topics.
+ * A note answers like a page but is never shown as a link. A line under a
+ * heading like "See: [About Spurwing](https://www.spurwing.co.uk/about)" gives
+ * answers drawn from that note that public link instead. "How to use this doc"
+ * is never read.
  *
  * NOTES_URL is the JSON behind the Doc's public link, which ClickUp's own
  * viewer reads. It isn't a documented API, so a change on ClickUp's side shows
@@ -27,7 +29,7 @@ export async function syncNotes(env) {
 
 	const notes = flatten(doc.pages)
 		.filter((page) => !page.archived && !page.deleted && !SKIP.test(page.name ?? ""))
-		.map(toNote);
+		.flatMap(toNotes);
 
 	const loaded = (await env.AI_SEARCH.items.list({ search: NOTE_PREFIX, per_page: 50 })).result.filter((item) =>
 		item.key?.startsWith(NOTE_PREFIX),
@@ -55,49 +57,70 @@ function flatten(pages) {
 	return pages.flatMap((page) => [page, ...flatten(page.pages ?? [])]);
 }
 
-/** One Doc page as Markdown for AI Search, with its "See:" link lifted out as metadata. */
-export function toNote(page) {
-	const { text, see } = fromOps(JSON.parse(page.content || '{"ops":[]}').ops ?? []);
-	return {
-		key: `${NOTE_PREFIX}${page.id}.md`,
-		text: `# ${page.name}\n\n${text}`,
-		metadata: {
-			note: page.name,
-			// AI Search keeps only url and title; a note without a See link is titled by its page.
-			title: see?.title ?? page.name,
-			url: see?.url ?? "",
-			updated: String(page.date_updated ?? ""),
-		},
-	};
+/**
+ * One Doc page as notes for AI Search: one per heading (and one for any text
+ * before the first), each with its "See:" link lifted out as metadata.
+ */
+export function toNotes(page) {
+	return sections(lines(JSON.parse(page.content || '{"ops":[]}').ops ?? []))
+		.map((section) => fromSection(section, page.name))
+		.filter(({ text }) => text)
+		.map(({ name, text, see }, index) => ({
+			key: `${NOTE_PREFIX}${page.id}--${index}.md`,
+			text: `# ${page.name}\n\n${text}`,
+			metadata: {
+				note: name,
+				// AI Search keeps only url and title; a note without a See link is titled by its heading.
+				title: see?.title ?? name,
+				url: see?.url ?? "",
+				updated: String(page.date_updated ?? ""),
+			},
+		}));
 }
 
-/** ClickUp's page content (Quill ops) as plain Markdown, minus the "See:" line. */
-function fromOps(ops) {
-	const lines = [];
-	let line = [];
+// A heading line starts a new section.
+function sections(all) {
+	const found = [[]];
+	for (const entry of all) {
+		if (entry.header && found.at(-1).length) found.push([]);
+		found.at(-1).push(entry);
+	}
+	return found;
+}
+
+/** A section as plain Markdown, minus its "See:" line. */
+function fromSection(entries, pageName) {
 	let see = null;
+	const kept = entries.filter((entry) => {
+		const link = /^see:/i.test(entry.plain.trim()) && entry.links[0];
+		if (!link) return true;
+		see ??= publicLink(link);
+		return false;
+	});
+	const name = entries[0]?.header ? entries[0].plain.trim() : pageName;
+	const text = kept.map((entry) => entry.markdown).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+	// A heading on its own says nothing.
+	return { name, see, text: kept.length === 1 && kept[0].header ? "" : text };
+}
+
+/** ClickUp's page content (Quill ops) as lines. */
+function lines(ops) {
+	const all = [];
+	let line = [];
 
 	for (const op of ops) {
 		if (typeof op.insert !== "string") continue;
 		const parts = op.insert.split("\n");
 		parts.forEach((part, index) => {
 			if (index > 0) {
-				lines.push(finish(line, index === parts.length - 1 ? op.attributes : undefined));
+				all.push(finish(line, index === parts.length - 1 ? op.attributes : undefined));
 				line = [];
 			}
 			if (part) line.push({ text: part, link: op.attributes?.link });
 		});
 	}
-	if (line.length) lines.push(finish(line));
-
-	const kept = lines.filter((entry) => {
-		const link = /^see:/i.test(entry.plain.trim()) && entry.links[0];
-		if (!link) return true;
-		see ??= publicLink(link);
-		return false;
-	});
-
-	return { text: kept.map((entry) => entry.markdown).join("\n").replace(/\n{3,}/g, "\n\n").trim(), see };
+	if (line.length) all.push(finish(line));
+	return all;
 }
 
 // A line ends at a newline insert, which carries the line's heading or list style.
@@ -105,7 +128,7 @@ function finish(parts, style = {}) {
 	const plain = parts.map((part) => part.text).join("");
 	const links = parts.filter((part) => part.link).map((part) => ({ title: part.text.trim(), url: part.link }));
 	const prefix = style?.header ? `${"#".repeat(style.header)} ` : style?.list ? "- " : "";
-	return { plain, links, markdown: `${prefix}${plain}` };
+	return { plain, links, header: Boolean(style?.header), markdown: `${prefix}${plain}` };
 }
 
 // Only a page of this site can be shown to visitors as a link.

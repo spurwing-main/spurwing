@@ -111,9 +111,12 @@ export function pagesFrom(chunks = []) {
 	return [...pages.values()];
 }
 
-/** Pages as links for the page: no text, and no note without a public page. */
+/** Pages as links for the page: no text, no note without a public page, and each page once. */
 export function links(pages) {
-	return pages.filter(({ url }) => url).map(({ title, url }) => ({ title, url }));
+	const seen = new Set();
+	return pages
+		.filter(({ url }) => url && !seen.has(url) && seen.add(url))
+		.map(({ title, url }) => ({ title, url }));
 }
 
 /**
