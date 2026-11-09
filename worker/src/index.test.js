@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { citedPages, pagesFrom, relay, SYSTEM_PROMPT } from "./answer.js";
 import worker from "./index.js";
+import { syncNotes } from "./notes.js";
 
 const ORIGIN = "https://spurwing.webflow.io";
 
@@ -239,5 +240,93 @@ describe("citedPages", () => {
 		expect(citedPages(pages, "Yes, we worked with Aethos Hotels to bring eight WordPress sites into one, with booking integrations.")).toEqual([
 			{ title: "Aethos Hotels", url: "/work/aethos-hotels" },
 		]);
+	});
+});
+
+describe("notes", () => {
+	const ops = (items) => JSON.stringify({ ops: items });
+	const doc = {
+		is_doc_archived: false,
+		pages: [
+			{ id: "p-howto", name: "How to use this doc", date_updated: 1, content: ops([{ insert: "Rules\n" }]) },
+			{
+				id: "p-shopify",
+				name: "What we don't do",
+				date_updated: 2,
+				content: ops([
+					{ insert: "Shopify themes" },
+					{ insert: "\n", attributes: { header: 2 } },
+					{ insert: "We don't build Shopify themes, but we connect Shopify stores to Webflow sites.\nSee: " },
+					{ insert: "Greggs", attributes: { link: "https://www.spurwing.co.uk/work/greggs-baked-in-gold" } },
+					{ insert: "\n" },
+				]),
+				pages: [{ id: "p-rates", name: "Rates", date_updated: 3, content: ops([{ insert: "Day rates are on request.\nSee: " }, { insert: "ClickUp", attributes: { link: "https://app.clickup.com/x" } }, { insert: "\n" }]) }],
+			},
+		],
+	};
+
+	function bindings(loaded = []) {
+		return {
+			NOTES_URL: "https://notes.example/doc",
+			AI_SEARCH: {
+				items: {
+					list: vi.fn(async () => ({ result: loaded })),
+					upload: vi.fn(async () => ({})),
+					delete: vi.fn(async () => {}),
+				},
+			},
+		};
+	}
+
+	it("loads each page but the how-to, keeps the See link only for this site, and removes deleted pages", async () => {
+		vi.stubGlobal("fetch", vi.fn(async () => Response.json(doc)));
+		const env = bindings([
+			{ id: "i-old", key: "notes__p-gone.md", metadata: { updated: "1" } },
+			{ id: "i-rates", key: "notes__p-rates.md", metadata: { updated: "3" } },
+		]);
+
+		const result = await syncNotes(env);
+
+		expect(result).toEqual({ notes: 2, uploaded: ["notes__p-shopify.md"], removed: ["notes__p-gone.md"] });
+		const [key, text, { metadata }] = env.AI_SEARCH.items.upload.mock.calls[0];
+		expect(key).toBe("notes__p-shopify.md");
+		expect(text).toBe("# What we don't do\n\n## Shopify themes\nWe don't build Shopify themes, but we connect Shopify stores to Webflow sites.");
+		expect(metadata).toEqual({ note: "What we don't do", title: "Greggs", url: "https://www.spurwing.co.uk/work/greggs-baked-in-gold", updated: "2" });
+		expect(env.AI_SEARCH.items.delete).toHaveBeenCalledWith("i-old");
+		vi.unstubAllGlobals();
+	});
+
+	it("changes nothing when ClickUp doesn't answer", async () => {
+		vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
+		const env = bindings([{ id: "i-1", key: "notes__p-shopify.md", metadata: {} }]);
+
+		await expect(syncNotes(env)).rejects.toThrow("ClickUp answered 401");
+		expect(env.AI_SEARCH.items.delete).not.toHaveBeenCalled();
+		vi.unstubAllGlobals();
+	});
+
+	it("answers from a note but never links visitors to it, and logs which note it used", async () => {
+		const run = vi.fn(async () => {});
+		const bind = vi.fn(() => ({ run }));
+		const waits = [];
+		const env2 = env({
+			DB: { prepare: vi.fn(() => ({ bind })) },
+			AI: { run: model([delta("We don't build Shopify themes, but we connect Shopify stores to Webflow sites."), done]) },
+			AI_SEARCH: {
+				search: vi.fn(async () => ({
+					chunks: [
+						{ item: { key: "notes__p-a.md", metadata: { note: "What we don't do", title: "", url: "" } }, text: "We don't build Shopify themes, but we connect Shopify stores to Webflow sites." },
+					],
+				})),
+			},
+		});
+
+		const events = await collect((await worker.fetch(ask({ question: "Do you build Shopify themes?" }), env2, { waitUntil: (p) => waits.push(p) })).body);
+		await Promise.all(waits);
+
+		expect(events[0]).toEqual(["sources", []]);
+		expect(events.find(([event]) => event === "cited")).toEqual(["cited", []]);
+		expect(JSON.stringify(events)).not.toContain("notes__");
+		expect(bind.mock.calls[0][8]).toBe(JSON.stringify(["note: What we don't do"]));
 	});
 });

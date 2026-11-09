@@ -48,7 +48,8 @@ export async function record(env, entry) {
 			personal ? REMOVED : entry.question,
 			entry.answered ? 1 : 0,
 			personal ? "" : entry.answer,
-			JSON.stringify(entry.sources.map((source) => source.url)),
+			// A team note is logged by its page name, so an answer can be traced to it.
+			JSON.stringify(entry.sources.map((source) => (source.note ? `note: ${source.note}` : source.url))),
 			entry.firstWordMs,
 			entry.ms,
 			entry.clarityUser,

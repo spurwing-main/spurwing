@@ -14,6 +14,8 @@
 	// The question log (schema.sql).
 	"d1_databases": [{ "binding": "DB", "database_name": "spurwing-faq", "database_id": "93e6f900-ced5-43ad-acea-dae8e906ae9b" }],
 	// Per visitor: 5 questions a minute. Approximate by design, which is enough to stop abuse.
+	// Every hour, reload the team's notes from the "Ask box notes" ClickUp Doc (src/notes.js).
+	"triggers": { "crons": ["0 * * * *"] },
 	"ratelimits": [{ "name": "RATE_LIMIT", "namespace_id": "1101", "simple": { "limit": 5, "period": 60 } }],
 	"vars": {
 		"MODEL": "openai/gpt-6.1-terra",
@@ -21,5 +23,6 @@
 		"GATEWAY": "spurwing",
 		"ALLOWED_ORIGINS": "https://www.spurwing.co.uk,https://spurwing.co.uk,https://spurwing.webflow.io"
 	}
-	// Secrets, set with `wrangler secret put`: TURNSTILE_SECRET, INDEX_KEY.
+	// Secrets, set with `wrangler secret put`: TURNSTILE_SECRET, INDEX_KEY, and
+	// NOTES_URL (the JSON behind the notes Doc's public link, kept out of this repo).
 }

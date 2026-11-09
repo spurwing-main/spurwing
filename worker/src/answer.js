@@ -76,7 +76,7 @@ export async function relay(upstream, send, pages = []) {
 	}
 
 	const cited = citedPages(pages, answer);
-	send("cited", cited);
+	send("cited", links(cited));
 	send("done", {});
 	return { answered: true, answer, sources: cited };
 }
@@ -92,6 +92,12 @@ export function pagesFrom(chunks = []) {
 			continue;
 		}
 		const meta = item.metadata ?? {};
+		// A team note (notes.js) answers like a page but has no address of its own;
+		// it shows only the public page its "See:" line names, if any.
+		if (meta.note) {
+			pages.set(item.key, { title: meta.title || meta.note, url: meta.url || null, note: meta.note, text });
+			continue;
+		}
 		const path = meta.url ? new URL(meta.url).pathname : pathFromKey(item.key);
 		pages.set(item.key, {
 			title: shortTitle(meta.title || titleFromPath(path)),
@@ -102,9 +108,9 @@ export function pagesFrom(chunks = []) {
 	return [...pages.values()];
 }
 
-/** Pages as links for the page: no text. */
+/** Pages as links for the page: no text, and no note without a public page. */
 export function links(pages) {
-	return pages.map(({ title, url }) => ({ title, url }));
+	return pages.filter(({ url }) => url).map(({ title, url }) => ({ title, url }));
 }
 
 /**
@@ -120,17 +126,16 @@ export function citedPages(pages, answer) {
 		.filter(({ score }) => score >= 2)
 		.sort((a, b) => b.score - a.score);
 	const best = scored[0]?.score ?? 0;
-	return links(
-		scored
-			.filter(({ score }) => score >= best / 2)
-			.slice(0, MAX_CITED)
-			.map(({ page }) => page),
-	);
+	// Notes stay named here for the question log; links() drops what visitors can't see.
+	return scored
+		.filter(({ score }) => score >= best / 2)
+		.slice(0, MAX_CITED)
+		.map(({ page: { title, url, note } }) => (note ? { title, url, note } : { title, url }));
 }
 
 /** The pages as Terra reads them: title and address, then the text. */
 function context(pages) {
-	return pages.map((page) => `## ${page.title} (${page.url})\n${page.text}`).join("\n\n");
+	return pages.map((page) => `## ${page.title}${page.url ? ` (${page.url})` : ""}\n${page.text}`).join("\n\n");
 }
 
 // Words too common on this site to say which page an answer came from.
