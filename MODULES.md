@@ -80,7 +80,7 @@ Moves the image in each `[data-img-parallax="section"]` from 15% of its height u
 
 ### `insight-toc.js`
 
-Positions the sidebar indicator against the current Finsweet table-of-contents link, holding its last position through the gaps where Finsweet drops its `w--current` class.
+The contents list beside an Insights article, and beside the one rich text block on legal-style pages such as /llm-info. It gives each `h2` an id, builds a link per heading from the template item the Designer holds in `.insights-item-sidebar_links`, marks the section being read and moves the indicator to it, and honours a shared `#section` link once the ids exist.
 
 ### `menu-toggle.js`
 

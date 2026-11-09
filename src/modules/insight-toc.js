@@ -1,4 +1,5 @@
-// The Insights contents list: ids, links, the active section and its indicator.
+// The contents list on Insights articles and legal-style pages: ids, links, the
+// active section and its indicator.
 //
 // Built here rather than by Finsweet because the ids were the whole problem.
 // Section ids do not exist in the published HTML — they are slugified from the
@@ -17,8 +18,9 @@
 
 const insightTocConfig = {
 	// The lead-in is a separate rich text block above the article and its
-	// heading is not a section.
-	bodySelector: ".insights-item-main_body .rich-text:not(.is-insights-leadin)",
+	// heading is not a section. Legal-style pages (/llm-info, the legal pages)
+	// reuse the same sidebar beside their one rich text block.
+	bodySelector: ".insights-item-main_body .rich-text:not(.is-insights-leadin), .legal_rt-wrap .rich-text",
 	listSelector: ".insights-item-sidebar_links",
 	itemSelector: ".insights-item-sidebar_link-wrap",
 	linkSelector: ".insights-item-sidebar_link",

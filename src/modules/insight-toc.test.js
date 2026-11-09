@@ -74,4 +74,20 @@ describe("initInsightToc", () => {
 
 		expect(links()).toHaveLength(1);
 	});
+
+	it("builds the same list beside a legal-style page's text", () => {
+		document.body.innerHTML = `
+			<div class="insights-item-sidebar_links">
+				<div class="insights-item-sidebar_link-wrap"><a class="insights-item-sidebar_link" href="#top">Section</a></div>
+			</div>
+			<div class="legal_rt-wrap"><div class="rich-text"><h2>Basic information</h2><p>Text</p><h2>Pricing</h2></div></div>
+		`;
+
+		initInsightToc();
+
+		expect(links().map((link) => [link.getAttribute("href"), link.textContent])).toEqual([
+			["#basic-information", "Basic information"],
+			["#pricing", "Pricing"],
+		]);
+	});
 });
