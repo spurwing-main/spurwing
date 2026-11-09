@@ -8,9 +8,9 @@
  * under it. Text above a page's first heading is for the team and never read.
  * A note answers like a page but is never shown as a link. A line under a
  * heading like "See: [About Spurwing](https://www.spurwing.co.uk/about)" gives
- * answers drawn from that note that public link instead. The pages for the team
- * ("Start here" and "Known gaps") are never read, nor is a question left empty
- * or answered only "TBC".
+ * answers drawn from that note that public link instead. The "Start here" page
+ * is for the team and never read, nor is a question left empty or answered
+ * only "TBC".
  *
  * NOTES_URL is the JSON behind the Doc's public link, which ClickUp's own
  * viewer reads. It isn't a documented API, so a change on ClickUp's side shows
@@ -19,8 +19,8 @@
 
 export const NOTE_PREFIX = "notes__";
 const SITE_HOST = "www.spurwing.co.uk";
-// Pages for the team, not the box: its rules, and the questions it can't answer yet.
-const SKIP = /^(start here|how to use|known gaps)/i;
+// The team's instructions, not answers.
+const SKIP = /^start here/i;
 // An answer still to be written.
 const PLACEHOLDER = /^(tbc|tbd|todo|to do|tba|\?+|-+|…|\.\.\.)\.?$/i;
 

@@ -256,6 +256,7 @@ the site.
 | `worker/src/answer.js`          | The prompt, Terra's answer, the found and cited pages.            |
 | `worker/src/events.js`          | Server-sent events in from the model and out to the page.         |
 | `worker/src/log.js`             | The D1 question log.                                              |
+| `worker/src/notes.js`           | The team's answers from ClickUp, reloaded into AI Search hourly.  |
 | `worker/wrangler.jsonc`         | Bindings, the route, the rate limit and the model.                |
 | `worker/schema.sql`             | The `questions` table.                                            |
 | `worker/scripts/index-staging.mjs` | Sends staging's pages to AI Search until it crawls the live site. |
@@ -266,7 +267,17 @@ Turnstile widget `spurwing-ask`. The question log is read by asking Claude
 through Cloudflare's MCP server (`https://mcp.cloudflare.com/mcp`, D1 Read),
 or in the dashboard. Its secrets are set with
 `npx wrangler secret put NAME --config worker/wrangler.jsonc` and never
-committed: `TURNSTILE_SECRET` and `INDEX_KEY`.
+committed: `TURNSTILE_SECRET`, `INDEX_KEY` and `NOTES_URL`.
+
+Beyond the site's pages, the box answers from the "Ask box answers" ClickUp
+Doc (Spurwing Website 2026). Its "Questions and answers" page holds buyers'
+questions as headings with the team's answers under them; a blank question
+is ignored, and a "See:" line under an answer gives it a link to a page on
+the site. Every hour the Worker reads the Doc through its public link
+(`NOTES_URL`, the JSON behind that link) and loads each answered question
+into AI Search. Visitors never get a link to the Doc, and the question log
+records an answer drawn from it as `note: <question>`. The "Start here" page
+is for the team and never read.
 
 `npm test` covers the Worker with the rest. To ship it, run `npm test`, then
 `npm run worker:deploy`, then ask a question on staging.
