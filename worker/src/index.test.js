@@ -248,7 +248,7 @@ describe("notes", () => {
 	const doc = {
 		is_doc_archived: false,
 		pages: [
-			{ id: "p-howto", name: "How to use this doc", date_updated: 1, content: ops([{ insert: "Rules\n" }]) },
+			{ id: "p-howto", name: "Start here", date_updated: 1, content: ops([{ insert: "Rules\n" }]) },
 			{ id: "p-gaps", name: "Known gaps", date_updated: 1, content: ops([{ insert: "Do you sign NDAs?\n" }]) },
 			{
 				id: "p-shopify",
@@ -265,6 +265,9 @@ describe("notes", () => {
 					{ insert: "We don't design print.\n" },
 					{ insert: "Empty heading" },
 					{ insert: "\n", attributes: { header: 2 } },
+					{ insert: "Do you sign NDAs?" },
+					{ insert: "\n", attributes: { header: 2 } },
+					{ insert: "TBC\n" },
 				]),
 				pages: [{ id: "p-rates", name: "Rates", date_updated: 3, content: ops([{ insert: "Day rates are on request.\nSee: " }, { insert: "ClickUp", attributes: { link: "https://app.clickup.com/x" } }, { insert: "\n" }]) }],
 			},

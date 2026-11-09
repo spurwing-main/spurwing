@@ -1,5 +1,5 @@
 /**
- * The team's notes for the ask box: a ClickUp Doc ("Ask box notes") shared to
+ * The team's answers for the ask box: a ClickUp Doc ("Ask box answers") shared to
  * the web. Every hour the Worker reads it through its public link (the
  * NOTES_URL secret, so the link stays out of this repo) and loads each page
  * into AI Search beside the site's pages.
@@ -8,7 +8,8 @@
  * A note answers like a page but is never shown as a link. A line under a
  * heading like "See: [About Spurwing](https://www.spurwing.co.uk/about)" gives
  * answers drawn from that note that public link instead. The pages for the team
- * ("How to use this doc" and "Known gaps") are never read.
+ * ("Start here" and "Known gaps") are never read, nor is a question left empty
+ * or answered only "TBC".
  *
  * NOTES_URL is the JSON behind the Doc's public link, which ClickUp's own
  * viewer reads. It isn't a documented API, so a change on ClickUp's side shows
@@ -18,7 +19,9 @@
 export const NOTE_PREFIX = "notes__";
 const SITE_HOST = "www.spurwing.co.uk";
 // Pages for the team, not the box: its rules, and the questions it can't answer yet.
-const SKIP = /^(how to use|known gaps)/i;
+const SKIP = /^(start here|how to use|known gaps)/i;
+// An answer still to be written.
+const PLACEHOLDER = /^(tbc|tbd|todo|to do|tba|\?+|-+|…|\.\.\.)\.?$/i;
 
 export async function syncNotes(env) {
 	if (!env.NOTES_URL) throw new Error("notes: NOTES_URL is not set");
@@ -100,8 +103,10 @@ function fromSection(entries, pageName) {
 	});
 	const name = entries[0]?.header ? entries[0].plain.trim() : pageName;
 	const text = kept.map((entry) => entry.markdown).join("\n").replace(/\n{3,}/g, "\n\n").trim();
-	// A heading on its own says nothing.
-	return { name, see, text: kept.length === 1 && kept[0].header ? "" : text };
+	// A heading on its own, or over a placeholder, says nothing.
+	const body = kept.filter((entry) => !entry.header && entry.plain.trim());
+	const empty = !body.length || body.every((entry) => PLACEHOLDER.test(entry.plain.trim()));
+	return { name, see, text: empty ? "" : text };
 }
 
 /** ClickUp's page content (Quill ops) as lines. */
