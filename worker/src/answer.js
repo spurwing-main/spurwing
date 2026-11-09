@@ -3,6 +3,7 @@
  * the pages that answer actually drew on.
  */
 import { readEvents } from "./events.js";
+import { NOTE_PREFIX } from "./notes.js";
 
 export const SYSTEM_PROMPT = [
 	"You answer visitors' questions on the website of Spurwing, a UK Webflow agency.",
@@ -93,9 +94,11 @@ export function pagesFrom(chunks = []) {
 		}
 		const meta = item.metadata ?? {};
 		// A team note (notes.js) answers like a page but has no address of its own;
-		// it shows only the public page its "See:" line names, if any.
-		if (meta.note) {
-			pages.set(item.key, { title: meta.title || meta.note, url: meta.url || null, note: meta.note, text });
+		// it shows only the public page its "See:" line names, if any. Notes are
+		// known by their key, since AI Search keeps only the url and title fields.
+		if (item.key.startsWith(NOTE_PREFIX)) {
+			const note = meta.note || meta.title || item.key;
+			pages.set(item.key, { title: meta.title || note, url: meta.url || null, note, text });
 			continue;
 		}
 		const path = meta.url ? new URL(meta.url).pathname : pathFromKey(item.key);

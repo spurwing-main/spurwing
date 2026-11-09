@@ -63,7 +63,8 @@ export function toNote(page) {
 		text: `# ${page.name}\n\n${text}`,
 		metadata: {
 			note: page.name,
-			title: see?.title ?? "",
+			// AI Search keeps only url and title; a note without a See link is titled by its page.
+			title: see?.title ?? page.name,
 			url: see?.url ?? "",
 			updated: String(page.date_updated ?? ""),
 		},

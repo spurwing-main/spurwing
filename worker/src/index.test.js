@@ -315,7 +315,8 @@ describe("notes", () => {
 			AI_SEARCH: {
 				search: vi.fn(async () => ({
 					chunks: [
-						{ item: { key: "notes__p-a.md", metadata: { note: "What we don't do", title: "", url: "" } }, text: "We don't build Shopify themes, but we connect Shopify stores to Webflow sites." },
+						// Search returns only the url and title metadata fields.
+						{ item: { key: "notes__p-a.md", metadata: { title: "What we don't do", url: "" } }, text: "We don't build Shopify themes, but we connect Shopify stores to Webflow sites." },
 					],
 				})),
 			},
