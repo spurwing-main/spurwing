@@ -26,6 +26,10 @@ The site's one reveal system. Flips `data-anim-state="in"` when an element tagge
 
 Fades the progressive blur over the Approach hero out as the reader scrolls into the capabilities section, and back in when they leave it.
 
+### `bg-video.js`
+
+Plays a background video: a `<video data-bg-video>` custom element placed after the image it covers, with that image's class. Webflow publishes custom elements without `muted` and `loop`, and browsers only autoplay muted video, so this sets both, plays the video while it's within 200px of the screen and pauses it otherwise. Give the element `preload="none"` so it downloads only then. Reduced motion never plays it, and the "Global — motion" embed hides it so the image underneath stays.
+
 ### `booking-details.js`
 
 Builds the booking confirmation from the Cal.com query parameters — attendee, formatted times, reschedule link — hiding any row it has no value for, then reveals the rows in sequence.

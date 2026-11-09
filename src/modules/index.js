@@ -2,6 +2,7 @@ import { initAiFaq } from "./ai-faq.js";
 import { initAnim } from "./anim.js";
 import { initApproachHero } from "./approach-hero.js";
 import { initApproachSlider } from "./approach-slider.js";
+import { initBgVideo } from "./bg-video.js";
 import { initBookingDetails } from "./booking-details.js";
 import { initCaps } from "./caps.js";
 import { initCardReveal } from "./card-reveal.js";
@@ -38,6 +39,7 @@ export const modules = [
 	{ name: "impact-slider", init: initImpactSlider },
 	{ name: "booking-details", init: initBookingDetails },
 	{ name: "image-fade", init: initImageFade },
+	{ name: "bg-video", init: initBgVideo },
 
 	{ name: "menu-toggle", init: initMenuToggle },
 	{ name: "nav-auto-hide", init: initNavAutoHide },
