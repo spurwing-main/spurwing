@@ -219,8 +219,8 @@ describe("initAiFaq", () => {
 
 		const card = $('[data-ai-faq="answer"]');
 		expect(card.nextElementSibling).toBe($('[data-ai-faq="ask"]'));
-		expect([...card.children].map((child) => child.tagName + "." + child.className)).toEqual(["H3.", "DIV.faq-card_panel"]);
-		expect(card.querySelector("h3 > .faq-card_trigger > .faq-card_title")).not.toBeNull();
+		expect([...card.children].map((child) => child.tagName + "." + child.className)).toEqual(["H3.faq-card_title", "DIV.faq-card_panel"]);
+		expect(card.querySelector("h3.faq-card_title > .faq-card_trigger > span")).not.toBeNull();
 		const star = card.querySelector(".faq-card_icon svg");
 		expect(star.hasAttribute("data-ai-faq")).toBe(false);
 		expect(star.hasAttribute("class")).toBe(false);
@@ -243,7 +243,8 @@ describe("initAiFaq", () => {
 		expect(document.activeElement).toBe(heading);
 		await settled();
 
-		expect(heading.querySelector(".faq-card_title").textContent).toBe("Keyboard?");
+		expect(heading.className).toBe("faq-card_title");
+		expect(heading.textContent).toBe("Keyboard?");
 		expect(document.activeElement).toBe(heading);
 	});
 
@@ -257,6 +258,7 @@ describe("initAiFaq", () => {
 		);
 		initAiFaq();
 		const status = $('[data-ai-faq="component"] [role="status"]');
+		expect(status.className).toBe("u-visually-hidden");
 		expect(status.textContent).toBe("");
 
 		ask("How many?");

@@ -303,9 +303,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 		 */
 		function answerCard(question) {
 			const element = node("div", "faq-card");
-			const heading = node("h3");
+			const heading = node("h3", "faq-card_title");
 			const head = node("div", "faq-card_trigger");
-			const title = node("span", "faq-card_title");
+			const title = node("span");
 			const status = node("span", "faq-card_icon");
 			const panel = node("div", "faq-card_panel");
 			const content = node("div", "faq-card_content");
@@ -506,18 +506,10 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 	// One polite status per box, there from the start: a region created along
 	// with its message is often not heard at all.
+	// Hidden by the site's u-visually-hidden utility (the base embed).
 	function liveRegion(component) {
-		const region = node("div");
+		const region = node("div", "u-visually-hidden");
 		region.setAttribute("role", "status");
-		Object.assign(region.style, {
-			position: "absolute",
-			width: "1px",
-			height: "1px",
-			overflow: "hidden",
-			clip: "rect(0 0 0 0)",
-			clipPath: "inset(50%)",
-			whiteSpace: "nowrap",
-		});
 		component.append(region);
 		return region;
 	}

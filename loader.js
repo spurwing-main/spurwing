@@ -1,21 +1,22 @@
 (() => {
   "use strict";
 
+  // Edit this block when you start a project.
   const DEFAULTS = Object.freeze({
     namespace: "spurwing",
     label: "Spurwing JS",
-    owner: "spurwing-main",
-    project: "spurwing",
-    commit: "main",
-    environment: "auto",
+    environment: "live",
     localBase: "http://localhost:5500",
     probeTimeout: 900,
+    readyTimeout: 4000,
   });
 
   const root = document.documentElement;
   const params = new URLSearchParams(location.search);
   const script = document.currentScript;
   const namespace = DEFAULTS.namespace;
+  const readyClass = `${namespace}-ready`;
+  const loadingClass = `${namespace}-loading`;
   const storageKey = `${namespace}_environment`;
 
   if (!/^[a-z][a-z0-9-]*$/.test(namespace)) {
@@ -25,6 +26,16 @@
 
   const project = (window[namespace] = window[namespace] || {});
   root.dataset.projectNamespace = namespace;
+  root.classList.remove(readyClass);
+  root.classList.add(loadingClass);
+
+  let readyTimer;
+  const setReady = () => {
+    window.clearTimeout(readyTimer);
+    root.classList.remove(loadingClass);
+    root.classList.add(readyClass);
+  };
+  readyTimer = window.setTimeout(setReady, DEFAULTS.readyTimeout);
 
   const getParam = (name) => {
     const value = params.get(name);
@@ -61,35 +72,48 @@
 
   const self = (() => {
     const source = script?.src || "";
-    const match = source.match(/\/gh\/([^/]+)\/([^@/]+)@([^/]+)\/(?:.*\/)?loader\.js/);
+    const match = source.match(/^https:\/\/cdn\.jsdelivr\.net\/gh\/([^/]+)\/([^@/]+)@([0-9a-f]{40})\/(?:.*\/)?loader\.js/);
     return match ? { owner: match[1], project: match[2], commit: match[3] } : null;
   })();
 
-  const commitParam = getParam("commit");
-  const commitOverride = commitParam && /^[0-9a-f]{7,40}$/i.test(commitParam) ? commitParam : null;
-  if (commitParam && !commitOverride) {
-    console.warn("[loader] The commit value must be a Git commit SHA.");
+  if (!self) {
+    console.error("[loader] The loader must be loaded from cdn.jsdelivr.net at a full 40-character commit, so no bundle was loaded.");
+    setReady();
+    return;
   }
 
-  const owner = self?.owner || DEFAULTS.owner;
-  const repository = self?.project || DEFAULTS.project;
-  const commit = commitOverride || self?.commit || DEFAULTS.commit;
-  const localBase = (
-    getParam("local") || script?.dataset.localBase || DEFAULTS.localBase
-  ).replace(/\/$/, "");
-  const localUrl = `${localBase}/bundle.js`;
+  const isLoopback = (hostname) => ["localhost", "127.0.0.1", "[::1]"].includes(hostname);
+  // Query flags cannot grant permission to change which code runs.
+  const isDevHost = isLoopback(location.hostname) || location.hostname.endsWith(".webflow.io");
+
+  const { owner, project: repository, commit } = self;
+  const parseBase = (value) => {
+    if (typeof value !== "string" || /[?#]/.test(value)) return null;
+    try {
+      const url = new URL(value);
+      if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.search || url.hash) return null;
+      return url;
+    } catch {
+      return null;
+    }
+  };
+  const defaultBase = parseBase(DEFAULTS.localBase);
+  const scriptBase = parseBase(script?.dataset.localBase);
+  const requestedBase = isDevHost ? parseBase(getParam("local")) : null;
+  const trustedOrigins = [defaultBase?.origin, scriptBase?.origin];
+  const allowedBase = requestedBase && (isLoopback(requestedBase.hostname) || trustedOrigins.includes(requestedBase.origin))
+    ? requestedBase : null;
+  const localBase = (allowedBase || scriptBase || defaultBase)?.href.replace(/\/$/, "") || null;
+  const localUrl = localBase ? `${localBase}/bundle.js` : null;
   const liveUrl = `https://cdn.jsdelivr.net/gh/${owner}/${repository}@${commit}/dist/bundle.js`;
-  const isDevHost = location.hostname === "localhost" || location.hostname.endsWith(".webflow.io");
   const devFlag = getFlag("dev") ?? getFlag("mode");
-  const devMode = devFlag === false ? false : devFlag === true || isDevHost;
-  const requestedEnvironment = getParam("env");
+  const devMode = isDevHost && devFlag !== false;
+  const requestedEnvironment = isDevHost ? getParam("env") : null;
   const storedEnvironment = devMode ? store.get() : null;
-  const environment = ["auto", "local", "live"].includes(
-    requestedEnvironment || storedEnvironment || DEFAULTS.environment
-  )
-    ? requestedEnvironment || storedEnvironment || DEFAULTS.environment
-    : DEFAULTS.environment;
-  const hasOverride = Boolean(requestedEnvironment || commitOverride || getParam("local") || storedEnvironment);
+  const selectedEnvironment = requestedEnvironment || storedEnvironment || DEFAULTS.environment;
+  const environment = !isDevHost ? "live" : ["local", "live"].includes(selectedEnvironment)
+    ? selectedEnvironment : DEFAULTS.environment;
+  const hasOverride = Boolean(requestedEnvironment || allowedBase || storedEnvironment);
 
   project.boot = {
     namespace,
@@ -101,9 +125,11 @@
     localUrl,
     liveUrl,
     devMode,
+    ready: setReady,
   };
 
   async function localIsAvailable() {
+    if (!localUrl) return false;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), DEFAULTS.probeTimeout);
 
@@ -113,6 +139,7 @@
         mode: "cors",
         signal: controller.signal,
       });
+      if (!response.ok) console.error("[loader] The local server returned an error:", await response.text());
       return response.ok;
     } catch {
       return false;
@@ -122,26 +149,28 @@
   }
 
   async function getSource() {
-    if (environment === "live") return { url: liveUrl, kind: "live", localUp: null };
-    // Auto checks for a local build only on localhost itself. From any other
-    // host, Webflow staging included, a request to localhost makes Chrome ask
-    // the visitor for local network access, so there it takes ?env=local.
-    if (environment === "auto" && location.hostname !== "localhost") {
-      return { url: liveUrl, kind: "live", localUp: null };
-    }
+    // Local network access requires an explicit Local choice on a development host.
+    if (environment !== "local") return { url: liveUrl, kind: "live", localUp: null };
 
     const localUp = await localIsAvailable();
     if (localUp) return { url: localUrl, kind: "local", localUp: true };
-    if (environment === "local") {
-      console.warn("[loader] The local bundle is not available. The loader will use the live bundle.");
-    }
+    console.warn("[loader] The local bundle is not available. The loader will use the live bundle.");
     return { url: liveUrl, kind: "live", localUp: false };
   }
 
   function inject(source, canFallback = true) {
+    updatePanel(source);
     const bundle = document.createElement("script");
     bundle.type = "module";
     bundle.src = source.url;
+    bundle.onload = () => {
+      console.log(`[${namespace}] JS bundle loaded`, {
+        environment,
+        source: source.kind,
+        url: source.url,
+        commit,
+      });
+    };
     bundle.onerror = () => {
       console.error("[loader] The bundle did not load.", source.url);
       if (source.kind === "local" && canFallback) {
@@ -149,6 +178,19 @@
       }
     };
     document.head.appendChild(bundle);
+  }
+
+  function updatePanel(source) {
+    const panel = document.querySelector("[data-loader-panel]");
+    if (!panel) return;
+    const state = source.kind === "local" ? "local" : source.localUp === false ? "down" : "live";
+    const status = source.kind === "local" ? "Local connected" : source.localUp === false ? "Local unavailable" : "Live";
+    panel.querySelector("[data-loader-dot]").dataset.state = state;
+    panel.querySelector("[data-loader-title]").textContent = DEFAULTS.label;
+    panel.querySelector("[data-loader-status]").textContent = status;
+    panel.querySelector("[data-loader-source]").textContent = source.kind === "local" ? localBase : "jsDelivr";
+    panel.querySelector("[data-loader-commit]").textContent = commit.slice(0, 10);
+
   }
 
   function mountPanel(source) {
@@ -188,7 +230,6 @@
       </div>
       <div data-loader-options>
         <button data-environment="local" type="button">Local</button>
-        <button data-environment="auto" type="button">Auto</button>
         <button data-environment="live" type="button">Live</button>
       </div>
       <div data-loader-meta>
@@ -199,13 +240,6 @@
       <button data-loader-reset type="button">Reset overrides</button>
     `;
 
-    const state = source.kind === "local" ? "local" : source.localUp === false ? "down" : "live";
-    const status = source.kind === "local" ? "Local connected" : source.localUp === false ? "Local unavailable" : "Live";
-    panel.querySelector("[data-loader-dot]").dataset.state = state;
-    panel.querySelector("[data-loader-title]").textContent = DEFAULTS.label;
-    panel.querySelector("[data-loader-status]").textContent = status;
-    panel.querySelector("[data-loader-source]").textContent = source.kind === "local" ? localBase : "jsDelivr";
-    panel.querySelector("[data-loader-commit]").textContent = commit.slice(0, 10);
 
     panel.querySelectorAll("[data-environment]").forEach((button) => {
       const value = button.dataset.environment;
@@ -226,11 +260,12 @@
     });
     panel.querySelector("[data-loader-close]").addEventListener("click", () => panel.remove());
     root.appendChild(panel);
+    updatePanel(source);
   }
 
   getSource().then((source) => {
     inject(source);
-    const showPanel = devFlag !== false && (devFlag === true || hasOverride || source.localUp === true);
+    const showPanel = devMode && (devFlag === true || hasOverride || source.localUp === true);
     if (showPanel) mountPanel(source);
   });
 })();
