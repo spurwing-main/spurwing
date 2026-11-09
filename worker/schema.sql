@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS questions (
 	question TEXT NOT NULL,
 	answered INTEGER NOT NULL,
 	answer TEXT NOT NULL,
-	sources TEXT NOT NULL,   -- JSON list of the cited page URLs, and "note: <page>" for a team note
+	sources TEXT NOT NULL,   -- JSON list of the cited page URLs
 	first_word_ms INTEGER,
 	ms INTEGER NOT NULL,     -- until the answer finished
 	clarity_user TEXT,       -- Clarity's visitor ID, once cookies are accepted

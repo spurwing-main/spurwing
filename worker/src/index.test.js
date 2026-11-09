@@ -1,9 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 
-import { citedPages, pagesFrom, relay, SYSTEM_PROMPT } from "./answer.js";
+import { citedPages, links, pagesFrom, relay, SYSTEM_PROMPT } from "./answer.js";
 import worker from "./index.js";
-import { syncNotes } from "./notes.js";
 
 const ORIGIN = "https://spurwing.webflow.io";
 
@@ -243,115 +242,14 @@ describe("citedPages", () => {
 	});
 });
 
-describe("notes", () => {
-	const ops = (items) => JSON.stringify({ ops: items });
-	const doc = {
-		is_doc_archived: false,
-		pages: [
-			{ id: "p-howto", name: "Start here", date_updated: 1, content: ops([{ insert: "Rules\n" }]) },
-			{
-				id: "p-shopify",
-				name: "What we don't do",
-				date_updated: 2,
-				content: ops([
-					{ insert: "For the team: write answers under the questions.\n" },
-					{ insert: "Shopify themes" },
-					{ insert: "\n", attributes: { header: 2 } },
-					{ insert: "We don't build Shopify themes, but we connect Shopify stores to Webflow sites.\nSee: " },
-					{ insert: "Greggs", attributes: { link: "https://www.spurwing.co.uk/work/greggs-baked-in-gold" } },
-					{ insert: "\n" },
-					{ insert: "Printed brochures" },
-					{ insert: "\n", attributes: { header: 2 } },
-					{ insert: "We don't design print.\n" },
-					{ insert: "Empty heading" },
-					{ insert: "\n", attributes: { header: 2 } },
-					{ insert: "Do you sign NDAs?" },
-					{ insert: "\n", attributes: { header: 2 } },
-					{ insert: "TBC\n" },
-				]),
-				pages: [{ id: "p-rates", name: "Rates", date_updated: 3, content: ops([{ insert: "Day rates" }, { insert: "\n", attributes: { header: 2 } }, { insert: "Day rates are on request.\nSee: " }, { insert: "ClickUp", attributes: { link: "https://app.clickup.com/x" } }, { insert: "\n" }]) }],
-			},
-		],
-	};
-
-	function bindings(loaded = []) {
-		return {
-			NOTES_URL: "https://notes.example/doc",
-			AI_SEARCH: {
-				items: {
-					list: vi.fn(async () => ({ result: loaded })),
-					upload: vi.fn(async () => ({})),
-					delete: vi.fn(async () => {}),
-				},
-			},
-		};
-	}
-
-	it("loads a note per heading, skipping Start here and text above the first heading, keeps See links only for this site, and removes deleted ones", async () => {
-		vi.stubGlobal("fetch", vi.fn(async () => Response.json(doc)));
-		const env = bindings([
-			{ id: "i-old", key: "notes__p-gone--0.md", metadata: { updated: "1" } },
-			{ id: "i-rates", key: "notes__p-rates--0.md", metadata: { updated: "3" } },
-		]);
-
-		const result = await syncNotes(env);
-
-		expect(result).toEqual({ notes: 3, uploaded: ["notes__p-shopify--0.md", "notes__p-shopify--1.md"], removed: ["notes__p-gone--0.md"] });
-		const [[key, text, { metadata }], [, printText, { metadata: printMeta }]] = env.AI_SEARCH.items.upload.mock.calls;
-		expect(key).toBe("notes__p-shopify--0.md");
-		expect(text).toBe("# What we don't do\n\n## Shopify themes\nWe don't build Shopify themes, but we connect Shopify stores to Webflow sites.");
-		expect(metadata).toEqual({ note: "Shopify themes", title: "Greggs", url: "https://www.spurwing.co.uk/work/greggs-baked-in-gold", updated: "2" });
-		expect(printText).toBe("# What we don't do\n\n## Printed brochures\nWe don't design print.");
-		expect(printMeta).toEqual({ note: "Printed brochures", title: "Printed brochures", url: "", updated: "2" });
-		expect(env.AI_SEARCH.items.delete).toHaveBeenCalledWith("i-old");
-		vi.unstubAllGlobals();
-	});
-
-	it("changes nothing when ClickUp doesn't answer", async () => {
-		vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
-		const env = bindings([{ id: "i-1", key: "notes__p-shopify.md", metadata: {} }]);
-
-		await expect(syncNotes(env)).rejects.toThrow("ClickUp answered 401");
-		expect(env.AI_SEARCH.items.delete).not.toHaveBeenCalled();
-		vi.unstubAllGlobals();
-	});
-
-	it("answers from a note but never links visitors to it, and logs which note it used", async () => {
-		const run = vi.fn(async () => {});
-		const bind = vi.fn(() => ({ run }));
-		const waits = [];
-		const env2 = env({
-			DB: { prepare: vi.fn(() => ({ bind })) },
-			AI: { run: model([delta("We don't build Shopify themes, but we connect Shopify stores to Webflow sites."), done]) },
-			AI_SEARCH: {
-				search: vi.fn(async () => ({
-					chunks: [
-						// Search returns only the url and title metadata fields.
-						{ item: { key: "notes__p-a.md", metadata: { title: "What we don't do", url: "" } }, text: "We don't build Shopify themes, but we connect Shopify stores to Webflow sites." },
-					],
-				})),
-			},
-		});
-
-		const events = await collect((await worker.fetch(ask({ question: "Do you build Shopify themes?" }), env2, { waitUntil: (p) => waits.push(p) })).body);
-		await Promise.all(waits);
-
-		expect(events[0]).toEqual(["sources", []]);
-		expect(events.find(([event]) => event === "cited")).toEqual(["cited", []]);
-		expect(JSON.stringify(events)).not.toContain("notes__");
-		expect(JSON.stringify(events)).not.toContain("clickup");
-		expect(bind.mock.calls[0][8]).toBe(JSON.stringify(["note: What we don't do"]));
-	});
-});
-
 describe("links", () => {
-	it("lists each public page once, even when a note points at it too", async () => {
+	it("lists each page once, and never the LLM info page", async () => {
 		const { links } = await import("./answer.js");
 		expect(
 			links([
-				{ title: "About Spurwing", url: "https://www.spurwing.co.uk/about", note: "Team" },
 				{ title: "About Spurwing", url: "https://www.spurwing.co.uk/about" },
-				{ title: "Rates", url: null, note: "Rates" },
+				{ title: "About Spurwing", url: "https://www.spurwing.co.uk/about" },
+				{ title: "LLM info", url: "https://www.spurwing.co.uk/llm-info", unlinked: true },
 			]),
 		).toEqual([{ title: "About Spurwing", url: "https://www.spurwing.co.uk/about" }]);
 	});
@@ -363,7 +261,9 @@ describe("the LLM info page", () => {
 			{ item: { key: "llm-info.html", metadata: { url: "https://www.spurwing.co.uk/llm-info", title: "LLM info | Spurwing" } }, text: "Spurwing Agency Limited, company number 12977511." },
 			{ item: { key: "about.html", metadata: {} }, text: "About" },
 		]);
-		expect(pages[0]).toMatchObject({ url: null, note: "llm-info" });
-		expect(citedPages(pages, "Spurwing Agency Limited, company number 12977511.")).toEqual([{ title: "LLM info", url: null, note: "llm-info" }]);
+		expect(pages[0]).toMatchObject({ url: "https://www.spurwing.co.uk/llm-info", unlinked: true });
+		const cited = citedPages(pages, "Spurwing Agency Limited, company number 12977511.");
+		expect(cited).toEqual([{ title: "LLM info", url: "https://www.spurwing.co.uk/llm-info", unlinked: true }]);
+		expect(links(cited)).toEqual([]);
 	});
 });

@@ -3,7 +3,6 @@
  * the pages that answer actually drew on.
  */
 import { readEvents } from "./events.js";
-import { NOTE_PREFIX } from "./notes.js";
 
 export const SYSTEM_PROMPT = [
 	"You answer visitors' questions on the website of Spurwing, a UK Webflow agency.",
@@ -94,35 +93,24 @@ export function pagesFrom(chunks = []) {
 			continue;
 		}
 		const meta = item.metadata ?? {};
-		// A team note (notes.js) answers like a page but has no address of its own;
-		// it shows only the public page its "See:" line names, if any. Notes are
-		// known by their key, since AI Search keeps only the url and title fields.
-		if (item.key.startsWith(NOTE_PREFIX)) {
-			const note = meta.note || meta.title || item.key;
-			pages.set(item.key, { title: meta.title || note, url: meta.url || null, note, text });
-			continue;
-		}
 		const path = meta.url ? new URL(meta.url).pathname : pathFromKey(item.key);
 		// The LLM info page is a fact sheet for answer engines: the box answers from
 		// it but sends visitors to the page each fact is about, not to it.
-		if (UNLINKED.has(path.replace(/\/$/, ""))) {
-			pages.set(item.key, { title: shortTitle(meta.title || "LLM info"), url: null, note: "llm-info", text });
-			continue;
-		}
 		pages.set(item.key, {
 			title: shortTitle(meta.title || titleFromPath(path)),
 			url: path === "/" ? SITE : `${SITE}${path}`,
 			text,
+			...(UNLINKED.has(path.replace(/\/$/, "")) && { unlinked: true }),
 		});
 	}
 	return [...pages.values()];
 }
 
-/** Pages as links for the page: no text, no note without a public page, and each page once. */
+/** Pages as links for the page: no text, none the visitor shouldn't be sent to, and each page once. */
 export function links(pages) {
 	const seen = new Set();
 	return pages
-		.filter(({ url }) => url && !seen.has(url) && seen.add(url))
+		.filter(({ url, unlinked }) => !unlinked && !seen.has(url) && seen.add(url))
 		.map(({ title, url }) => ({ title, url }));
 }
 
@@ -139,16 +127,16 @@ export function citedPages(pages, answer) {
 		.filter(({ score }) => score >= 2)
 		.sort((a, b) => b.score - a.score);
 	const best = scored[0]?.score ?? 0;
-	// Notes stay named here for the question log; links() drops what visitors can't see.
+	// Unlinked pages stay here for the question log; links() drops them for visitors.
 	return scored
 		.filter(({ score }) => score >= best / 2)
 		.slice(0, MAX_CITED)
-		.map(({ page: { title, url, note } }) => (note ? { title, url, note } : { title, url }));
+		.map(({ page: { title, url, unlinked } }) => (unlinked ? { title, url, unlinked } : { title, url }));
 }
 
 /** The pages as Terra reads them: title and address, then the text. */
 function context(pages) {
-	return pages.map((page) => `## ${page.title}${page.url ? ` (${page.url})` : ""}\n${page.text}`).join("\n\n");
+	return pages.map((page) => `## ${page.title} (${page.url})\n${page.text}`).join("\n\n");
 }
 
 // Words too common on this site to say which page an answer came from.

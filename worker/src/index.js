@@ -20,7 +20,6 @@
 import { links, pagesFrom, relay, startAnswer } from "./answer.js";
 import { eventStream } from "./events.js";
 import { record } from "./log.js";
-import { syncNotes } from "./notes.js";
 
 const MAX_QUESTION = 300;
 // The page sends its last two questions and answers, so a follow-up has context.
@@ -41,11 +40,6 @@ export default {
 		// Ours alone, locked by INDEX_KEY. Without the key it doesn't exist.
 		if (pathname === "/index" && unlocked(request, env)) return indexPage(request, env);
 		return notFound(cors);
-	},
-
-	// Hourly: reload the team's notes from ClickUp (notes.js).
-	scheduled(event, env, ctx) {
-		ctx.waitUntil(syncNotes(env).then((result) => console.log({ notes: result })));
 	},
 };
 
