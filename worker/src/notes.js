@@ -29,7 +29,7 @@ export async function syncNotes(env) {
 		.filter((page) => !page.archived && !page.deleted && !SKIP.test(page.name ?? ""))
 		.map(toNote);
 
-	const loaded = (await env.AI_SEARCH.items.list({ search: NOTE_PREFIX, per_page: 100 })).result.filter((item) =>
+	const loaded = (await env.AI_SEARCH.items.list({ search: NOTE_PREFIX, per_page: 50 })).result.filter((item) =>
 		item.key?.startsWith(NOTE_PREFIX),
 	);
 	const byKey = new Map(loaded.map((item) => [item.key, item]));
