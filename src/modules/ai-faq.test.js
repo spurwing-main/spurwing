@@ -219,7 +219,8 @@ describe("initAiFaq", () => {
 
 		const card = $('[data-ai-faq="answer"]');
 		expect(card.nextElementSibling).toBe($('[data-ai-faq="ask"]'));
-		expect([...card.children].map((child) => child.className)).toEqual(["faq-card_trigger", "faq-card_panel"]);
+		expect([...card.children].map((child) => child.tagName + "." + child.className)).toEqual(["H3.", "DIV.faq-card_panel"]);
+		expect(card.querySelector("h3 > .faq-card_trigger > .faq-card_title")).not.toBeNull();
 		const star = card.querySelector(".faq-card_icon svg");
 		expect(star.hasAttribute("data-ai-faq")).toBe(false);
 		expect(star.hasAttribute("class")).toBe(false);
@@ -232,15 +233,49 @@ describe("initAiFaq", () => {
 		expect(card.querySelector(".faq-card_icon svg path").getAttribute("d")).toMatch(/^M56 86/);
 	});
 
-	it("moves focus to Ask another when the text box took it away", async () => {
+	it("moves focus to the question's heading when the text box goes, and leaves it there", async () => {
 		respondWith(sse([["token", "Yes."]]));
 		initAiFaq();
 
 		$('[data-ai-faq="input"]').focus();
 		ask("Keyboard?");
+		const heading = $('[data-ai-faq="answer"] h3');
+		expect(document.activeElement).toBe(heading);
 		await settled();
 
-		expect(document.activeElement).toBe($('[data-ai-faq="another"]'));
+		expect(heading.querySelector(".faq-card_title").textContent).toBe("Keyboard?");
+		expect(document.activeElement).toBe(heading);
+	});
+
+	it("tells a screen reader it is writing, then reads the finished answer once", async () => {
+		respondWith(
+			sse([
+				["sources", [{ title: "About", url: "/about" }]],
+				["token", "Six "],
+				["token", "people."],
+			]),
+		);
+		initAiFaq();
+		const status = $('[data-ai-faq="component"] [role="status"]');
+		expect(status.textContent).toBe("");
+
+		ask("How many?");
+		expect(status.textContent).toBe("Writing an answer…");
+		await settled();
+
+		expect(status.textContent).toBe("Six people.");
+		expect($('[data-ai-faq="answer"] [aria-live]')).toBeNull();
+	});
+
+	it("reveals first when it leads the list, and after the questions when it ends it", () => {
+		const question = '<div data-accordion="item"></div>';
+		document.body.innerHTML = `<div class="list">${markup}${question}${question}</div>`;
+		initAiFaq();
+		expect($(".faq-card").style.getPropertyValue("--anim-i")).toBe("0");
+
+		document.body.innerHTML = `<div class="list">${question}${question}${markup}</div>`;
+		initAiFaq();
+		expect($(".faq-card").style.getPropertyValue("--anim-i")).toBe("2");
 	});
 
 	it("lets Ask another, then the new ask card, take their room gradually so the page below glides", async () => {

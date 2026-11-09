@@ -3,7 +3,8 @@ import { animate } from "motion";
 import { claimOnce, requireElement } from "../dom.js";
 
 /**
- * Ask your own question: the AI box at the end of every FAQ list.
+ * Ask your own question: the AI box in every FAQ list, before or after the
+ * questions.
  *
  *   <div data-ai-faq="component">
  *     <div data-ai-faq="ask">
@@ -75,6 +76,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		const sparkle = component.querySelector('[data-ai-faq="sparkle"]');
 		const askCard = input.closest(".faq-card");
 		const plus = another.querySelector("svg");
+		const announcer = liveRegion(component);
 		const history = [];
 		// Ties this box's follow-ups together in the log; one per page view.
 		const conversation = crypto.randomUUID();
@@ -150,16 +152,18 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 		/**
 		 * The ask card reveals with the site's scroll animation on the turn after
-		 * the cards above it. The site's rule sets --anim-i on every data-anim
-		 * element, so the turn goes on the card itself. The sparkle sits outside
-		 * the card, where the reveal's mask would hide it, so it fades in on the
-		 * same beat instead; without the scroll animation (reduced motion, or its
-		 * safety net switched it off) the sparkle is simply there.
+		 * the questions above it: first when it leads the list, last when it ends
+		 * it. The site's rule sets --anim-i on every data-anim element, so the turn
+		 * goes on the card itself. The sparkle sits outside the card, where the
+		 * reveal's mask would hide it, so it fades in on the same beat instead;
+		 * without the scroll animation (reduced motion, or its safety net switched
+		 * it off) the sparkle is simply there.
 		 */
 		function revealWithTheList() {
 			if (!askCard) return;
-			const list = component.parentElement;
-			const turn = Math.min(list ? list.querySelectorAll(".w-dyn-item, .faqs-new_extra > *").length : 0, 6);
+			const questions = component.parentElement?.querySelectorAll('[data-accordion="item"]') ?? [];
+			const above = [...questions].filter((item) => item.compareDocumentPosition(component) & Node.DOCUMENT_POSITION_FOLLOWING);
+			const turn = Math.min(above.length, 6);
 			if (!askCard.hasAttribute("data-anim")) askCard.setAttribute("data-anim", "card");
 			askCard.style.setProperty("--anim-i", String(turn));
 
@@ -206,6 +210,10 @@ export function initAiFaq(root = document, { signal } = {}) {
 			const hadFocus = ask.contains(document.activeElement);
 			ask.before(card.element);
 			ask.hidden = true;
+			// Hiding the ask card would drop focus to the top of the page, so it moves
+			// to the question's heading, where a screen reader picks up the answer.
+			if (hadFocus) card.heading.focus({ preventScroll: true });
+			announcer.textContent = config.stages[2];
 			card.open();
 			// Measured while hidden, the box would collapse to nothing and come back
 			// unusable, so clear its size and measure again when it returns.
@@ -214,6 +222,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 			const answer = await stream(question, card, id);
 			card.finish();
+			// Read once, whole: announced word by word as it streams, a screen
+			// reader missed the start and spoke the rest in fragments.
+			announcer.textContent = card.spoken();
 			busy = false;
 
 			if (answer) {
@@ -226,11 +237,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 			another.hidden = false;
 			makeRoom(another);
 			rise(another);
-			// Focus went with the hidden ask card; unless the reader has moved on,
-			// it comes back on the next thing to do.
-			const lost = document.activeElement === document.body || ask.contains(document.activeElement);
-			// No ring for it: the reader didn't move it there.
-			if (hadFocus && lost) another.focus({ preventScroll: true, focusVisible: false });
 		}
 
 		async function stream(question, card, id) {
@@ -291,13 +297,15 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 		/**
 		 * One answer card, built from the classes a curated FAQ card carries so the
-		 * Designer's styles apply. It isn't an accordion item and isn't marked up
-		 * as a published FAQ: the AI's answers are never presented to Google as ours.
+		 * Designer's styles apply, in its shape: a heading around the row. It isn't
+		 * an accordion item and isn't marked up as a published FAQ: the AI's
+		 * answers are never presented to Google as ours.
 		 */
 		function answerCard(question) {
 			const element = node("div", "faq-card");
+			const heading = node("h3");
 			const head = node("div", "faq-card_trigger");
-			const title = node("h3", "faq-card_title");
+			const title = node("span", "faq-card_title");
 			const status = node("span", "faq-card_icon");
 			const panel = node("div", "faq-card_panel");
 			const content = node("div", "faq-card_content");
@@ -313,14 +321,15 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 			element.dataset.aiFaq = "answer";
 			element.setAttribute("aria-busy", "true");
+			heading.tabIndex = -1;
 			head.style.cursor = "default";
 			title.textContent = question;
-			body.setAttribute("aria-live", "polite");
 			head.append(title, status);
+			heading.append(head);
 			body.append(text);
 			content.append(body);
 			panel.append(content);
-			element.append(head, panel);
+			element.append(heading, panel);
 
 			// The thinking star is the ask card's own sparkle, twinkling as in the
 			// design: each star shrinks, turns and dims in turn.
@@ -469,6 +478,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 				if (!pages.length) return;
 				const from = node("p");
+				from.dataset.aiFaqSources = "";
 				from.append("From: ");
 				pages.forEach((page, index) => {
 					const link = node("a", "text-style-link");
@@ -480,8 +490,36 @@ export function initAiFaq(root = document, { signal } = {}) {
 				rise(from);
 			}
 
-			return { element, open, stage, write, cite, handoff, finish };
+			// What a screen reader hears once the card is done: the answer, or the
+			// hand-off, without the stage words or the sources line.
+			function spoken() {
+				return [...body.querySelectorAll("p")]
+					.filter((p) => !p.hasAttribute("data-ai-faq-sources"))
+					.map((p) => p.textContent.trim())
+					.filter(Boolean)
+					.join(" ");
+			}
+
+			return { element, heading, open, stage, write, cite, handoff, finish, spoken };
 		}
+	}
+
+	// One polite status per box, there from the start: a region created along
+	// with its message is often not heard at all.
+	function liveRegion(component) {
+		const region = node("div");
+		region.setAttribute("role", "status");
+		Object.assign(region.style, {
+			position: "absolute",
+			width: "1px",
+			height: "1px",
+			overflow: "hidden",
+			clip: "rect(0 0 0 0)",
+			clipPath: "inset(50%)",
+			whiteSpace: "nowrap",
+		});
+		component.append(region);
+		return region;
 	}
 
 	// The design's fade-up: in from 8px below, on Spurwing's ease.
