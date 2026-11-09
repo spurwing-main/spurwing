@@ -7,8 +7,8 @@
  * Each heading on a page starts its own note, so one page can hold many topics.
  * A note answers like a page but is never shown as a link. A line under a
  * heading like "See: [About Spurwing](https://www.spurwing.co.uk/about)" gives
- * answers drawn from that note that public link instead. "How to use this doc"
- * is never read.
+ * answers drawn from that note that public link instead. The pages for the team
+ * ("How to use this doc" and "Known gaps") are never read.
  *
  * NOTES_URL is the JSON behind the Doc's public link, which ClickUp's own
  * viewer reads. It isn't a documented API, so a change on ClickUp's side shows
@@ -17,7 +17,8 @@
 
 export const NOTE_PREFIX = "notes__";
 const SITE_HOST = "www.spurwing.co.uk";
-const SKIP = /^how to use/i;
+// Pages for the team, not the box: its rules, and the questions it can't answer yet.
+const SKIP = /^(how to use|known gaps)/i;
 
 export async function syncNotes(env) {
 	if (!env.NOTES_URL) throw new Error("notes: NOTES_URL is not set");

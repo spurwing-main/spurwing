@@ -249,6 +249,7 @@ describe("notes", () => {
 		is_doc_archived: false,
 		pages: [
 			{ id: "p-howto", name: "How to use this doc", date_updated: 1, content: ops([{ insert: "Rules\n" }]) },
+			{ id: "p-gaps", name: "Known gaps", date_updated: 1, content: ops([{ insert: "Do you sign NDAs?\n" }]) },
 			{
 				id: "p-shopify",
 				name: "What we don't do",
@@ -283,7 +284,7 @@ describe("notes", () => {
 		};
 	}
 
-	it("loads a note per heading on each page but the how-to, keeps See links only for this site, and removes deleted ones", async () => {
+	it("loads a note per heading on each page but the how-to and known gaps, keeps See links only for this site, and removes deleted ones", async () => {
 		vi.stubGlobal("fetch", vi.fn(async () => Response.json(doc)));
 		const env = bindings([
 			{ id: "i-old", key: "notes__p-gone--0.md", metadata: { updated: "1" } },
