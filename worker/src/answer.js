@@ -20,6 +20,7 @@ export const UNANSWERED = Object.freeze({ answered: false, answer: "", sources: 
 const NO_ANSWER = "NO_ANSWER";
 const SITE = "https://www.spurwing.co.uk";
 const MAX_CITED = 2;
+const UNLINKED = new Set(["/llm-info"]);
 
 /**
  * Terra's answer as a stream of OpenAI-style deltas. Without reasoning its
@@ -102,6 +103,12 @@ export function pagesFrom(chunks = []) {
 			continue;
 		}
 		const path = meta.url ? new URL(meta.url).pathname : pathFromKey(item.key);
+		// The LLM info page is a fact sheet for answer engines: the box answers from
+		// it but sends visitors to the page each fact is about, not to it.
+		if (UNLINKED.has(path.replace(/\/$/, ""))) {
+			pages.set(item.key, { title: shortTitle(meta.title || "LLM info"), url: null, note: "llm-info", text });
+			continue;
+		}
 		pages.set(item.key, {
 			title: shortTitle(meta.title || titleFromPath(path)),
 			url: path === "/" ? SITE : `${SITE}${path}`,

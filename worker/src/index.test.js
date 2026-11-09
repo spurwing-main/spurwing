@@ -356,3 +356,14 @@ describe("links", () => {
 		).toEqual([{ title: "About Spurwing", url: "https://www.spurwing.co.uk/about" }]);
 	});
 });
+
+describe("the LLM info page", () => {
+	it("answers from it but never links visitors to it", () => {
+		const pages = pagesFrom([
+			{ item: { key: "llm-info.html", metadata: { url: "https://www.spurwing.co.uk/llm-info", title: "LLM info | Spurwing" } }, text: "Spurwing Agency Limited, company number 12977511." },
+			{ item: { key: "about.html", metadata: {} }, text: "About" },
+		]);
+		expect(pages[0]).toMatchObject({ url: null, note: "llm-info" });
+		expect(citedPages(pages, "Spurwing Agency Limited, company number 12977511.")).toEqual([{ title: "LLM info", url: null, note: "llm-info" }]);
+	});
+});
