@@ -37,6 +37,10 @@ const config = {
 	ease: "linear",
 	fade: 0.4, // seconds the line takes to fade out when the step changes
 	fadeEase: "easeOut",
+	// Milliseconds a picked step waits, at most, for the previous image's copy
+	// to decode. An image already on screen decodes in a few; a tab must never
+	// feel slower than this.
+	cover: 100,
 	activeClass: "is-active",
 	// The site's reveal keyframes, from the Global motion CSS.
 	reveal: /^anim-/,
@@ -182,10 +186,14 @@ function run(section, steps, template, signal) {
 	};
 
 	// The previous image goes on top of the incoming step while that step is
-	// still hidden, and the step only shows once the copy is decoded. Safari
+	// still hidden, and the step shows once the copy is decoded. Safari
 	// decodes a new image off the main thread, so without the wait the first
 	// frame shows the new image alone, then the old one pops back and fades:
 	// a flash on every tab change.
+	//
+	// The copy must not keep loading="lazy": Safari never loads a lazy image
+	// inside a hidden step, so its decode() never settles. And the step never
+	// waits on the decode alone: after config.cover it shows regardless.
 	const coverWithPrevious = (previousImage, source, step) => {
 		stopImageFade();
 		if (reduced || !previousImage || !source || !previousImage.complete || !previousImage.naturalWidth) return null;
@@ -195,7 +203,7 @@ function run(section, steps, template, signal) {
 		if (!image) return null;
 
 		const overlay = previousImage.cloneNode(false);
-		for (const attribute of ["srcset", "sizes", "data-img", "data-wf-id", "data-w-id", "id"]) {
+		for (const attribute of ["loading", "srcset", "sizes", "data-img", "data-wf-id", "data-w-id", "id"]) {
 			overlay.removeAttribute(attribute);
 		}
 		overlay.src = source;
@@ -207,7 +215,12 @@ function run(section, steps, template, signal) {
 		imageFade = controller;
 		controller.signal.addEventListener("abort", () => overlay.remove(), { once: true });
 
-		return { overlay, image, media, controller, ready: overlay.decode().catch(() => {}) };
+		const ready = Promise.race([
+			overlay.decode().catch(() => {}),
+			new Promise((resolve) => setTimeout(resolve, config.cover)),
+		]);
+
+		return { overlay, image, media, controller, ready };
 	};
 
 	const fadeOut = ({ overlay, image, media, controller }) => {

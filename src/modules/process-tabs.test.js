@@ -195,6 +195,40 @@ describe("initProcessTabs", () => {
 		expect(newStep.querySelectorAll("[data-process-media] img")).toHaveLength(1);
 	});
 
+	it("still changes step when the previous image's copy never decodes", async () => {
+		document.body.innerHTML = mediaSection(2);
+		for (const image of document.querySelectorAll("[data-process-media] img")) loaded(image);
+		HTMLImageElement.prototype.animate = vi.fn(() => ({ cancel: vi.fn(), onfinish: null }));
+		HTMLImageElement.prototype.decode = vi.fn(() => new Promise(() => {}));
+
+		initProcessTabs();
+		tabs()[1].click();
+
+		const [oldStep, newStep] = steps();
+		await vi.waitFor(() => expect(newStep.hidden).toBe(false), { timeout: 500 });
+		expect(oldStep.hidden).toBe(true);
+		expect(HTMLImageElement.prototype.animate).toHaveBeenCalledOnce();
+	});
+
+	it("does not copy lazy loading onto the previous image's copy", async () => {
+		// Safari never loads a lazy image inside a hidden step, so a lazy copy
+		// would never decode.
+		document.body.innerHTML = mediaSection(2);
+		for (const image of document.querySelectorAll("[data-process-media] img")) {
+			loaded(image);
+			image.setAttribute("loading", "lazy");
+		}
+		HTMLImageElement.prototype.animate = vi.fn(() => ({ cancel: vi.fn(), onfinish: null }));
+		HTMLImageElement.prototype.decode = vi.fn(() => Promise.resolve());
+
+		initProcessTabs();
+		tabs()[1].click();
+		await settled();
+
+		const copy = steps()[1].querySelectorAll("[data-process-media] img")[1];
+		expect(copy.hasAttribute("loading")).toBe(false);
+	});
+
 	it("waits for the next image to load before fading the previous one", async () => {
 		document.body.innerHTML = mediaSection(2);
 		const [oldImage, newImage] = document.querySelectorAll("[data-process-media] img");
