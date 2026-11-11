@@ -43,7 +43,6 @@ const navPanelConfig = {
 	// worse than one the markup defines. Every container's children, plus the
 	// work rail, which is a full-bleed sibling of the containers.
 	row: ".container > *, .work-slide_swiper",
-	arrow: ".nav_panel-arrow",
 	scrim: "[data-nav-scrim]",
 	linkSelector: "a",
 	openAttr: "data-nav-open",
@@ -230,22 +229,9 @@ export function initNavPanel(root = document, { signal } = {}) {
 		target.addEventListener(event, fn, { signal, ...options });
 	}
 
-	// Stamped because these arrows reject a Designer attribute too, and because
-	// nav-panel is registered before work-slide, which reads them. If the arrows
-	// are ever rebuilt in the Designer rather than from WHTML, put the
-	// attributes there and delete this.
 	items.forEach((item) => {
-		const arrows = [...item.querySelectorAll(navPanelConfig.arrow)];
-		arrows.forEach((arrow, index) => {
-			arrow.setAttribute("data-work-slide", index === 0 ? "prev" : "next");
-			arrow.setAttribute("role", "button");
-			arrow.setAttribute("tabindex", "0");
-			arrow.setAttribute("aria-label", index === 0 ? "Previous work" : "Next work");
-			arrow.setAttribute("data-cursor-text", index === 0 ? "Previous" : "Next");
-		});
-
 		// The link names its panel with aria-controls, but the panel rejects a
-		// Designer id like the arrows reject attributes, so it is given here.
+		// Designer id, so it is given here.
 		const controls = linkOf(item)?.getAttribute("aria-controls");
 		if (controls) panelOf(item).id = controls;
 	});

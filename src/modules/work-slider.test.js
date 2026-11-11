@@ -17,8 +17,8 @@ function section(count) {
 				<div class="w-dyn-list"><div role="list">${cards}</div></div>
 			</div>
 			<div><div data-work-slider-progress></div></div>
-			<div data-work-slider-prev></div>
-			<div data-work-slider-next></div>
+			<div data-slider-arrow="prev"></div>
+			<div data-slider-arrow="next"></div>
 		</section>
 	`;
 }
@@ -85,19 +85,19 @@ describe("initWorkSlider", () => {
 
 		initWorkSlider();
 
-		expect($("[data-work-slider-prev]").getAttribute("aria-disabled")).toBe("true");
-		expect($("[data-work-slider-prev]").getAttribute("tabindex")).toBe("-1");
-		expect($("[data-work-slider-next]").getAttribute("aria-disabled")).toBe("false");
+		expect($('[data-slider-arrow="prev"]').getAttribute("aria-disabled")).toBe("true");
+		expect($('[data-slider-arrow="prev"]').getAttribute("tabindex")).toBe("-1");
+		expect($('[data-slider-arrow="next"]').getAttribute("aria-disabled")).toBe("false");
 
-		$("[data-work-slider-next]").click();
+		$('[data-slider-arrow="next"]').click();
 		expect(embla.api.scrollNext).toHaveBeenCalledOnce();
 
 		embla.api.canScrollPrev.mockReturnValue(true);
 		embla.api.canScrollNext.mockReturnValue(false);
 		embla.handlers.select();
 
-		expect($("[data-work-slider-prev]").getAttribute("aria-disabled")).toBe("false");
-		expect($("[data-work-slider-next]").getAttribute("aria-disabled")).toBe("true");
+		expect($('[data-slider-arrow="prev"]').getAttribute("aria-disabled")).toBe("false");
+		expect($('[data-slider-arrow="next"]').getAttribute("aria-disabled")).toBe("true");
 	});
 
 	it("moves the bar with the row", () => {

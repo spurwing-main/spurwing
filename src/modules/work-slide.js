@@ -10,9 +10,9 @@ const workSlideConfig = {
 	cardSelector: ".work-item_component",
 	containerSelector: ".container",
 	dotsSelector: ".caps_dots",
-	arrowSelector: "[data-work-slide]",
-	previousSelector: '[data-work-slide="prev"]',
-	nextSelector: '[data-work-slide="next"]',
+	arrowSelector: "[data-slider-arrow]",
+	previousSelector: '[data-slider-arrow="prev"]',
+	nextSelector: '[data-slider-arrow="next"]',
 	dotClass: "caps_dot",
 	selectedDotClass: "caps_dot--selected",
 	disabledArrowClass: "swiper-button-disabled",
@@ -160,7 +160,8 @@ function initSlider(section, signal) {
 	let dots = null;
 	let updateFrame = 0;
 
-	// The Designer marks optional controls with data-work-slide="prev" or "next".
+	// Optional controls: the Slider arrows component, whose buttons carry
+	// data-slider-arrow="prev" or "next".
 	// Handing them to Swiper's own navigation module — rather than stepping the
 	// slider by hand — is what gives them .swiper-button-disabled at each end,
 	// the class the site's shared slider-arrows CSS already styles.

@@ -12,7 +12,7 @@ import { grabCursor } from "./slider-controls.js";
  *       …<div role="list"> (the Collection List's items)
  *         <div role="listitem">…</div> × n
  *     <div><div data-work-slider-progress></div></div>
- *     <div data-work-slider-prev>…</div><div data-work-slider-next>…</div>
+ *     Slider arrows component: <div data-slider-arrow="prev">…</div><div data-slider-arrow="next">…</div>
  *   </section>
  *
  * The row is the first `[role="list"]` in the viewport, so the Collection
@@ -46,8 +46,8 @@ export function initWorkSlider(root = document, { signal } = {}) {
 function run(section, viewport, container, signal) {
 	const slides = [...container.children];
 	const fill = section.querySelector("[data-work-slider-progress]");
-	const previous = section.querySelector("[data-work-slider-prev]");
-	const next = section.querySelector("[data-work-slider-next]");
+	const previous = section.querySelector('[data-slider-arrow="prev"]');
+	const next = section.querySelector('[data-slider-arrow="next"]');
 
 	const embla = EmblaCarousel(viewport, {
 		container,

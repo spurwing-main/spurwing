@@ -9,9 +9,9 @@ import { initWorkSlide } from "./work-slide.js";
 function section({ arrows = true } = {}) {
 	const controls = arrows
 		? `
-			<div class="slider_arrows">
-				<div class="slider_arrow" role="button" tabindex="0" data-work-slide="prev"></div>
-				<div class="slider_arrow" role="button" tabindex="0" data-work-slide="next"></div>
+			<div class="slider-arrows" data-slider-arrows>
+				<div class="slider-arrows_button" role="button" tabindex="0" data-slider-arrow="prev"></div>
+				<div class="slider-arrows_button" role="button" tabindex="0" data-slider-arrow="next"></div>
 			</div>
 		`
 		: "";
@@ -105,8 +105,8 @@ describe("initWorkSlide", () => {
 
 		const options = createSwiper.mock.calls[0][1];
 
-		expect(options.navigation.prevEl).toBe(document.querySelector('[data-work-slide="prev"]'));
-		expect(options.navigation.nextEl).toBe(document.querySelector('[data-work-slide="next"]'));
+		expect(options.navigation.prevEl).toBe(document.querySelector('[data-slider-arrow="prev"]'));
+		expect(options.navigation.nextEl).toBe(document.querySelector('[data-slider-arrow="next"]'));
 		expect(options.navigation.disabledClass).toBe("swiper-button-disabled");
 	});
 
@@ -116,8 +116,8 @@ describe("initWorkSlide", () => {
 		initWorkSlide();
 
 		const { on } = createSwiper.mock.calls[0][1];
-		const previous = document.querySelector('[data-work-slide="prev"]');
-		const next = document.querySelector('[data-work-slide="next"]');
+		const previous = document.querySelector('[data-slider-arrow="prev"]');
+		const next = document.querySelector('[data-slider-arrow="next"]');
 
 		instance.isBeginning = true;
 		on.init(instance);
@@ -138,7 +138,7 @@ describe("initWorkSlide", () => {
 
 		initWorkSlide();
 
-		const next = document.querySelector('[data-work-slide="next"]');
+		const next = document.querySelector('[data-slider-arrow="next"]');
 		const clicked = vi.fn();
 
 		next.addEventListener("click", clicked);

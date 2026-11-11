@@ -20,9 +20,9 @@ const section = (list) => `
 		<div class="embla">
 			<div class="impact_rt w-richtext">${list}</div>
 		</div>
-		<div class="slider_arrows">
-			<button class="slider_arrow"></button>
-			<button class="slider_arrow"></button>
+		<div class="slider-arrows" data-slider-arrows>
+			<button class="slider-arrows_button" data-slider-arrow="prev"></button>
+			<button class="slider-arrows_button" data-slider-arrow="next"></button>
 		</div>
 	</section>
 `;

@@ -10,8 +10,8 @@ import { grabCursor } from "./slider-controls.js";
 const impactConfig = {
 	sectionSelector: ".section_impact",
 	viewportSelector: ".embla",
-	arrowsSelector: ".slider_arrows",
-	arrowSelector: ".slider_arrow",
+	arrowsSelector: "[data-slider-arrows]",
+	arrowSelector: "[data-slider-arrow]",
 	layoutSelector: ".impact_layout",
 	claimAttr: "data-impact-ready",
 	grabbingClass: "is-grabbing",
