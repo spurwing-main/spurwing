@@ -181,13 +181,18 @@ function run(section, steps, template, signal) {
 		imageFade = null;
 	};
 
-	const fadeImage = (previousImage, source, step) => {
+	// The previous image goes on top of the incoming step while that step is
+	// still hidden, and the step only shows once the copy is decoded. Safari
+	// decodes a new image off the main thread, so without the wait the first
+	// frame shows the new image alone, then the old one pops back and fades:
+	// a flash on every tab change.
+	const coverWithPrevious = (previousImage, source, step) => {
 		stopImageFade();
-		if (reduced || !previousImage || !source || !previousImage.complete || !previousImage.naturalWidth) return;
+		if (reduced || !previousImage || !source || !previousImage.complete || !previousImage.naturalWidth) return null;
 
 		const media = step.querySelector("[data-process-media]");
 		const image = media?.querySelector("img");
-		if (!image) return;
+		if (!image) return null;
 
 		const overlay = previousImage.cloneNode(false);
 		for (const attribute of ["srcset", "sizes", "data-img", "data-wf-id", "data-w-id", "id"]) {
@@ -201,6 +206,13 @@ function run(section, steps, template, signal) {
 		const controller = new AbortController();
 		imageFade = controller;
 		controller.signal.addEventListener("abort", () => overlay.remove(), { once: true });
+
+		return { overlay, image, media, controller, ready: overlay.decode().catch(() => {}) };
+	};
+
+	const fadeOut = ({ overlay, image, media, controller }) => {
+		if (controller.signal.aborted) return;
+
 		const start = () => {
 			const animation = overlay.animate([{ opacity: 1 }, { opacity: 0 }], {
 				duration: Number(media.dataset.processFade),
@@ -219,19 +231,32 @@ function run(section, steps, template, signal) {
 		}
 	};
 
+	let switching = 0;
+
 	const show = (index, { focus = false, first = false } = {}) => {
 		const changed = !first && active !== index;
 		const previousImage = changed ? steps[active].querySelector("[data-process-media] img") : null;
 		const previousSource = previousImage?.currentSrc || previousImage?.src;
 		active = index;
 
-		steps.forEach((step, i) => {
-			step.hidden = i !== index;
-		});
+		const turn = ++switching;
+		const cover = changed ? coverWithPrevious(previousImage, previousSource, steps[index]) : null;
 
-		// The first step reveals as it scrolls in, like everything else.
-		if (!first) reveal(steps[index]);
-		if (changed) fadeImage(previousImage, previousSource, steps[index]);
+		const swap = () => {
+			// A quicker pick has already moved on.
+			if (turn !== switching) return;
+
+			steps.forEach((step, i) => {
+				step.hidden = i !== index;
+			});
+
+			// The first step reveals as it scrolls in, like everything else.
+			if (!first) reveal(steps[index]);
+			if (cover) fadeOut(cover);
+		};
+
+		if (cover) cover.ready.then(swap);
+		else swap();
 
 		tabs.forEach((tab, i) => {
 			const selected = i === index;

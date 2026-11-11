@@ -41,6 +41,9 @@ function loaded(image) {
 	});
 }
 
+// Lets the decode the module waits on settle before the step changes.
+const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 // A controllable animation: the test decides when it finishes.
 function animation() {
 	let finish;
@@ -159,16 +162,26 @@ describe("initProcessTabs", () => {
 		expect(hover.play).not.toHaveBeenCalled();
 	});
 
-	it("fades the previous image over the new image without exposing a duplicate", () => {
+	it("fades the previous image over the new image without exposing a duplicate", async () => {
 		document.body.innerHTML = mediaSection(2);
 		for (const image of document.querySelectorAll("[data-process-media] img")) loaded(image);
 		const fade = { cancel: vi.fn(), onfinish: null };
 		HTMLImageElement.prototype.animate = vi.fn(() => fade);
+		let decoded;
+		HTMLImageElement.prototype.decode = vi.fn(() => new Promise((resolve) => (decoded = resolve)));
 
 		initProcessTabs();
 		tabs()[1].click();
 
 		const [oldStep, newStep] = steps();
+
+		// Until the previous image's copy is decoded the new step stays hidden,
+		// so its first frame never shows without the copy on top.
+		await settled();
+		expect(newStep.hidden).toBe(true);
+
+		decoded();
+		await settled();
 		const images = newStep.querySelectorAll("[data-process-media] img");
 		expect(oldStep.hidden).toBe(true);
 		expect(newStep.hidden).toBe(false);
@@ -182,15 +195,17 @@ describe("initProcessTabs", () => {
 		expect(newStep.querySelectorAll("[data-process-media] img")).toHaveLength(1);
 	});
 
-	it("waits for the next image to load before fading the previous one", () => {
+	it("waits for the next image to load before fading the previous one", async () => {
 		document.body.innerHTML = mediaSection(2);
 		const [oldImage, newImage] = document.querySelectorAll("[data-process-media] img");
 		loaded(oldImage);
 		Object.defineProperty(newImage, "complete", { configurable: true, value: false });
 		HTMLImageElement.prototype.animate = vi.fn(() => ({ cancel: vi.fn(), onfinish: null }));
+		HTMLImageElement.prototype.decode = vi.fn(() => Promise.resolve());
 
 		initProcessTabs();
 		tabs()[1].click();
+		await settled();
 		expect(steps()[1].querySelectorAll("[data-process-media] img")).toHaveLength(2);
 		expect(HTMLImageElement.prototype.animate).not.toHaveBeenCalled();
 
@@ -198,7 +213,7 @@ describe("initProcessTabs", () => {
 		expect(HTMLImageElement.prototype.animate).toHaveBeenCalledOnce();
 	});
 
-	it("cleans up an interrupted image fade when another tab is picked", () => {
+	it("cleans up an interrupted image fade when another tab is picked", async () => {
 		document.body.innerHTML = mediaSection(3);
 		for (const image of document.querySelectorAll("[data-process-media] img")) loaded(image);
 		const fades = [];
@@ -207,10 +222,13 @@ describe("initProcessTabs", () => {
 			fades.push(fade);
 			return fade;
 		});
+		HTMLImageElement.prototype.decode = vi.fn(() => Promise.resolve());
 
 		initProcessTabs();
 		tabs()[1].click();
+		await settled();
 		tabs()[2].click();
+		await settled();
 
 		expect(fades[0].cancel).toHaveBeenCalledOnce();
 		expect(steps()[1].querySelectorAll("[data-process-media] img")).toHaveLength(1);
