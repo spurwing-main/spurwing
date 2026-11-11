@@ -22,7 +22,6 @@ import { initQuoteFade } from "./quote-fade.js";
 import { initRightway } from "./rightway.js";
 import { initRtFlow } from "./rt-flow.js";
 import { initStick } from "./stick.js";
-import { initTabbed } from "./tabbed.js";
 import { initTeamSwitch } from "./team-switch.js";
 import { initTicker } from "./ticker.js";
 import { initWave } from "./wave.js";
@@ -48,7 +47,6 @@ export const modules = [
 	{ name: "faq", init: initFaq },
 	{ name: "ai-faq", init: initAiFaq },
 	{ name: "insight-toc", init: initInsightToc },
-	{ name: "tabbed", init: initTabbed },
 	{ name: "team-switch", init: initTeamSwitch },
 	{ name: "wave", init: initWave },
 	{ name: "stick", init: initStick },

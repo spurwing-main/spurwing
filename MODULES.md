@@ -124,10 +124,6 @@ The parts every slider shares, whichever library drives it: the dots, and the gr
 
 Marks whichever item in the sticky list sits nearest the middle of the viewport. Desktop only — below the breakpoint the list reads straight through.
 
-### `tabbed.js`
-
-Runs the tabbed capabilities section (`.tcp`): one stage at a time, and one panel open inside it. A stage and its row of panels pair by position, not by id. The module writes one attribute per level — `data-stage-open` on the group, `data-open` on the item, `data-current` on the stage — and gives each panel and its copy the ids that tie them together. Panels are controls, not tabs: each is a click-and-key target and the paragraph below the row is the region it names. The state the markup ships wins, so the Designer decides what opens; the section is marked ready only after it is wired, and every rule that collapses it is gated on that mark, so a blocked bundle leaves the section in normal flow. It claims each section once, because a page transition leaves both pages in the DOM. Rail width, expansion, the vertical label and the durations all live in the section's CSS embed — this file sets no style and knows no duration.
-
 ### `team-switch.js`
 
 Switches the team section between its groups, cross-fading with a view transition where the browser has one.
