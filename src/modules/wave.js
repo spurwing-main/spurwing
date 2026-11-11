@@ -32,7 +32,9 @@ const config = {
 	wave: { duration: 1.1, ease: "easeInOut", repeat: Infinity, repeatDelay: 0.4 },
 	fade: { duration: 0.2, ease: "easeOut" },
 	// The Large button's hand, added by script.
-	large: '[data-wf--button--variant="large"]',
+	// Webflow names the attribute after the variant setting and its panel group,
+	// so a setting moved into "Settings" publishes as settings-variant.
+	large: '[data-wf--button--variant="large" i], [data-wf--button--settings-variant="large" i]',
 	hand: '<div data-wave-hand aria-hidden="true"><div>👋</div></div>',
 };
 
