@@ -19,6 +19,7 @@ const workSlideConfig = {
 	grabbingClass: "is-grabbing",
 	revealOptOutAttr: "data-reveal-disabled",
 	gapVar: "--work-slide--gap",
+	peekVar: "--work-slide--peek",
 	widthVar: "--work-slide-item-width",
 	dragThreshold: 6,
 	speed: 450,
@@ -108,7 +109,22 @@ function initSlider(section, signal) {
 		// and let the next resize settle it.
 		if (!widest) return;
 
-		section.style.setProperty(workSlideConfig.widthVar, `${widest}px`);
+		// A card's natural width follows its longest line of copy, which on a
+		// phone is wider than the screen. Cap it at the text column, less the
+		// gap and a sliver of the next card, so a slide always fits and the
+		// next one shows there is more to swipe to.
+		const column = container.getBoundingClientRect();
+		const columnStyles = window.getComputedStyle(container);
+		const sectionStyles = window.getComputedStyle(section);
+		const room =
+			column.width -
+			parseFloat(columnStyles.paddingLeft || 0) -
+			parseFloat(columnStyles.paddingRight || 0) -
+			toPixels(section, sectionStyles.getPropertyValue(workSlideConfig.gapVar)) -
+			toPixels(section, sectionStyles.getPropertyValue(workSlideConfig.peekVar));
+		const width = room > 0 ? Math.min(widest, room) : widest;
+
+		section.style.setProperty(workSlideConfig.widthVar, `${width}px`);
 
 		if (hadSwiperClasses) {
 			wrapper.classList.add("swiper-wrapper");

@@ -75,6 +75,29 @@ describe("initWorkSlide", () => {
 		vi.restoreAllMocks();
 	});
 
+	it("caps a slide at the text column, less the gap and a peek of the next card", () => {
+		document.body.innerHTML = section({ arrows: false });
+
+		const host = document.querySelector(".section_work-slide");
+		host.style.setProperty("--work-slide--gap", "24px");
+		host.style.setProperty("--work-slide--peek", "48px");
+		document.querySelector(".container").style.padding = "0 16px";
+
+		vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function () {
+			const width = this.classList.contains("work-item_component")
+				? 428
+				: this.classList.contains("container")
+					? 393
+					: parseFloat(this.style.width) || 300;
+
+			return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: 200, width, height: 200 };
+		});
+
+		initWorkSlide();
+
+		expect(host.style.getPropertyValue("--work-slide-item-width")).toBe("289px");
+	});
+
 	it("hands the controls to Swiper's navigation module, so they gain a disabled state", () => {
 		document.body.innerHTML = section();
 
