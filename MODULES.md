@@ -4,7 +4,7 @@ The bundle starts these through `src/modules/index.js` once the DOM is ready, an
 
 Every module is called as `init(root, { signal })`. The signal is fresh on each run and the previous run's is aborted first. Anything that outlives the markup it was created for takes the signal: listeners on `window`, `document` or a `MediaQueryList`, observers, timers, and third-party instances with their own teardown. A listener bound to a node inside the swapped page does not need it, because the node goes and takes the listener with it — but nothing bound outside that page may omit it, which is how a slider once kept autoplaying against a list that had already been thrown away. Nothing else goes in that second argument, and nothing goes beside it — a loader passed positionally is how three modules once received the options object where a function belonged, and `contract.test.js` reads the signatures to stop it recurring.
 
-`boot.js` owns running each module once per page, so a module does not guard itself for that reason. Several guard for a different one: during a transition the outgoing and incoming pages are both in the DOM, so a module that queries the document finds the old page's elements too and would set them up a second time. `impact-slider.js`, `quote-fade.js` and `rt-flow.js` consume the markup they build from and would read their own output; `approach-slider.js`, `caps.js`, `copy-to-clipboard.js` and `work-slide.js` use `claimOnce` from `src/dom.js` to leave a claim on each element they take. A lookup that must not cross pages scopes itself to `[data-pt-container]` — `faq.js` and `insight-toc.js` both do.
+`boot.js` owns running each module once per page, so a module does not guard itself for that reason. Several guard for a different one: during a transition the outgoing and incoming pages are both in the DOM, so a module that queries the document finds the old page's elements too and would set them up a second time. `quote-fade.js` consumes the markup it builds from and would read its own output; `approach-slider.js`, `caps.js`, `copy-to-clipboard.js`, `impact-slider.js` and `work-slide.js` use `claimOnce` from `src/dom.js` to leave a claim on each element they take. A lookup that must not cross pages scopes itself to `[data-pt-container]` — `faq.js` and `insight-toc.js` both do.
 
 Anything that hides content must be able to reveal it again after its run has been aborted. A page transition aborts the previous signal, so a reveal that depends on a listener carrying that signal can be taken away mid-flight, and the next run will skip an element already marked as handled. That has shipped before, in `image-fade.js`. `src/dom.js` also holds `press` and `keyActivates` for elements styled to look like buttons, and `freezeAndDestroy` for tearing a carousel down without moving it while the old page is still on screen.
 
@@ -72,7 +72,7 @@ Fades each image up as it decodes, so a picture does not snap from nothing to ev
 
 ### `impact-slider.js`
 
-Reads the impact cards out of one Rich Text block — a title, a body and an optional italic line each — and builds them into the `.section_impact` slider with its arrows.
+Makes the case study's "Impact stats" list the `.section_impact` slider: Embla moves the Rich Text's own `<ul>` (one bullet per stat: bold number, label, optional italic note), and wires the arrows. The slides' look is CSS on `.impact_rt li` in the Global code "work" embed. A case study with no stats hides the section.
 
 ### `img-parallax.js`
 
@@ -111,10 +111,6 @@ Turns a testimonial Collection List into a cross-fading, auto-advancing quote, a
 ### `rightway.js`
 
 Turns the Rightway card grid into a slider with dots below the breakpoint where the grid stops fitting, and takes it apart again above it.
-
-### `rt-flow.js`
-
-Reshapes one Rich Text block into the Designer's own repeated item template, so the styling stays in Webflow.
 
 ### `slider-controls.js`
 

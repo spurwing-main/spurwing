@@ -20,7 +20,6 @@ import { initNavPanel } from "./nav-panel.js";
 import { initProcessTabs } from "./process-tabs.js";
 import { initQuoteFade } from "./quote-fade.js";
 import { initRightway } from "./rightway.js";
-import { initRtFlow } from "./rt-flow.js";
 import { initStick } from "./stick.js";
 import { initTeamSwitch } from "./team-switch.js";
 import { initTicker } from "./ticker.js";
@@ -34,7 +33,6 @@ import { initWorkSlider } from "./work-slider.js";
 // a module that throws does not stop the next.
 export const modules = [
 	{ name: "cms-counts", init: initCmsCounts },
-	{ name: "rt-flow", init: initRtFlow },
 	{ name: "impact-slider", init: initImpactSlider },
 	{ name: "booking-details", init: initBookingDetails },
 	{ name: "image-fade", init: initImageFade },

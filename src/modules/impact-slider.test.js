@@ -15,36 +15,46 @@ vi.mock("embla-carousel", () => ({ default: createEmbla }));
 
 import { initImpactSlider } from "./impact-slider.js";
 
+const section = (list) => `
+	<section class="section_impact">
+		<div class="embla">
+			<div class="impact_rt w-richtext">${list}</div>
+		</div>
+		<div class="slider_arrows">
+			<button class="slider_arrow"></button>
+			<button class="slider_arrow"></button>
+		</div>
+	</section>
+`;
+
 describe("initImpactSlider", () => {
 	afterEach(() => {
 		document.body.innerHTML = "";
 		createEmbla.mockClear();
 	});
 
-	it("builds its slides once, because building consumes the markup", async () => {
-		document.body.innerHTML = `
-			<section class="section_impact">
-				<div data-card="source"><h3>Title</h3><p>Body</p></div>
-				<div class="embla">
-					<div class="impact_list">
-						<div class="embla__slide">
-							<h3 data-card="1"></h3>
-							<p data-card="2"></p>
-							<em data-card="3"></em>
-						</div>
-					</div>
-				</div>
-				<div class="slider_arrows">
-					<button class="slider_arrow"></button>
-					<button class="slider_arrow"></button>
-				</div>
-			</section>
-		`;
+	it("slides the stats list itself, once", () => {
+		document.body.innerHTML = section(
+			"<ul><li><strong>95%</strong> Increase in traffic <em>In two months.</em></li><li><strong>113%</strong> Booking clicks</li></ul>",
+		);
 
 		initImpactSlider(document);
 		initImpactSlider(document);
 
 		expect(createEmbla).toHaveBeenCalledOnce();
-		expect(document.querySelectorAll(".embla__slide").length).toBe(1);
+		const [viewport, options] = createEmbla.mock.calls[0];
+		expect(viewport.classList.contains("embla")).toBe(true);
+		expect(options.container).toBe(document.querySelector(".impact_rt ul"));
+		// Nothing is copied: the two bullets are still the only slides.
+		expect(document.querySelectorAll(".impact_rt li").length).toBe(2);
+	});
+
+	it("hides the section when the case study has no stats", () => {
+		document.body.innerHTML = section("<p>‍</p>");
+
+		initImpactSlider(document);
+
+		expect(createEmbla).not.toHaveBeenCalled();
+		expect(document.querySelector(".section_impact").style.display).toBe("none");
 	});
 });
