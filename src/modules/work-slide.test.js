@@ -170,6 +170,22 @@ describe("initWorkSlide", () => {
 		expect(createSwiper.mock.calls[0][1].navigation).toBe(false);
 	});
 
+	it("moves on a sideways trackpad swipe and leaves a vertical one to scroll the page", () => {
+		document.body.innerHTML = section();
+
+		initWorkSlide();
+
+		expect(createSwiper.mock.calls[0][1].mousewheel).toEqual({ forceToAxis: true });
+	});
+
+	it("lets a slow drag of a sixth of a card move on, rather than springing back", () => {
+		document.body.innerHTML = section();
+
+		initWorkSlide();
+
+		expect(createSwiper.mock.calls[0][1].longSwipesRatio).toBe(0.15);
+	});
+
 	it("stops the browser dragging a card's link or image away from the slider", () => {
 		document.body.innerHTML = section();
 

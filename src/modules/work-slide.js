@@ -22,6 +22,7 @@ const workSlideConfig = {
 	peekVar: "--work-slide--peek",
 	widthVar: "--work-slide-item-width",
 	dragThreshold: 6,
+	dragRatio: 0.15,
 	speed: 450,
 };
 
@@ -197,6 +198,14 @@ function initSlider(section, signal) {
 		grabCursor: false,
 		watchOverflow: true,
 		threshold: workSlideConfig.dragThreshold,
+		// Swiper sends a slow drag back where it started unless it covered half
+		// a card, which on the wide cards of a case study page is most of a
+		// hand's travel. A sixth of a card is a drag that plainly meant it.
+		longSwipesRatio: workSlideConfig.dragRatio,
+		// A trackpad's two-finger swipe is a wheel event, not a drag, and Swiper
+		// ignores those unless asked. Sideways only: a wheel that is mostly
+		// vertical is left alone, so the page scrolls as it always did.
+		mousewheel: { forceToAxis: true },
 		on: {
 			init(instance) {
 				syncArrows(instance);

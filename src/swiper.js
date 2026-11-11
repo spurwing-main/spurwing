@@ -2,7 +2,8 @@
 // opened by checking whether it had loaded yet. It is part of the bundle now,
 // and this file is the one place that says which of its modules the site uses:
 // creative and fade effects, the controller that links the approach stacks,
-// navigation arrows and autoplay. Adding a Swiper option that needs another
+// navigation arrows, autoplay and the mouse wheel, which is also how a
+// trackpad's two-finger swipe arrives. Adding a Swiper option that needs another
 // module means adding it here too.
 //
 // THE VERSION IS PINNED, EXACTLY, IN package.json. Swiper's CSS is not in this
@@ -11,8 +12,8 @@
 // install while that stylesheet stayed put, and the two would drift apart with
 // nothing to say so. Changing the version means changing it in both places.
 import Swiper from "swiper";
-import { Autoplay, Controller, EffectCreative, EffectFade, Navigation } from "swiper/modules";
+import { Autoplay, Controller, EffectCreative, EffectFade, Mousewheel, Navigation } from "swiper/modules";
 
-Swiper.use([Autoplay, Controller, EffectCreative, EffectFade, Navigation]);
+Swiper.use([Autoplay, Controller, EffectCreative, EffectFade, Mousewheel, Navigation]);
 
 export default Swiper;
