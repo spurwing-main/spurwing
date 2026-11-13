@@ -25,7 +25,12 @@ import { animate, motionValue, springValue, styleEffect } from "motion";
 const config = {
 	// Above and right of the pointer, so the pointer still shows what it is on.
 	offset: { x: 10, y: -44 },
-	follow: { stiffness: 1210, damping: 17.6, mass: 0.1 },
+	// Loose enough that the hand trails a quick move and catches up, as
+	// FigJam's does.
+	follow: { stiffness: 260, damping: 22, mass: 0.6 },
+	// The hand leans away from the way it is moving, by this many degrees per
+	// 1000px/s across, up to the limit, and swings back on its own spring.
+	lean: { perSpeed: 12, max: 24, spring: { stiffness: 300, damping: 18, mass: 0.5 } },
 	enter: { type: "spring", visualDuration: 0.3, bounce: 0.4 },
 	exit: { type: "spring", visualDuration: 0.3, bounce: 0 },
 	// Three rocks from the wrist, a breath, and again.
@@ -63,7 +68,17 @@ export function initWave(root = document, { signal } = {}) {
 		const srcY = motionValue(0);
 		const x = calm ? srcX : springValue(srcX, config.follow);
 		const y = calm ? srcY : springValue(srcY, config.follow);
-		styleEffect(hand, { x, y });
+		const tilt = motionValue(0);
+		const rotate = calm ? tilt : springValue(tilt, config.lean.spring);
+		styleEffect(hand, { x, y, rotate });
+
+		if (!calm) {
+			const { perSpeed, max } = config.lean;
+			x.on("change", () => {
+				const lean = (-x.getVelocity() / 1000) * perSpeed;
+				tilt.set(Math.max(-max, Math.min(max, lean)));
+			});
+		}
 
 		let waving = null;
 
@@ -77,6 +92,8 @@ export function initWave(root = document, { signal } = {}) {
 			track(event);
 			x.jump(srcX.get());
 			y.jump(srcY.get());
+			tilt.jump(0);
+			rotate.jump(0);
 
 			if (calm) {
 				animate(palm, { opacity: 1 }, config.fade);

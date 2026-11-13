@@ -9,9 +9,9 @@ import { config, initAiFaq, readEvents } from "./ai-faq.js";
 const markup = `
 	<div data-ai-faq="component">
 		<div data-ai-faq="ask">
-			<svg data-ai-faq="sparkle" class="ai-faq_sparkle"><path d="M1 1"/><path d="M2 2"/><path d="M3 3"/></svg>
 			<div class="faq-card"><div class="faq-card_trigger">
 				<textarea data-ai-faq="input"></textarea>
+				<svg data-ai-faq="sparkle" class="ai-faq_sparkle"><path d="M1 1"/><path d="M2 2"/><path d="M3 3"/></svg>
 				<button data-ai-faq="send" type="button"></button>
 			</div></div>
 		</div>
@@ -103,20 +103,25 @@ describe("initAiFaq", () => {
 		expect(render).toHaveBeenCalledTimes(2);
 	});
 
-	it("reveals the ask card with the FAQ cards and fades the sparkle in with it", async () => {
-		document.documentElement.setAttribute("data-anim-ready", "");
+	it("reveals the ask card with the FAQ cards", () => {
 		initAiFaq();
-		const card = $(".faq-card");
+
+		expect($(".faq-card").getAttribute("data-anim")).toBe("card");
+	});
+
+	it("shows the sparkle in the icon slot at rest and the send arrow while the reader is in the box", () => {
+		initAiFaq();
+		const input = $('[data-ai-faq="input"]');
 		const sparkle = $('[data-ai-faq="sparkle"]');
+		const send = $('[data-ai-faq="send"]');
 
-		expect(card.getAttribute("data-anim")).toBe("card");
-		expect(sparkle.style.opacity).toBe("0");
-
-		card.setAttribute("data-anim-state", "in");
-		await vi.waitFor(() =>
-			expect(motion.animate).toHaveBeenCalledWith(sparkle, { opacity: 1, scale: [0.6, 1] }, expect.objectContaining({ duration: 0.5 })),
-		);
-		document.documentElement.removeAttribute("data-anim-ready");
+		expect([sparkle.style.display, send.style.display]).toEqual(["", "none"]);
+		input.dispatchEvent(new FocusEvent("focus"));
+		expect([sparkle.style.display, send.style.display]).toEqual(["none", ""]);
+		input.dispatchEvent(new FocusEvent("blur", { relatedTarget: send }));
+		expect(send.style.display).toBe("");
+		input.dispatchEvent(new FocusEvent("blur"));
+		expect([sparkle.style.display, send.style.display]).toEqual(["", "none"]);
 	});
 
 	it("hides Ask another question until there is an answer", () => {
@@ -230,7 +235,7 @@ describe("initAiFaq", () => {
 
 		finish(new Response(sse([["token", "Yes."]])));
 		await settled();
-		expect(card.querySelector(".faq-card_icon svg path").getAttribute("d")).toMatch(/^M56 86/);
+		expect(card.querySelector(".faq-card_icon svg")).toBe(star);
 	});
 
 	it("moves focus to the question's heading when the text box goes, and leaves it there", async () => {

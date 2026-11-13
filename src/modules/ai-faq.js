@@ -8,9 +8,9 @@ import { claimOnce, requireElement } from "../dom.js";
  *
  *   <div data-ai-faq="component">
  *     <div data-ai-faq="ask">
- *       <svg data-ai-faq="sparkle">
  *       <div class="faq-card"><div class="faq-card_trigger">
- *         <textarea data-ai-faq="input">  <button data-ai-faq="send">
+ *         <textarea data-ai-faq="input">
+ *         <svg data-ai-faq="sparkle">  <button data-ai-faq="send">
  *     <button data-ai-faq="another" hidden>
  *
  * The Designer owns the look: the ask card is a curated FAQ card's classes, and
@@ -20,7 +20,11 @@ import { claimOnce, requireElement } from "../dom.js";
  * Asking turns the ask card into the answer card in place: the question stays
  * where it was typed, the card opens like an FAQ answer, and the sparkle
  * twinkles beside shimmering stage words ("Checking 6 pages…") until the answer
- * streams in. The finished card shows a tick and the pages the answer came from.
+ * streams in. The sparkle stays as the finished card's icon, over the pages the
+ * answer came from.
+ *
+ * The sparkle holds the ask card's icon slot, where an FAQ card shows its plus;
+ * the send arrow takes the slot while the reader is in the box.
  *
  * Questions go to the Worker at `config.endpoint` (worker/ in this repo), which
  * answers only from spurwing.co.uk and sends server-sent events:
@@ -54,8 +58,6 @@ const EASE = [0.2, 0.7, 0.2, 1];
 // The FAQ cards' own opening (faq.js), so an answer opens like one.
 const OPEN = { duration: 400, easing: "cubic-bezier(0.25, 0.1, 0.25, 1)" };
 
-const TICK =
-	'<svg viewBox="34 35 60 60" width="100%" height="100%" fill="none" aria-hidden="true"><path d="M56 86L36 66.16L42.36 60L56 73.4L85.64 44L92 50.32L56 86Z" fill="currentColor"/></svg>';
 
 export function initAiFaq(root = document, { signal } = {}) {
 	const components = root.querySelectorAll('[data-ai-faq="component"]');
@@ -86,6 +88,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		another.hidden = true;
 
 		revealWithTheList();
+		showSparkle(true, true);
 
 		// Vouch for the visitor before they ask, not after.
 		const near = new IntersectionObserver(
@@ -103,8 +106,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 			prepareToken();
 			showSparkle(false);
 		});
-		input.addEventListener("blur", () => {
-			if (!input.value.trim()) showSparkle(true);
+		// Leaving the box for its own send arrow keeps the arrow.
+		input.addEventListener("blur", (event) => {
+			if (!input.value.trim() && event.relatedTarget !== send) showSparkle(true);
 		});
 		input.addEventListener("input", fit);
 		input.addEventListener("keydown", (event) => {
@@ -154,10 +158,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		 * The ask card reveals with the site's scroll animation on the turn after
 		 * the questions above it: first when it leads the list, last when it ends
 		 * it. The site's rule sets --anim-i on every data-anim element, so the turn
-		 * goes on the card itself. The sparkle sits outside the card, where the
-		 * reveal's mask would hide it, so it fades in on the same beat instead;
-		 * without the scroll animation (reduced motion, or its safety net switched
-		 * it off) the sparkle is simply there.
+		 * goes on the card itself, and the sparkle inside it comes in with it.
 		 */
 		function revealWithTheList() {
 			if (!askCard) return;
@@ -166,25 +167,16 @@ export function initAiFaq(root = document, { signal } = {}) {
 			const turn = Math.min(above.length, 6);
 			if (!askCard.hasAttribute("data-anim")) askCard.setAttribute("data-anim", "card");
 			askCard.style.setProperty("--anim-i", String(turn));
-
-			const html = document.documentElement;
-			if (!sparkle || reduceMotion || !html.hasAttribute("data-anim-ready")) return;
-			sparkle.style.opacity = "0";
-			const watch = new MutationObserver(() => {
-				if (askCard.getAttribute("data-anim-state") !== "in" && !html.hasAttribute("data-anim-panic")) return;
-				watch.disconnect();
-				animate(sparkle, { opacity: 1, scale: [0.6, 1] }, { duration: 0.5, delay: turn * 0.06 + 0.2, ease: EASE });
-			});
-			watch.observe(askCard, { attributes: true, attributeFilter: ["data-anim-state"] });
-			watch.observe(html, { attributes: true, attributeFilter: ["data-anim-panic"] });
-			signal?.addEventListener("abort", () => watch.disconnect());
 		}
 
-		// The sparkle steps aside while the reader types.
-		function showSparkle(visible) {
+		// One icon slot: the sparkle at rest, the send arrow while the reader is in
+		// the box. The one coming in grows from the middle of the slot.
+		function showSparkle(visible, still = false) {
 			if (!sparkle) return;
-			const to = visible ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.6 };
-			animate(sparkle, to, { duration: reduceMotion ? 0 : 0.25, ease: EASE });
+			const [shown, gone] = visible ? [sparkle, send] : [send, sparkle];
+			gone.style.display = "none";
+			shown.style.display = "";
+			if (!still && !reduceMotion) animate(shown, { opacity: [0, 1], scale: [0.6, 1] }, { duration: 0.25, ease: EASE });
 		}
 
 		async function submit() {
@@ -341,7 +333,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 				star.removeAttribute("width");
 				star.removeAttribute("height");
 				// Drawn at the question's 22px, as in the design, over the 16px icon
-				// slot the tick fills; the negative margin keeps it centred there.
+				// slot; the negative margin keeps it centred there.
 				Object.assign(star.style, { display: "block", width: "1.375rem", height: "1.375rem", margin: "-0.1875rem" });
 				status.append(star);
 				if (!reduceMotion) {
@@ -466,15 +458,15 @@ export function initAiFaq(root = document, { signal } = {}) {
 				rise(text);
 			}
 
-			// The star gives way to a tick, or to nothing when it couldn't answer,
-			// and the pages it drew on rise in underneath.
+			// The star stops twinkling and settles as the card's icon, and the
+			// pages it drew on rise in underneath.
 			function finish() {
 				writing = true;
 				stopShimmer();
 				twinkle.forEach((controls) => controls.stop());
+				const paths = [...status.querySelectorAll("path")];
+				if (paths.length && !reduceMotion) animate(paths, { scale: 1, rotate: 0, opacity: 1 }, { duration: 0.35, ease: EASE });
 				element.removeAttribute("aria-busy");
-				status.innerHTML = handedOff ? "" : TICK;
-				if (!handedOff && !reduceMotion) animate(status, { opacity: [0, 1], scale: [0.5, 1] }, { duration: 0.35, ease: EASE });
 
 				if (!pages.length) return;
 				const from = node("p");
