@@ -24,7 +24,8 @@ import { claimOnce, requireElement } from "../dom.js";
  * answer came from.
  *
  * The sparkle holds the ask card's icon slot, where an FAQ card shows its plus;
- * the send arrow takes the slot while the reader is in the box.
+ * the send arrow takes the slot while the reader is in the box or it holds a
+ * question. The Designer's CSS owns that swap, so it holds before this runs.
  *
  * Questions go to the Worker at `config.endpoint` (worker/ in this repo), which
  * answers only from spurwing.co.uk and sends server-sent events:
@@ -88,7 +89,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 		another.hidden = true;
 
 		revealWithTheList();
-		showSparkle(true, true);
 
 		// Vouch for the visitor before they ask, not after.
 		const near = new IntersectionObserver(
@@ -102,14 +102,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		near.observe(component);
 		signal?.addEventListener("abort", () => near.disconnect());
 
-		input.addEventListener("focus", () => {
-			prepareToken();
-			showSparkle(false);
-		});
-		// Leaving the box for its own send arrow keeps the arrow.
-		input.addEventListener("blur", (event) => {
-			if (!input.value.trim() && event.relatedTarget !== send) showSparkle(true);
-		});
+		input.addEventListener("focus", prepareToken);
 		input.addEventListener("input", fit);
 		input.addEventListener("keydown", (event) => {
 			if (event.key !== "Enter" || event.shiftKey) return;
@@ -167,16 +160,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 			const turn = Math.min(above.length, 6);
 			if (!askCard.hasAttribute("data-anim")) askCard.setAttribute("data-anim", "card");
 			askCard.style.setProperty("--anim-i", String(turn));
-		}
-
-		// One icon slot: the sparkle at rest, the send arrow while the reader is in
-		// the box. The one coming in grows from the middle of the slot.
-		function showSparkle(visible, still = false) {
-			if (!sparkle) return;
-			const [shown, gone] = visible ? [sparkle, send] : [send, sparkle];
-			gone.style.display = "none";
-			shown.style.display = "";
-			if (!still && !reduceMotion) animate(shown, { opacity: [0, 1], scale: [0.6, 1] }, { duration: 0.25, ease: EASE });
 		}
 
 		async function submit() {

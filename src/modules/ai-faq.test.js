@@ -109,21 +109,6 @@ describe("initAiFaq", () => {
 		expect($(".faq-card").getAttribute("data-anim")).toBe("card");
 	});
 
-	it("shows the sparkle in the icon slot at rest and the send arrow while the reader is in the box", () => {
-		initAiFaq();
-		const input = $('[data-ai-faq="input"]');
-		const sparkle = $('[data-ai-faq="sparkle"]');
-		const send = $('[data-ai-faq="send"]');
-
-		expect([sparkle.style.display, send.style.display]).toEqual(["", "none"]);
-		input.dispatchEvent(new FocusEvent("focus"));
-		expect([sparkle.style.display, send.style.display]).toEqual(["none", ""]);
-		input.dispatchEvent(new FocusEvent("blur", { relatedTarget: send }));
-		expect(send.style.display).toBe("");
-		input.dispatchEvent(new FocusEvent("blur"));
-		expect([sparkle.style.display, send.style.display]).toEqual(["", "none"]);
-	});
-
 	it("hides Ask another question until there is an answer", () => {
 		initAiFaq();
 
