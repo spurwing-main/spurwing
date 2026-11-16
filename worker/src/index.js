@@ -17,11 +17,12 @@
  *
  * Every question is logged to D1, with the time and page it was asked on.
  */
-import { links, pagesFrom, relay, startAnswer } from "./answer.js";
+import { factSheet, links, pagesFrom, relay, startAnswer, withFactSheet } from "./answer.js";
 import { eventStream } from "./events.js";
 import { record } from "./log.js";
 
-const MAX_QUESTION = 300;
+// The ask box allows 500 characters.
+const MAX_QUESTION = 500;
 // The page sends its last two questions and answers, so a follow-up has context.
 const MAX_HISTORY = 4;
 const MAX_TURN = 2000;
@@ -84,7 +85,9 @@ async function ask(request, env, ctx, cors) {
 			return sendEvent(event, data);
 		};
 
-		const pages = pagesFrom((await search(input.question, env)).chunks);
+		// LLM info is read first with every question; it loads beside the search.
+		const [found, sheet] = await Promise.all([search(input.question, env), factSheet()]);
+		const pages = withFactSheet(pagesFrom(found.chunks), sheet);
 		mark("searched");
 		send("sources", links(pages));
 

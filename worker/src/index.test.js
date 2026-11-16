@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { citedPages, links, pagesFrom, relay, SYSTEM_PROMPT } from "./answer.js";
 import worker from "./index.js";
@@ -57,6 +57,9 @@ function env(overrides = {}) {
 
 const ctx = { waitUntil: vi.fn() };
 
+// The live LLM info page, as the Worker reads it before every answer.
+const LLM_INFO = `<html><body><nav>Menu</nav><main><h1>LLM info</h1><p>Spurwing Agency Limited &amp; partners, company number 12977511.</p><script>x()</script></main><footer>Footer</footer></body></html>`;
+
 function ask(body, headers = {}) {
 	return new Request("https://ask.spurwing.co.uk/ask", {
 		method: "POST",
@@ -66,6 +69,37 @@ function ask(body, headers = {}) {
 }
 
 describe("worker fetch", () => {
+	beforeEach(() => vi.stubGlobal("fetch", vi.fn(async () => new Response(LLM_INFO))));
+	afterEach(() => vi.unstubAllGlobals());
+
+	it("reads the LLM info page first with every question, ahead of what the search found, and never links to it", async () => {
+		const bindings = env();
+		const response = await worker.fetch(ask({ question: "Who are you?" }), bindings, ctx);
+		const events = await collect(response.body);
+
+		const system = bindings.AI.run.mock.calls[0][1].messages[0].content;
+		expect(system).toContain("## LLM info (https://www.spurwing.co.uk/llm-info)\nLLM info\nSpurwing Agency Limited & partners, company number 12977511.");
+		expect(system).not.toContain("Menu");
+		expect(system).not.toContain("x()");
+		expect(system.indexOf("## LLM info")).toBeLessThan(system.indexOf("## Approach"));
+		expect(events[0]).toEqual([
+			"sources",
+			[
+				{ title: "Approach", url: "https://www.spurwing.co.uk/approach" },
+				{ title: "Contact", url: "https://www.spurwing.co.uk/contact" },
+			],
+		]);
+	});
+
+	it("reads LLM info once, not twice, when the search finds it too", async () => {
+		const { withFactSheet } = await import("./answer.js");
+		const sheet = { title: "LLM info", url: "https://www.spurwing.co.uk/llm-info", text: "Facts", unlinked: true };
+		const found = [{ title: "About", url: "https://www.spurwing.co.uk/about", text: "About" }, { ...sheet, text: "A chunk" }];
+
+		expect(withFactSheet(found, sheet)).toEqual([sheet, found[0]]);
+		expect(withFactSheet(found, null)).toBe(found);
+	});
+
 	it("streams the pages from AI Search, then Terra's answer written from them without reasoning", async () => {
 		const bindings = env();
 		const response = await worker.fetch(ask({ question: "How do you work?", history: [], page: "/faq" }), bindings, ctx);
@@ -98,7 +132,7 @@ describe("worker fetch", () => {
 	it("refuses other sites, bad input and a visitor over the limit", async () => {
 		expect((await worker.fetch(ask({ question: "Hi" }, { origin: "https://evil.example" }), env(), ctx)).status).toBe(403);
 		expect((await worker.fetch(ask({ question: "" }), env(), ctx)).status).toBe(400);
-		expect((await worker.fetch(ask({ question: "x".repeat(301) }), env(), ctx)).status).toBe(400);
+		expect((await worker.fetch(ask({ question: "x".repeat(501) }), env(), ctx)).status).toBe(400);
 
 		const limited = env({ RATE_LIMIT: { limit: async () => ({ success: false }) } });
 		expect((await worker.fetch(ask({ question: "Hi" }), limited, ctx)).status).toBe(429);
@@ -121,7 +155,6 @@ describe("worker fetch", () => {
 
 		expect(response.status).toBe(403);
 		expect(fetch.mock.calls[0][0]).toBe("https://challenges.cloudflare.com/turnstile/v0/siteverify");
-		vi.unstubAllGlobals();
 	});
 
 	it("only uploads a page to AI Search with the right index key", async () => {
