@@ -205,6 +205,26 @@ describe("worker fetch", () => {
 		expect(options.gateway.metadata).toEqual({ page: "/faq", question: "q-1" });
 	});
 
+	it("tells the page and the log when the model call fails, instead of handing off", async () => {
+		vi.spyOn(console, "error").mockImplementation(() => {});
+		const run = vi.fn(async () => {});
+		const bind = vi.fn(() => ({ run }));
+		const waits = [];
+		const bindings = env({
+			DB: { prepare: vi.fn(() => ({ bind })) },
+			AI: { run: model([`data: ${JSON.stringify({ error: { message: "Incorrect API key provided: sk-...abcd" } })}\n\n`]) },
+		});
+
+		const events = await collect((await worker.fetch(ask({ question: "What is a Webflow agency?" }), bindings, { waitUntil: (p) => waits.push(p) })).body);
+		await Promise.all(waits);
+
+		expect(events.at(-1)).toEqual(["error", { message: "failed" }]);
+		expect(events.some(([event]) => event === "handoff")).toBe(false);
+		const [, , , , , , answered, answer] = bind.mock.calls[0];
+		expect([answered, answer]).toEqual([0, "[failed: see Workers logs by Ray ID]"]);
+		expect(answer).not.toContain("sk-");
+	});
+
 	it("answers the browser's preflight", async () => {
 		const response = await worker.fetch(new Request("https://ask.spurwing.co.uk/ask", { method: "OPTIONS", headers: { origin: ORIGIN } }), env(), ctx);
 
@@ -237,11 +257,19 @@ describe("relay", () => {
 		expect(result).toEqual({ answered: false, answer: "", sources: [] });
 	});
 
-	it("hands off when nothing is said", async () => {
+	it("hands off when the reply says nothing", async () => {
 		const sent = [];
-		await relay(upstream([done]), (event, data) => sent.push([event, data]));
+		await relay(upstream([`data: ${JSON.stringify({ choices: [{ delta: {} }] })}\n\n`, done]), (event, data) => sent.push([event, data]));
 
 		expect(sent).toEqual([["handoff", { message: "I couldn't find that on our site." }]]);
+	});
+
+	it("fails, rather than handing off, when the model call fails or sends nothing", async () => {
+		const send = vi.fn();
+		await expect(relay(upstream([`data: ${JSON.stringify({ error: { type: "invalid_api_key" } })}\n\n`]), send)).rejects.toThrow("invalid_api_key");
+		await expect(relay(upstream(['{"error":"Unauthorized"}\n\n']), send)).rejects.toThrow("nothing");
+		await expect(relay(upstream([done]), send)).rejects.toThrow("nothing");
+		expect(send).not.toHaveBeenCalled();
 	});
 });
 

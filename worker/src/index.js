@@ -17,7 +17,7 @@
  *
  * Every question is logged to D1, with the time and page it was asked on.
  */
-import { factSheet, links, pagesFrom, relay, startAnswer, withFactSheet } from "./answer.js";
+import { factSheet, failed, links, pagesFrom, relay, startAnswer, withFactSheet } from "./answer.js";
 import { eventStream } from "./events.js";
 import { record } from "./log.js";
 
@@ -91,7 +91,13 @@ async function ask(request, env, ctx, cors) {
 		mark("searched");
 		send("sources", links(pages));
 
-		log(await relay(await startAnswer(input, pages, env), send, pages));
+		// A failed answer is logged too, then reaches the page as an `error`.
+		try {
+			log(await relay(await startAnswer(input, pages, env), send, pages));
+		} catch (error) {
+			log(failed(error));
+			await send("error", { message: "failed" });
+		}
 	});
 }
 

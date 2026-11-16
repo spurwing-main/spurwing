@@ -21,7 +21,7 @@ import { claimOnce, requireElement } from "../dom.js";
  * it, newest first, so earlier answers move down rather than away. The sparkle
  * twinkles beside shimmering stage words ("Checking 6 pages…") until the answer
  * streams in, then stays as the finished card's icon, over the pages the answer
- * came from. A finished card opens and closes like an FAQ, says the answer was
+ * came from. Asking again closes the earlier answers to their questions. A finished card opens and closes like an FAQ, says the answer was
  * written by AI, and can be removed, with a few seconds to undo.
  *
  * Answers are kept in the visitor's own browser (the newest few), so they are
@@ -95,6 +95,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 		const askCard = input.closest(".faq-card");
 		const announcer = liveRegion(component);
 		const history = [];
+		// Each answer card's controls, by its element.
+		const cards = new WeakMap();
 		// Ties this box's follow-ups together in the log; one per page view.
 		const conversation = crypto.randomUUID();
 		let busy = false;
@@ -105,6 +107,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		let below = ask;
 		for (const item of loadAnswers()) {
 			const card = answerCard(item.question, item);
+			cards.set(card.element, card);
 			below.after(card.element);
 			below = card.element;
 		}
@@ -188,9 +191,14 @@ export function initAiFaq(root = document, { signal } = {}) {
 			window.clarity?.("set", "ai_faq_conversation", conversation);
 			track("ai_faq_ask");
 
+			// The earlier answers close to their questions, as in the design, so the
+			// new one is the only one open.
+			component.querySelectorAll('[data-ai-faq="answer"]').forEach((element) => cards.get(element)?.close());
+
 			// The box clears and stays, so the next question can be typed while this
 			// one is answered. Focus stays in it; the status region reads the answer.
 			const card = answerCard(question);
+			cards.set(card.element, card);
 			ask.after(card.element);
 			makeRoom(card.element);
 			input.value = "";
@@ -587,6 +595,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 				finish,
 				spoken,
 				pages: () => pages,
+				close: () => done && open && toggle(false),
 				onCancel: (stop) => (cancel = stop),
 				keep: (item) => (kept = item),
 			};
@@ -596,7 +605,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 	/**
 	 * One note for the page, "Question removed · Undo", shown for a few seconds
 	 * after a removal. A second removal replaces the first: only the latest can
-	 * be undone.
+	 * be undone. It shows in the browser's top layer: on a phone the cookie
+	 * banner sits where the note does, in a layer no z-index gets above.
 	 */
 	function undoNote() {
 		const box = node("div", "ai-faq_toast");
@@ -605,6 +615,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		let timer;
 		let undo = null;
 		box.setAttribute("role", "status");
+		box.popover = "manual";
 		box.hidden = true;
 		button.type = "button";
 		button.textContent = config.undo;
@@ -621,6 +632,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		function hide() {
 			clearTimeout(timer);
 			undo = null;
+			if (box.matches?.(":popover-open")) box.hidePopover();
 			box.hidden = true;
 		}
 
@@ -631,6 +643,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 				undo = action;
 				label.textContent = message;
 				box.hidden = false;
+				if (box.showPopover && !box.matches(":popover-open")) box.showPopover();
 				rise(box);
 				timer = setTimeout(hide, config.undoMs);
 			},

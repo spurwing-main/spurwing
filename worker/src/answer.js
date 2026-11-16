@@ -93,14 +93,22 @@ export function startAnswer({ question, history, page, id }, pages, env) {
  * Pass Terra's answer on as `token` events, then `cited` and `done`. The
  * opening characters are held back until it's clear they aren't NO_ANSWER, so a
  * hand-off never shows a half-written answer first. Returns what to log.
+ *
+ * A reply with an error in it, or with nothing in it at all, is a failed call
+ * (a refused key, no credit), not the site lacking an answer: it throws, so the
+ * page says it couldn't answer just now instead of "couldn't find that".
  */
 export async function relay(upstream, send, pages = []) {
 	let opening = "";
 	let answer = "";
+	let replied = false;
 
 	for await (const { data } of readEvents(upstream)) {
 		if (data === "[DONE]") break;
-		const piece = JSON.parse(data)?.choices?.[0]?.delta?.content;
+		const message = parse(data);
+		if (!message || message.error) throw new Error(`model replied with an error: ${data.slice(0, 500)}`);
+		replied = true;
+		const piece = message.choices?.[0]?.delta?.content;
 		if (!piece) continue;
 
 		if (answer) {
@@ -116,6 +124,8 @@ export async function relay(upstream, send, pages = []) {
 		send("token", answer);
 	}
 
+	if (!replied) throw new Error("model replied with nothing");
+
 	if (!answer) {
 		send("handoff", { message: HANDOFF });
 		return UNANSWERED;
@@ -125,6 +135,24 @@ export async function relay(upstream, send, pages = []) {
 	send("cited", links(cited));
 	send("done", {});
 	return { answered: true, answer, sources: cited };
+}
+
+function parse(data) {
+	try {
+		return JSON.parse(data);
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * What a failed answer logs. The row says only that it failed; the reason, which
+ * can quote the provider's own message, goes to the Worker's logs, which only
+ * the team can read.
+ */
+export function failed(error) {
+	console.error("answer failed", error);
+	return { answered: false, answer: "[failed: see Workers logs by Ray ID]", sources: [] };
 }
 
 /** AI Search chunks as pages: one per page, best first, each with all its text. */

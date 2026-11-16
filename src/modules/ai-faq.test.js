@@ -323,6 +323,20 @@ describe("initAiFaq", () => {
 		expect(titles).toEqual(["Second?", "First?"]);
 	});
 
+	it("closes the earlier answers when a new question is asked", async () => {
+		const fetch = respondWith(sse([["token", "Yes."]]));
+		initAiFaq();
+
+		ask("First?");
+		await settled();
+		fetch.mockImplementation(async () => new Response(sse([["token", "Again."]])));
+		ask("Second?");
+		await vi.waitFor(() => expect(document.querySelectorAll('[data-ai-faq="answer"]:not([aria-busy])')).toHaveLength(2));
+
+		const expanded = [...document.querySelectorAll('[data-ai-faq="answer"] .faq-card_trigger')].map((trigger) => trigger.getAttribute("aria-expanded"));
+		expect(expanded).toEqual(["true", "false"]);
+	});
+
 	it("says the answer was written by AI, with a report link and Remove", async () => {
 		respondWith(sse([["token", "Yes."]]));
 		initAiFaq();
