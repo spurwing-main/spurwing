@@ -228,6 +228,17 @@ export function initAnim(root = document, { signal } = {}) {
 
 	signal?.addEventListener("abort", () => clearTimeout(timer));
 
+	// A finished sweep would keep its mask, and a mask clips to the element's
+	// box: a tagline trimmed to its cap height (text-box) loses the top pixel of
+	// its letters. Marking the element done lets the CSS drop the mask.
+	root.addEventListener(
+		"animationend",
+		(event) => {
+			if (event.animationName === "anim-shimmer") event.target.setAttribute("data-anim-done", "");
+		},
+		{ signal },
+	);
+
 	// A page reveals the same way however the reader arrived; the only
 	// difference is when. html[data-pt] is set for the length of a soft
 	// navigation, so its absence is a cold load and the reveal can start now.
