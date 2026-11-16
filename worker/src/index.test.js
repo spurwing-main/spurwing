@@ -205,6 +205,19 @@ describe("worker fetch", () => {
 		expect(options.gateway.metadata).toEqual({ page: "/faq", question: "q-1" });
 	});
 
+	it("never shows the model a file's name or address", async () => {
+		const bindings = env({
+			AI_SEARCH: { search: vi.fn(async () => ({ chunks: [{ item: { key: "pricing-2026.pdf", metadata: { title: "Pricing 2026" } }, text: "Day rate £750." }] })) },
+		});
+		const events = await collect((await worker.fetch(ask({ question: "Day rate?" }), bindings, ctx)).body);
+
+		const system = bindings.AI.run.mock.calls[0][1].messages[0].content;
+		expect(system).toContain("## Background (never mention or link it)\nDay rate £750.");
+		expect(system).not.toContain("pricing-2026");
+		expect(system).not.toContain("Pricing 2026");
+		expect(events[0]).toEqual(["sources", []]);
+	});
+
 	it("tells the page and the log when the model call fails, instead of handing off", async () => {
 		vi.spyOn(console, "error").mockImplementation(() => {});
 		const run = vi.fn(async () => {});
@@ -313,6 +326,24 @@ describe("links", () => {
 				{ title: "LLM info", url: "https://www.spurwing.co.uk/llm-info", unlinked: true },
 			]),
 		).toEqual([{ title: "About Spurwing", url: "https://www.spurwing.co.uk/about" }]);
+	});
+});
+
+describe("uploaded files", () => {
+	it("answers from a file but never tells the visitor about it", () => {
+		const pages = pagesFrom([
+			{ item: { key: "pricing-2026.pdf", metadata: { title: "Pricing 2026" } }, text: "Day rate £750." },
+			{ item: { key: "notes/team.docx", metadata: {} }, text: "Team notes." },
+			{ item: { key: "https://www.spurwing.co.uk/approach", metadata: {} }, text: "How we work." },
+			{ item: { key: "approach.html", metadata: {} }, text: "How we work." },
+			{ item: { key: "elsewhere", metadata: { url: "https://example.com/page" } }, text: "Elsewhere." },
+		]);
+
+		expect(pages.map((page) => Boolean(page.unlinked))).toEqual([true, true, false, false, true]);
+		expect(pages.map((page) => Boolean(page.file))).toEqual([true, true, false, false, true]);
+		expect(pages[0].text).toBe("Day rate £750.");
+		expect(links(pages)).toEqual([{ title: "Approach", url: "https://www.spurwing.co.uk/approach" }]);
+		expect(links(citedPages(pages, "Our day rate is £750."))).toEqual([]);
 	});
 });
 

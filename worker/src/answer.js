@@ -137,6 +137,16 @@ export async function relay(upstream, send, pages = []) {
 	return { answered: true, answer, sources: cited };
 }
 
+// A page of spurwing.co.uk, live or staging, rather than an uploaded file.
+function onSite(address) {
+	try {
+		const { hostname } = new URL(address);
+		return /(^|\.)spurwing\.co\.uk$/.test(hostname) || hostname === "spurwing.webflow.io";
+	} catch {
+		return false;
+	}
+}
+
 function parse(data) {
 	try {
 		return JSON.parse(data);
@@ -166,14 +176,21 @@ export function pagesFrom(chunks = []) {
 			continue;
 		}
 		const meta = item.metadata ?? {};
-		const path = meta.url ? new URL(meta.url).pathname : pathFromKey(item.key);
+		const address = meta.url || (/^https?:\/\//.test(item.key) ? item.key : "");
+		// A file uploaded to the index (a PDF, a doc) informs the answer, but the
+		// visitor is never told about it: only pages of the site are ever listed.
+		// A page is a crawled address on the site, or one of the site's pages
+		// uploaded by scripts/index-staging.mjs, keyed like "approach.html".
+		const page = address ? onSite(address) : /\.html?$/i.test(item.key);
+		const path = address && page ? new URL(address).pathname : page ? pathFromKey(item.key) : `/${item.key}`;
 		// The LLM info page is a fact sheet for answer engines: the box answers from
 		// it but sends visitors to the page each fact is about, not to it.
 		pages.set(item.key, {
 			title: shortTitle(meta.title || titleFromPath(path)),
 			url: path === "/" ? SITE : `${SITE}${path}`,
 			text,
-			...(UNLINKED.has(path.replace(/\/$/, "")) && { unlinked: true }),
+			...(!page && { file: true }),
+			...((!page || UNLINKED.has(path.replace(/\/$/, ""))) && { unlinked: true }),
 		});
 	}
 	return [...pages.values()];
@@ -209,7 +226,9 @@ export function citedPages(pages, answer) {
 
 /** The pages as Terra reads them: title and address, then the text. */
 function context(pages) {
-	return pages.map((page) => `## ${page.title} (${page.url})\n${page.text}`).join("\n\n");
+	return pages
+		.map((page) => (page.file ? `## Background (never mention or link it)\n${page.text}` : `## ${page.title} (${page.url})\n${page.text}`))
+		.join("\n\n");
 }
 
 // Words too common on this site to say which page an answer came from.
