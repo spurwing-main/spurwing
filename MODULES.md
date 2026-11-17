@@ -52,7 +52,7 @@ Cycles the logos in `[data-client-logos]`, whose `[data-client-logos-list]` grid
 
 ### `cms-counts.js`
 
-Counts the items in each Collection from a hidden page and writes the numbers into `[data-cms-count-target]`. It runs in the background so it cannot delay the other modules. The hidden page, /dev/data, is fetched once per page view by `src/data-page.js` and shared with `work-tags.js`.
+Counts the items in each Collection from a hidden page and writes the numbers into `[data-cms-count-target]`. It runs in the background so it cannot delay the other modules. The hidden page, /dev/data, is fetched once per page view by `src/data-page.js` and shared with `tag-slots.js`.
 
 ### `copy-to-clipboard.js`
 
@@ -132,9 +132,9 @@ Runs every `[data-ticker]` strip: it drifts left at `data-ticker-velocity` rem a
 
 Waves a hand beside the pointer for as long as it is over the element holding it, after FigJam's waving hand; on the site, the big "Discuss a project" button. The Designer puts `[data-wave-hand]` inside that element, with one div inside it for the hand: the outer div follows the pointer and the inner one grows in, rocks from the wrist on a loop and fades out on leaving. The hand is whatever the inner div holds, an emoji or an SVG. The Button component's Large variant (`data-wf--button--variant="large"`) gets its hand from this file, an emoji in the same two divs, and the header CSS places it. Skipped without a fine pointer; a visitor who asks for reduced motion gets the hand as a plain fade, without the wave.
 
-### `work-tags.js`
+### `tag-slots.js`
 
-Shows every service on each work card (`.work-item_component`: Home, /work, the nav work rail, "more work"), where the card's own field holds only one. /dev/data lists each case study by `data-work-slug` with its services as `data-work-service`; the card's slug is the end of its `.work-item_link`. Each missing service is a copy of the card's tag placed after it, so the card's own tag stays first, and carries `data-work-tag`, which the "Global — motion" embed fades in with a short stagger (no fade under reduced motion). A done card takes `data-work-tags`. It runs again when a Finsweet list re-renders its cards. Without the data a card keeps its one tag.
+Fills tag slots from /dev/data. A slot is any element with `[data-tags-for="key"]` placed straight after a tag, inside the row of tags; on the Work Item component it is "More tags" (`work-item_tags-more`, display: contents), after the card's own "Service on card" tag, keyed by the case study's name, inside "Tags" (`work-item_tags`, flex-wrap, shown only when that service is set). /dev/data lists each key the same way, `[data-tags-for="key"]` holding `[data-tag="name"]` items. Each listed tag the row doesn't already show is added to the slot as a copy of the tag before it, so the card's own tag stays first and the copies look the same. The "Global — motion" embed fades in whatever a slot holds (no fade under reduced motion). It runs again when a Finsweet list re-renders its cards. Without the data, nothing is added.
 
 ### `work-archive.js`
 

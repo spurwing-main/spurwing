@@ -1,5 +1,5 @@
 // /dev/data is a hidden page of Collection Lists that the site reads as data:
-// item counts (cms-counts.js) and each case study's services (work-tags.js).
+// item counts (cms-counts.js) and each case study's services (tag-slots.js).
 // It is requested and parsed once per page view, however many modules ask.
 // Resolves to the parsed document, or null when it cannot be had.
 
