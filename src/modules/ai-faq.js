@@ -109,6 +109,11 @@ export function initAiFaq(root = document, { signal } = {}) {
 		const conversation = crypto.randomUUID();
 
 		revealWithTheList();
+		if (sparkle) {
+			const mark = aiMark();
+			sparkle.before(mark);
+			mark.prepend(sparkle);
+		}
 
 		// The answers kept from earlier, newest straight under the box, closed.
 		let below = ask;
@@ -146,13 +151,22 @@ export function initAiFaq(root = document, { signal } = {}) {
 		}
 
 		/**
-		 * Something new in the list takes its room gradually, on the FAQ cards'
-		 * opening ease, so the page below glides down instead of jumping. A card
-		 * leaving gives its room back the same way.
+		 * Something new in the list first opens its slot, on the FAQ cards' opening
+		 * ease, so the page below glides down instead of jumping; then the card
+		 * rises into that slot rather than out from under the box. A card leaving
+		 * gives its room back.
 		 */
 		function makeRoom(element) {
 			if (reduceMotion) return;
-			element.animate([{ marginTop: `${-room(element)}px` }, { marginTop: "0px" }], OPEN);
+			const hidden = { opacity: 0, transform: "translateY(0.5rem)" };
+			element.animate(
+				[
+					{ marginTop: `${-room(element)}px`, ...hidden, easing: OPEN.easing },
+					{ marginTop: "0px", ...hidden, offset: 0.5, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" },
+					{ marginTop: "0px", opacity: 1, transform: "none" },
+				],
+				{ duration: OPEN.duration * 2 },
+			);
 		}
 
 		function giveRoom(element) {
@@ -188,6 +202,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 				input.focus();
 				return;
 			}
+			if (answerAgain(question)) return;
 
 			// Each question's ID is in the log, and tagged in Clarity, so the two
 			// can be matched: filter Clarity's recordings by ai_faq_question_id.
@@ -235,6 +250,45 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 			if (signal?.aborted) return;
 			prepareToken();
+		}
+
+		/**
+		 * A question this page already answers isn't asked again. A written FAQ
+		 * that matches opens where it is; an earlier AI answer moves back under the
+		 * box and opens. Matching is by words, ignoring case and punctuation: the
+		 * same words, or one more or fewer, count. One word swapped for another
+		 * doesn't ("website" for "migration"), so different questions still go.
+		 */
+		function answerAgain(question) {
+			const written = [...(component.parentElement?.querySelectorAll('[data-accordion="item"]') ?? [])].find((item) =>
+				sameQuestion(question, item.querySelector('[data-accordion="trigger"]')?.textContent ?? ""),
+			);
+			const earlier = [...component.querySelectorAll('[data-ai-faq="answer"]:not([aria-busy])')].find((element) =>
+				sameQuestion(question, cards.get(element)?.question ?? ""),
+			);
+			if (!written && !earlier) return false;
+
+			input.value = "";
+			input.style.height = "";
+			if (written) {
+				track("ai_faq_written");
+				if (written.dataset.accordionOpen !== "true") written.querySelector('[data-accordion="trigger"]').click();
+				written.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+				announce(written.querySelector('[data-accordion="content"]')?.textContent.trim() ?? "", true);
+				return true;
+			}
+
+			track("ai_faq_repeat");
+			const card = cards.get(earlier);
+			component.querySelectorAll('[data-ai-faq="answer"]').forEach((element) => element !== earlier && cards.get(element)?.close());
+			if (ask.nextElementSibling !== earlier) {
+				ask.after(earlier);
+				makeRoom(earlier);
+			}
+			card?.reopen();
+			if (card?.kept()) keepAnswer(card.kept());
+			announce(card?.spoken() ?? "", true);
+			return true;
 		}
 
 		/**
@@ -328,6 +382,16 @@ export function initAiFaq(root = document, { signal } = {}) {
 			});
 		}
 
+		// The sparkle with "AI" at its top right, as in Paul's demo.
+		function aiMark() {
+			const mark = node("span", "ai-faq_mark");
+			const label = node("span", "ai-faq_label");
+			mark.setAttribute("aria-hidden", "true");
+			label.textContent = "AI";
+			mark.append(label);
+			return mark;
+		}
+
 		/**
 		 * One answer card, built from the classes a curated FAQ card carries so the
 		 * Designer's styles apply, in its shape: a heading around a button row. It
@@ -388,8 +452,11 @@ export function initAiFaq(root = document, { signal } = {}) {
 				star.removeAttribute("height");
 				// Drawn at the question's 22px, as in the design, over the 16px icon
 				// slot; the negative margin keeps it centred there.
-				Object.assign(star.style, { display: "block", width: "1.375rem", height: "1.375rem", margin: "-0.1875rem" });
-				status.append(star);
+				Object.assign(star.style, { display: "block", width: "100%", height: "100%" });
+				const mark = aiMark();
+				mark.prepend(star);
+				Object.assign(mark.style, { width: "1.375rem", height: "1.375rem", margin: "-0.1875rem" });
+				status.append(mark);
 				if (!reduceMotion && !saved) {
 					twinkle = [...star.querySelectorAll("path")].map((path, index) => {
 						path.style.transformBox = "fill-box";
@@ -593,6 +660,13 @@ export function initAiFaq(root = document, { signal } = {}) {
 					report.textContent = config.report;
 					report.addEventListener("click", () => track("ai_faq_report"));
 					line.append(`${config.aiNote} `, report, ".");
+					if (sparkle) {
+						const icon = sparkle.cloneNode(true);
+						icon.removeAttribute("data-ai-faq");
+						icon.removeAttribute("style");
+						icon.setAttribute("class", "ai-faq_note-icon");
+						line.prepend(icon);
+					}
 					meta.append(line);
 				}
 				const remove = node("button", "ai-faq_remove");
@@ -636,6 +710,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			return {
 				element,
 				heading,
+				question,
 				open: begin,
 				stage,
 				hold,
@@ -647,6 +722,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 				spoken,
 				pages: () => pages,
 				close: () => done && open && toggle(false),
+				reopen: () => done && !open && toggle(true),
+				kept: () => kept,
 				onCancel: (stop) => (cancel = stop),
 				keep: (item) => (kept = item),
 			};
@@ -770,6 +847,16 @@ export async function* readEvents(body) {
 
 		if (done) return;
 	}
+}
+
+/** The same question: the same words, ignoring case and punctuation, or one more or fewer. */
+export function sameQuestion(a, b) {
+	const words = (text) => new Set(text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+	const one = words(a);
+	const two = words(b);
+	if (!one.size || !two.size) return false;
+	const shared = [...one].filter((word) => two.has(word)).length;
+	return shared / (one.size + two.size - shared) >= 0.8;
 }
 
 function discoveryLink(question) {

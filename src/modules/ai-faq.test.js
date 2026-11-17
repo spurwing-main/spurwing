@@ -4,7 +4,7 @@ const motion = vi.hoisted(() => ({ animate: vi.fn() }));
 
 vi.mock("motion", () => ({ animate: motion.animate }));
 
-import { config, initAiFaq, loadAnswers, readEvents } from "./ai-faq.js";
+import { config, initAiFaq, loadAnswers, readEvents, sameQuestion } from "./ai-faq.js";
 
 const markup = `
 	<div data-ai-faq="component">
@@ -84,7 +84,7 @@ describe("initAiFaq", () => {
 
 		const card = $('[data-ai-faq="answer"]');
 		expect(card.className).toBe("faq-card");
-		expect(card.querySelector(".faq-card_title").textContent).toBe("How many people work at Spurwing?");
+		expect(card.querySelector(".faq-card_trigger > span:first-child").textContent).toBe("How many people work at Spurwing?");
 		expect(card.querySelector(".rich-text p").textContent).toBe("Spurwing has six people.");
 		expect([...card.querySelectorAll(".rich-text a")].map((link) => link.getAttribute("href"))).toEqual(["/about", "/approach"]);
 		expect(card.hasAttribute("aria-busy")).toBe(false);
@@ -216,7 +216,7 @@ describe("initAiFaq", () => {
 		const card = $('[data-ai-faq="answer"]');
 		expect(card.previousElementSibling).toBe($('[data-ai-faq="ask"]'));
 		expect([...card.children].map((child) => child.tagName + "." + child.className)).toEqual(["H3.faq-card_title", "DIV.faq-card_panel"]);
-		expect(card.querySelector("h3.faq-card_title > .faq-card_trigger > span")).not.toBeNull();
+		expect(card.querySelector("h3.faq-card_title > .faq-card_trigger > span:first-child")).not.toBeNull();
 		const star = card.querySelector(".faq-card_icon svg");
 		expect(star.hasAttribute("data-ai-faq")).toBe(false);
 		expect(star.hasAttribute("class")).toBe(false);
@@ -239,7 +239,7 @@ describe("initAiFaq", () => {
 		ask("Keyboard?");
 		await settled();
 
-		expect($('[data-ai-faq="answer"] h3').textContent).toBe("Keyboard?");
+		expect($('[data-ai-faq="answer"] .faq-card_trigger > span:first-child').textContent).toBe("Keyboard?");
 		expect(document.activeElement).toBe(input);
 	});
 
@@ -285,7 +285,11 @@ describe("initAiFaq", () => {
 		await settled();
 
 		const index = Element.prototype.animate.mock.contexts.indexOf(card);
-		expect(Element.prototype.animate.mock.calls[index][0]).toEqual([{ marginTop: "-20px" }, { marginTop: "0px" }]);
+		// The slot opens first with the card unseen, then the card rises into it.
+		const [start, opened, arrived] = Element.prototype.animate.mock.calls[index][0];
+		expect(start).toMatchObject({ marginTop: "-20px", opacity: 0 });
+		expect(opened).toMatchObject({ marginTop: "0px", opacity: 0, offset: 0.5 });
+		expect(arrived).toMatchObject({ marginTop: "0px", opacity: 1 });
 	});
 
 	it("sends each question's ID, its conversation and Clarity's IDs, and tags Clarity with the question's ID", async () => {
@@ -322,7 +326,7 @@ describe("initAiFaq", () => {
 		ask("Second?");
 		await vi.waitFor(() => expect(document.querySelectorAll('[data-ai-faq="answer"]:not([aria-busy])')).toHaveLength(2));
 
-		const titles = [...document.querySelectorAll('[data-ai-faq="answer"] h3')].map((heading) => heading.textContent);
+		const titles = [...document.querySelectorAll('[data-ai-faq="answer"] .faq-card_trigger > span:first-child')].map((title) => title.textContent);
 		expect(titles).toEqual(["Second?", "First?"]);
 	});
 
@@ -460,6 +464,69 @@ describe("initAiFaq", () => {
 		expect(fetch).toHaveBeenCalledTimes(5);
 	});
 
+	it("doesn't ask a question this page already answered: the earlier answer comes back to the top, open", async () => {
+		const fetch = respondWith(sse([["token", "From £15,000."]]));
+		initAiFaq();
+
+		ask("How much does a project cost?");
+		await settled();
+		fetch.mockImplementation(async () => new Response(sse([["token", "Six people."]])));
+		ask("How many people?");
+		await vi.waitFor(() => expect(document.querySelectorAll('[data-ai-faq="answer"]:not([aria-busy])')).toHaveLength(2));
+		ask("how much does a project cost");
+
+		expect(fetch).toHaveBeenCalledTimes(2);
+		const first = $('[data-ai-faq="answer"]');
+		expect(first.querySelector(".faq-card_trigger > span:first-child").textContent).toBe("How much does a project cost?");
+		expect(first.querySelector(".faq-card_trigger").getAttribute("aria-expanded")).toBe("true");
+		expect($('[data-ai-faq="input"]').value).toBe("");
+		expect(loadAnswers()[0].question).toBe("How much does a project cost?");
+	});
+
+	it("opens a written FAQ that asks the same question instead of asking the AI", async () => {
+		const fetch = respondWith(sse([["token", "Yes."]]));
+		document.body.innerHTML = `<div class="list">${markup}
+			<div data-accordion="item" data-accordion-open="false">
+				<button data-accordion="trigger">How much does a Webflow website cost?</button>
+				<div data-accordion="content">From £15,000.</div>
+			</div></div>`;
+		const trigger = $('[data-accordion="trigger"]');
+		const opened = vi.fn();
+		trigger.addEventListener("click", opened);
+		initAiFaq();
+
+		// One word swapped: a different question, so the AI answers it.
+		ask("How much does a webflow project cost?");
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+		ask("how much does a webflow website cost");
+
+		expect(fetch).toHaveBeenCalledTimes(1);
+		expect(opened).toHaveBeenCalledTimes(1);
+		expect($('[data-ai-faq="component"] [role="status"]').lastElementChild.textContent).toBe("From £15,000.");
+	});
+
+	it("counts the same words, or one more or fewer, as the same question, but not a word swapped", () => {
+		expect(sameQuestion("How much does a project cost?", "how much does a project cost")).toBe(true);
+		expect(sameQuestion("How long does a website project take?", "how long does a project take?")).toBe(true);
+		expect(sameQuestion("How long does a website project take?", "How long does a website migration take?")).toBe(false);
+		expect(sameQuestion("How much does a project cost?", "How long does a project take?")).toBe(false);
+		expect(sameQuestion("?", "?")).toBe(false);
+	});
+
+	it("marks the sparkle 'AI', on the box and on each answer, and puts it before the AI line", async () => {
+		respondWith(sse([["token", "Yes."]]));
+		initAiFaq();
+		expect($('[data-ai-faq="ask"] .ai-faq_mark > [data-ai-faq="sparkle"] + .ai-faq_label').textContent).toBe("AI");
+
+		ask("AI?");
+		await settled();
+
+		const card = $('[data-ai-faq="answer"]');
+		expect(card.querySelector(".faq-card_icon .ai-faq_mark .ai-faq_label").textContent).toBe("AI");
+		expect(card.querySelector(".ai-faq_note > svg.ai-faq_note-icon")).not.toBeNull();
+		expect(card.querySelector(".ai-faq_note").textContent).toBe("This answer was generated by AI. Report an issue.");
+	});
+
 	it("cancels a question: the request stops and its card goes", async () => {
 		let aborted;
 		vi.stubGlobal(
@@ -477,7 +544,7 @@ describe("initAiFaq", () => {
 		$(".ai-faq_cancel").click();
 
 		expect(aborted.aborted).toBe(true);
-		await vi.waitFor(() => expect(Element.prototype.animate.mock.calls.at(-1)[0][1]).toMatchObject({ opacity: 0 }));
+		await vi.waitFor(() => expect(Element.prototype.animate.mock.calls.at(-1)[0][0]).toEqual({ opacity: 1 }));
 		Element.prototype.animate.mock.results.at(-1).value.onfinish();
 		expect(card.isConnected).toBe(false);
 		expect(loadAnswers()).toEqual([]);
@@ -496,7 +563,7 @@ describe("initAiFaq", () => {
 
 		const card = $('[data-ai-faq="answer"]');
 		expect(card.previousElementSibling).toBe($('[data-ai-faq="ask"]'));
-		expect(card.querySelector("h3").textContent).toBe("How many?");
+		expect(card.querySelector(".faq-card_trigger > span:first-child").textContent).toBe("How many?");
 		expect(card.querySelector(".rich-text p").textContent).toBe("Six people.");
 		expect(card.querySelector("[data-ai-faq-sources]").textContent).toBe("From: About");
 		expect(card.querySelector(".faq-card_trigger").getAttribute("aria-expanded")).toBe("false");
