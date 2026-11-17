@@ -82,6 +82,8 @@ export const config = {
 const EASE = [0.2, 0.7, 0.2, 1];
 // The FAQ cards' own opening (faq.js), so an answer opens like one.
 const OPEN = { duration: 400, easing: "cubic-bezier(0.25, 0.1, 0.25, 1)" };
+// A long, gentle ease-out for cards arriving and leaving.
+const SOFT = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 export function initAiFaq(root = document, { signal } = {}) {
 	const components = root.querySelectorAll('[data-ai-faq="component"]');
@@ -151,27 +153,43 @@ export function initAiFaq(root = document, { signal } = {}) {
 		}
 
 		/**
-		 * Something new in the list first opens its slot, on the FAQ cards' opening
-		 * ease, so the page below glides down instead of jumping; then the card
-		 * rises into that slot rather than out from under the box. A card leaving
-		 * gives its room back.
+		 * Something new in the list first opens its slot, so the page below glides
+		 * down instead of jumping. Before the slot has finished opening the card
+		 * settles into it: up from a little below and slightly smaller, its
+		 * question and then its answer following a beat behind. A card leaving
+		 * fades and shrinks a touch first, then gives its room back.
 		 */
 		function makeRoom(element) {
 			if (reduceMotion) return;
-			const hidden = { opacity: 0, transform: "translateY(0.5rem)" };
+			element.animate([{ marginTop: `${-room(element)}px` }, { marginTop: "0px" }], { duration: 560, easing: SOFT });
 			element.animate(
 				[
-					{ marginTop: `${-room(element)}px`, ...hidden, easing: OPEN.easing },
-					{ marginTop: "0px", ...hidden, offset: 0.5, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" },
-					{ marginTop: "0px", opacity: 1, transform: "none" },
+					{ opacity: 0, transform: "translateY(0.75rem) scale(0.985)" },
+					{ opacity: 1, transform: "none" },
 				],
-				{ duration: OPEN.duration * 2 },
+				{ duration: 560, delay: 260, easing: SOFT, fill: "backwards" },
+			);
+			[...element.children].forEach((part, index) =>
+				part.animate(
+					[
+						{ opacity: 0, transform: "translateY(0.375rem)" },
+						{ opacity: 1, transform: "none" },
+					],
+					{ duration: 480, delay: 340 + index * 80, easing: SOFT, fill: "backwards" },
+				),
 			);
 		}
 
 		function giveRoom(element) {
 			if (reduceMotion) return element.remove();
-			const leaving = element.animate([{ opacity: 1 }, { opacity: 0, marginTop: `${-room(element)}px` }], OPEN);
+			const leaving = element.animate(
+				[
+					{ opacity: 1, transform: "none" },
+					{ opacity: 0, transform: "scale(0.985)", marginTop: "0px", offset: 0.4 },
+					{ opacity: 0, transform: "scale(0.985)", marginTop: `${-room(element)}px` },
+				],
+				{ duration: 640, easing: SOFT },
+			);
 			leaving.onfinish = () => element.remove();
 		}
 
@@ -487,7 +505,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 			// Opens like an FAQ answer, the first words rising into it.
 			function begin() {
 				resize(() => {}, 0);
-				rise(text, 0.1);
 			}
 
 			/**

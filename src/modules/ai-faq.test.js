@@ -284,12 +284,11 @@ describe("initAiFaq", () => {
 		const card = $('[data-ai-faq="answer"]');
 		await settled();
 
-		const index = Element.prototype.animate.mock.contexts.indexOf(card);
-		// The slot opens first with the card unseen, then the card rises into it.
-		const [start, opened, arrived] = Element.prototype.animate.mock.calls[index][0];
-		expect(start).toMatchObject({ marginTop: "-20px", opacity: 0 });
-		expect(opened).toMatchObject({ marginTop: "0px", opacity: 0, offset: 0.5 });
-		expect(arrived).toMatchObject({ marginTop: "0px", opacity: 1 });
+		// The slot opens, and the card settles into it after a beat.
+		const calls = Element.prototype.animate.mock.calls.filter((call, i) => Element.prototype.animate.mock.contexts[i] === card);
+		expect(calls[0][0]).toEqual([{ marginTop: "-20px" }, { marginTop: "0px" }]);
+		expect(calls[1][0][0]).toMatchObject({ opacity: 0 });
+		expect(calls[1][1]).toMatchObject({ delay: 260, fill: "backwards" });
 	});
 
 	it("sends each question's ID, its conversation and Clarity's IDs, and tags Clarity with the question's ID", async () => {
@@ -544,7 +543,7 @@ describe("initAiFaq", () => {
 		$(".ai-faq_cancel").click();
 
 		expect(aborted.aborted).toBe(true);
-		await vi.waitFor(() => expect(Element.prototype.animate.mock.calls.at(-1)[0][0]).toEqual({ opacity: 1 }));
+		await vi.waitFor(() => expect(Element.prototype.animate.mock.calls.at(-1)[0][0]).toEqual({ opacity: 1, transform: "none" }));
 		Element.prototype.animate.mock.results.at(-1).value.onfinish();
 		expect(card.isConnected).toBe(false);
 		expect(loadAnswers()).toEqual([]);
