@@ -116,6 +116,92 @@ describe("initAiFaq", () => {
 		expect(render).toHaveBeenCalledTimes(2);
 	});
 
+	// A bot check whose passes go as `outcomes` says, one per widget: a token,
+	// "error", or "never" (no answer at all).
+	function botCheck(key, outcomes) {
+		config.turnstileSiteKey = key;
+		const render = vi.fn((holder, options) => {
+			const outcome = outcomes[render.mock.calls.length - 1] ?? "token-late";
+			if (outcome === "error") options["error-callback"]();
+			else if (outcome !== "never") options.callback(outcome);
+			return `widget-${render.mock.calls.length}`;
+		});
+		const remove = vi.fn();
+		vi.stubGlobal("turnstile", { render, remove });
+		const append = HTMLHeadElement.prototype.append;
+		vi.spyOn(HTMLHeadElement.prototype, "append").mockImplementation(function (script) {
+			if (script.src?.includes("turnstile")) return queueMicrotask(() => script.onload());
+			return append.call(this, script);
+		});
+		return { render, remove };
+	}
+
+	it("tries a fresh bot pass when the first one fails, and the question still goes", async () => {
+		const { render, remove } = botCheck("key-error", ["error", "token-2"]);
+		const fetch = respondWith(sse([["token", "Yes."]]));
+		initAiFaq();
+
+		ask("Hi?");
+		await settled();
+
+		expect(render.mock.calls[0][1].retry).toBe("never");
+		expect(JSON.parse(fetch.mock.calls[0][1].body).token).toBe("token-2");
+		expect(remove).toHaveBeenCalledWith("widget-1");
+		expect($('[data-ai-faq="answer"] .rich-text p').textContent).toBe("Yes.");
+	});
+
+	it("gives up on a bot pass that never comes, tries once more, then says it couldn't answer", async () => {
+		config.botCheckMs = 30;
+		const { render } = botCheck("key-never", ["never", "never"]);
+		const fetch = respondWith(sse([["token", "Yes."]]));
+		initAiFaq();
+
+		ask("Hi?");
+		await settled();
+
+		expect(render).toHaveBeenCalledTimes(3); // two tries, then the next spare
+		expect(fetch).not.toHaveBeenCalled();
+		expect($('[data-ai-faq="answer"] p').textContent).toContain(config.failure);
+		config.botCheckMs = 7000;
+	});
+
+	it("gets a fresh bot pass and sends again when the service refuses the pass", async () => {
+		botCheck("key-refused", ["token-1", "token-2"]);
+		const fetch = vi.fn(async () =>
+			fetch.mock.calls.length === 1 ? new Response("", { status: 403 }) : new Response(sse([["token", "Yes."]])),
+		);
+		vi.stubGlobal("fetch", fetch);
+		initAiFaq();
+
+		ask("Hi?");
+		await settled();
+
+		expect(fetch.mock.calls.map(([, init]) => JSON.parse(init.body).token)).toEqual(["token-1", "token-2"]);
+	});
+
+	it("gives up when the answer goes quiet, however long it has run", async () => {
+		config.silenceMs = 30;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url, init) => {
+				const body = new ReadableStream({
+					start(controller) {
+						controller.enqueue(new TextEncoder().encode(sse([["token", "Six "]])));
+						init.signal.addEventListener("abort", () => controller.error(new Error("aborted")));
+					},
+				});
+				return new Response(body);
+			}),
+		);
+		initAiFaq();
+
+		ask("How many?");
+		await settled();
+
+		expect($('[data-ai-faq="answer"] p').textContent).toContain(config.failure);
+		config.silenceMs = 15000;
+	});
+
 	it("reveals the ask card with the FAQ cards", () => {
 		initAiFaq();
 

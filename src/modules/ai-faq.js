@@ -21,9 +21,13 @@ import { claimOnce, requireElement } from "../dom.js";
  * it, newest first, so earlier answers move down rather than away. The sparkle
  * twinkles beside shimmering stage words ("Checking 6 pages…") until the answer
  * streams in, then stays as the finished card's icon, over the pages the answer
- * came from. A question asked while another is answered is answered alongside
- * it; past the Worker's 5 a minute, it waits on its card for its turn. Asking again closes the earlier answers to their questions. A finished card opens and closes like an FAQ, says the answer was
- * written by AI, and can be removed, with a few seconds to undo.
+ * came from. Asking again closes the earlier finished answers. A finished card
+ * opens and closes like an FAQ, says the answer was written by AI, and can be
+ * removed, with a few seconds to undo.
+ *
+ * Several questions are answered at once. Past the Worker's 5 a minute, a
+ * question waits on its card for its turn. A question the page already answers
+ * (a written FAQ, or an earlier AI answer) opens that answer instead.
  *
  * Answers are kept in the visitor's own browser (the newest few), so they are
  * still there on the next page or the next visit. Removing one removes it only
@@ -51,16 +55,21 @@ export const config = {
 	// spurwing.webflow.io). Public by design; its secret lives only in the Worker.
 	turnstileSiteKey: "0x4AAAAAAF2LSWTlSOLzJuaH",
 	stages: ["Reading the site…", "Checking {n} pages…", "Writing an answer…"],
+	waiting: "Waiting to send…",
 	// Each stage stays at least this long, so a fast answer doesn't flicker.
 	minStageMs: 300,
-	timeoutMs: 15000,
+	// The bot check usually vouches in a second or two. One that hasn't in this
+	// long is given up and tried once more.
+	botCheckMs: 7000,
+	// Once sent, the answer gives up after this long with nothing new arriving,
+	// however long the answer itself runs.
+	silenceMs: 15000,
 	// The Worker answers 5 questions a minute per connection. Past that, a
-	// question waits its turn rather than failing; tries is how many times one
-	// is sent when the Worker still says too many.
+	// question waits its turn instead of failing. A question the Worker still
+	// turns away (too many, or the bot pass refused) is sent at most this often.
 	perMinute: 5,
 	minuteMs: 60000,
 	tries: 3,
-	waiting: "Waiting to send…",
 	// Earlier questions and answers sent along, so a follow-up has its context.
 	historyTurns: 2,
 	handoffPath: "/discovery-call",
@@ -323,35 +332,50 @@ export function initAiFaq(root = document, { signal } = {}) {
 			announcer.append(line);
 		}
 
-		/** The answer as text, "" after a hand-off, or null when cancelled or the page went. */
+		/**
+		 * The answer as text, "" after a hand-off, or null when cancelled or the
+		 * page went. The question waits its turn in the minute, gets a bot pass,
+		 * and goes. Turned away for too many, it waits for the next minute; turned
+		 * away at the bot check, it gets a fresh pass.
+		 */
 		async function stream(question, card, id) {
 			const controller = new AbortController();
-			let cancelled = false;
+			const abort = controller.signal;
 			const stop = () => controller.abort();
+			let cancelled = false;
+			let silence;
+			const listen = () => {
+				clearTimeout(silence);
+				silence = setTimeout(stop, config.silenceMs);
+			};
 			signal?.addEventListener("abort", stop);
 			card.onCancel(() => {
 				cancelled = true;
 				track("ai_faq_cancel");
 				stop();
 			});
-			let timeout;
 			let answer = "";
 
 			try {
 				let response;
 				for (let tries = 1; ; tries++) {
-					await turn(card, controller.signal);
-					timeout = setTimeout(stop, config.timeoutMs);
-					response = await post(question, id, controller.signal);
-					if (response.status !== 429 || tries === config.tries) break;
-					// Too many from this connection, which others may share: the minute
-					// counts as used, and the question waits for the next one.
-					clearTimeout(timeout);
-					sent.splice(0, sent.length, ...Array(config.perMinute).fill(Date.now()));
+					clearTimeout(silence);
+					await turn(card, abort);
+					const token = await botCheck(abort);
+					listen();
+					response = await fetch(config.endpoint, {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({ question, history, page: location.pathname, id, conversation, clarity: clarityIds(), token }),
+						signal: abort,
+					});
+					if (response.ok || tries === config.tries || ![403, 429].includes(response.status)) break;
+					if (response.status === 429) fillMinute();
 				}
 				if (!response.ok || !response.body) throw new Error(`ask failed: ${response.status}`);
 
 				for await (const { event, data } of readEvents(response.body)) {
+					listen();
 					if (event === "sources") {
 						card.cite(data);
 						await card.stage(1, data.length);
@@ -378,26 +402,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 				track("ai_faq_no_answer");
 				return "";
 			} finally {
-				clearTimeout(timeout);
+				clearTimeout(silence);
 				signal?.removeEventListener("abort", stop);
 			}
-		}
-
-		async function post(question, id, abort) {
-			return fetch(config.endpoint, {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({
-					question,
-					history,
-					page: location.pathname,
-					id,
-					conversation,
-					clarity: clarityIds(),
-					token: await turnstileToken(),
-				}),
-				signal: abort,
-			});
 		}
 
 		// The sparkle with "AI" at its top right, as in Paul's demo.
@@ -500,11 +507,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 				button.addEventListener("click", () => cancel());
 				meta.append(button);
 				show(0);
-			}
-
-			// Opens like an FAQ answer, the first words rising into it.
-			function begin() {
-				resize(() => {}, 0);
 			}
 
 			/**
@@ -726,9 +728,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 			return {
 				element,
-				heading,
 				question,
-				open: begin,
+				// Opens from nothing, like an FAQ answer.
+				open: () => resize(() => {}, 0),
 				stage,
 				hold,
 				release,
@@ -831,11 +833,14 @@ async function turn(card, abort) {
 			return;
 		}
 		card.hold();
-		await new Promise((resolve, reject) => {
-			const timer = setTimeout(resolve, sent[0] + config.minuteMs - now);
-			abort.addEventListener("abort", () => (clearTimeout(timer), reject(abort.reason)), { once: true });
-		});
+		await until(pause(sent[0] + config.minuteMs - now), abort);
 	}
+}
+
+// The Worker said too many from this connection, which others may share: the
+// minute counts as used from now.
+function fillMinute() {
+	sent.splice(0, sent.length, ...Array(config.perMinute).fill(Date.now()));
 }
 
 /** Parse a server-sent event stream into { event, data } pairs, data JSON-decoded. */
@@ -941,55 +946,104 @@ export function clarityIds() {
 	return { user: first("_clck"), session: first("_clsk") };
 }
 
-// Turnstile takes about two seconds to vouch for a visitor. It starts as the
-// box comes near the screen and again after each question, so a token is
-// waiting by the time anyone presses Enter. Tokens are single-use and last five
-// minutes; an older one is fetched again.
-const TOKEN_LIFE_MS = 4 * 60 * 1000;
-let turnstile;
-let ready = null;
+/**
+ * The bot check (Cloudflare Turnstile) vouches for the visitor with a single-
+ * use pass the Worker checks. It takes a second or two, so a spare pass is
+ * fetched as the box comes near the screen, on focus, and after each answer;
+ * a question takes the spare if it's still fresh (passes last five minutes).
+ *
+ * A pass that doesn't come within config.botCheckMs, or comes back as an
+ * error, is given up and one fresh pass is tried. Each pass is its own hidden
+ * widget, removed once it has answered. Turnstile's own retrying is off: left
+ * on, a failing check can go on retrying for half a minute before it
+ * says anything.
+ */
+const PASS_LIFE_MS = 4 * 60 * 1000;
+let turnstile = null;
+let spare = null;
+
+// A spare is used only while fresh, and only for the widget it was made by.
+const fresh = () => spare && spare.key === config.turnstileSiteKey && Date.now() - spare.at < PASS_LIFE_MS;
 
 export function prepareToken() {
-	if (!config.turnstileSiteKey) return;
-	if (ready && Date.now() - ready.at < TOKEN_LIFE_MS) return;
-	const token = fetchToken();
-	token.catch(() => {});
-	ready = { token, at: Date.now() };
+	if (!config.turnstileSiteKey || fresh()) return;
+	const pass = newPass();
+	pass.catch(() => {});
+	spare = { pass, at: Date.now(), key: config.turnstileSiteKey };
 }
 
-function turnstileToken() {
-	if (!config.turnstileSiteKey) return Promise.resolve("");
-	prepareToken();
-	const { token } = ready;
-	ready = null;
-	return token;
+async function botCheck(abort) {
+	if (!config.turnstileSiteKey) return "";
+	let pass = fresh() ? spare.pass : null;
+	spare = null;
+	for (let tries = 1; ; tries++) {
+		try {
+			return await until(pass ?? newPass(), abort);
+		} catch (error) {
+			if (abort.aborted || tries === 2) throw error;
+			pass = null;
+		}
+	}
 }
 
-function fetchToken() {
-	turnstile ??= new Promise((resolve, reject) => {
-		const script = document.createElement("script");
-		script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-		script.onload = () => resolve(window.turnstile);
-		script.onerror = reject;
-		document.head.append(script);
-	});
+function newPass() {
+	return new Promise((resolve, reject) => {
+		const holder = node("div");
+		let api;
+		let widget;
+		let over = false;
+		const end = (settle, value) => {
+			if (over) return;
+			over = true;
+			clearTimeout(timer);
+			// Removed once render has returned its id; a pass can answer inside render.
+			queueMicrotask(() => {
+				if (widget !== undefined) api.remove(widget);
+				holder.remove();
+			});
+			settle(value);
+		};
+		const timer = setTimeout(() => end(reject, new Error("bot check took too long")), config.botCheckMs);
 
-	return turnstile.then(
-		(api) =>
-			new Promise((resolve, reject) => {
-				const holder = document.createElement("div");
+		turnstile ??= new Promise((ready, failed) => {
+			const script = document.createElement("script");
+			script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+			script.onload = () => ready();
+			script.onerror = () => {
+				turnstile = null;
+				script.remove();
+				failed(new Error("bot check didn't load"));
+			};
+			document.head.append(script);
+		});
+		turnstile.then(
+			() => {
+				if (over) return;
+				api = window.turnstile;
 				document.body.append(holder);
-				api.render(holder, {
+				widget = api.render(holder, {
 					sitekey: config.turnstileSiteKey,
-					callback: (token) => {
-						holder.remove();
-						resolve(token);
-					},
+					retry: "never",
+					callback: (token) => end(resolve, token),
 					"error-callback": () => {
-						holder.remove();
-						reject(new Error("turnstile failed"));
+						end(reject, new Error("bot check failed"));
+						return true;
 					},
+					"expired-callback": () => end(reject, new Error("bot check expired")),
+					"timeout-callback": () => end(reject, new Error("bot check timed out")),
 				});
-			}),
-	);
+			},
+			(error) => end(reject, error),
+		);
+	});
+}
+
+/** The promise's result, unless the signal aborts first. */
+function until(promise, abort) {
+	return new Promise((resolve, reject) => {
+		if (abort.aborted) return reject(abort.reason);
+		const stop = () => reject(abort.reason);
+		abort.addEventListener("abort", stop, { once: true });
+		promise.then(resolve, reject).finally(() => abort.removeEventListener("abort", stop));
+	});
 }
