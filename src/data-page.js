@@ -1,6 +1,8 @@
 // /dev/data is a hidden page of Collection Lists that the site reads as data:
 // item counts (cms-counts.js) and each case study's services (tag-slots.js).
-// It is requested and parsed once per page view, however many modules ask.
+// It is requested and parsed once per page view, however many modules ask,
+// and always checked with the server: Webflow sends it with no cache headers, so
+// a browser's stored copy could otherwise outlive a change to the page.
 // Resolves to the parsed document, or null when it cannot be had.
 
 const endpoint = "/dev/data";
@@ -25,7 +27,7 @@ async function fetchDataPage() {
 	try {
 		const response = await fetch(endpoint, {
 			credentials: "same-origin",
-			cache: "force-cache",
+			cache: "no-cache",
 			headers: { Accept: "text/html" },
 		});
 
