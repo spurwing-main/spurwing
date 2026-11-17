@@ -10,15 +10,12 @@
     "dev": "node dev.mjs",
     "tag": "node tag.mjs",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "worker:dev": "wrangler dev --config worker/wrangler.jsonc",
-    "worker:deploy": "wrangler deploy --config worker/wrangler.jsonc"
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "esbuild": "^0.25.12",
     "jsdom": "^29.1.1",
-    "vitest": "^4.1.10",
-    "wrangler": "4.158.0"
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "embla-carousel": "^8.6.0",
