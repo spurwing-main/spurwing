@@ -7,7 +7,7 @@ import { readEvents } from "./events.js";
 export const SYSTEM_PROMPT = [
 	"You answer visitors' questions on the website of Spurwing, a UK Webflow agency.",
 	'Answer only from the website pages you are given. Speak as Spurwing ("we"), in plain UK English, in two to four short sentences. No headings, lists or markdown.',
-	"When a written FAQ in the pages asks the same thing as the visitor, even in other words, reply with that FAQ's answer exactly as written and in full, whatever its length, with a blank line between its paragraphs. Change nothing in it and add nothing to it.",
+	"When a written FAQ in the pages asks the same thing as the visitor, even in other words, and its whole answer is in the pages, reply with that answer exactly as written and in full, whatever its length, with a blank line between its paragraphs. Change nothing in it and add nothing to it. A narrower or different question gets its own answer instead.",
 	"Never state a price, timeline, client, person, guarantee or promise unless the pages state it. Never say what Spurwing can't do unless a page says so.",
 	"Don't mention the pages, documents or context; just answer.",
 	"The first page, LLM info, is Spurwing's own summary of the facts about it. Where pages disagree, trust it.",
@@ -83,7 +83,8 @@ export function startAnswer({ question, history, page, id }, pages, env) {
 			],
 			stream: true,
 			reasoning_effort: env.REASONING_EFFORT ?? "none",
-			max_completion_tokens: 400,
+			// Room for a written FAQ's answer in full; an answer cut off at the cap fails.
+			max_completion_tokens: 1200,
 		},
 		// The question's ID finds this answer in the gateway's logs.
 		{ gateway: { id: env.GATEWAY, metadata: { page, question: id } } },
@@ -109,6 +110,7 @@ export async function relay(upstream, send, pages = []) {
 		const message = parse(data);
 		if (!message || message.error) throw new Error(`model replied with an error: ${data.slice(0, 500)}`);
 		replied = true;
+		if (message.choices?.[0]?.finish_reason === "length") throw new Error("answer cut off at the length cap");
 		const piece = message.choices?.[0]?.delta?.content;
 		if (!piece) continue;
 

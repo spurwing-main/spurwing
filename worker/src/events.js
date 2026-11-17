@@ -5,7 +5,8 @@ export function eventStream(headers, write) {
 	const { readable, writable } = new TransformStream();
 	const writer = writable.getWriter();
 	const encoder = new TextEncoder();
-	const send = (event, data) => writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+	// A visitor who cancels or leaves closes the stream; what's still to send goes nowhere.
+	const send = (event, data) => writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)).catch(() => {});
 
 	(async () => {
 		try {
@@ -14,7 +15,7 @@ export function eventStream(headers, write) {
 			console.error("ask failed", error);
 			await send("error", { message: "failed" });
 		} finally {
-			await writer.close();
+			await writer.close().catch(() => {});
 		}
 	})();
 

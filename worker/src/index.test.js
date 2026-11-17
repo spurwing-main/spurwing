@@ -145,6 +145,8 @@ describe("worker fetch", () => {
 
 		expect(response.status).toBe(200);
 		expect(await collect(response.body)).toEqual([["error", { message: "failed" }]]);
+		// …and the question is still logged.
+		expect(bindings.DB.prepare).toHaveBeenCalled();
 	});
 
 	it("checks Turnstile once its secret is set", async () => {
@@ -283,6 +285,11 @@ describe("relay", () => {
 		await expect(relay(upstream(['{"error":"Unauthorized"}\n\n']), send)).rejects.toThrow("nothing");
 		await expect(relay(upstream([done]), send)).rejects.toThrow("nothing");
 		expect(send).not.toHaveBeenCalled();
+	});
+
+	it("fails an answer cut off at the length cap rather than passing it off as whole", async () => {
+		const cut = `data: ${JSON.stringify({ choices: [{ delta: { content: "" }, finish_reason: "length" }] })}\n\n`;
+		await expect(relay(upstream([delta("Most projects cost"), cut, done]), vi.fn())).rejects.toThrow("length cap");
 	});
 });
 

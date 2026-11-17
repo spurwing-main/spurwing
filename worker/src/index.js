@@ -53,6 +53,7 @@ async function ask(request, env, ctx, cors) {
 	const ip = request.headers.get("cf-connecting-ip") ?? "";
 	const { success } = await env.RATE_LIMIT.limit({ key: ip });
 	if (!success) return json({ error: "rate limited" }, 429, cors);
+	if (!env.TURNSTILE_SECRET) console.error("TURNSTILE_SECRET is not set: questions are not bot-checked");
 	if (env.TURNSTILE_SECRET && !(await turnstileOk(input.token, ip, env))) {
 		return json({ error: "turnstile" }, 403, cors);
 	}
@@ -85,14 +86,13 @@ async function ask(request, env, ctx, cors) {
 			return sendEvent(event, data);
 		};
 
-		// LLM info is read first with every question; it loads beside the search.
-		const [found, sheet] = await Promise.all([search(input.question, env), factSheet()]);
-		const pages = withFactSheet(pagesFrom(found.chunks), sheet);
-		mark("searched");
-		send("sources", links(pages));
-
-		// A failed answer is logged too, then reaches the page as an `error`.
+		// A failed search or answer is logged too, then reaches the page as an `error`.
 		try {
+			// LLM info is read first with every question; it loads beside the search.
+			const [found, sheet] = await Promise.all([search(input.question, env), factSheet()]);
+			const pages = withFactSheet(pagesFrom(found.chunks), sheet);
+			mark("searched");
+			send("sources", links(pages));
 			log(await relay(await startAnswer(input, pages, env), send, pages));
 		} catch (error) {
 			log(failed(error));
@@ -141,14 +141,21 @@ async function readInput(request) {
 	};
 }
 
+// A check Cloudflare can't make (its service down) refuses the question; the
+// page then tries a fresh pass and, failing that, says it couldn't answer.
 async function turnstileOk(token, ip, env) {
 	if (!token) return false;
 	const form = new FormData();
 	form.append("secret", env.TURNSTILE_SECRET);
 	form.append("response", token);
 	if (ip) form.append("remoteip", ip);
-	const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
-	return (await response.json())?.success === true;
+	try {
+		const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
+		return (await response.json())?.success === true;
+	} catch (error) {
+		console.error("turnstile check failed", error);
+		return false;
+	}
 }
 
 function corsHeaders(origin, env) {

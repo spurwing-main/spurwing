@@ -27,7 +27,7 @@ import { claimOnce, requireElement } from "../dom.js";
  *
  * Several questions are answered at once. Past the Worker's 5 a minute, a
  * question waits on its card for its turn. A question the page already answers
- * (a written FAQ, or an earlier AI answer) opens that answer instead.
+ * (a written FAQ, or an earlier AI answer) opens that answer where it is.
  *
  * Answers are kept in the visitor's own browser (the newest few), so they are
  * still there on the next page or the next visit. Removing one removes it only
@@ -113,7 +113,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 		const sparkle = component.querySelector('[data-ai-faq="sparkle"]');
 		const askCard = input.closest(".faq-card");
 		const announcer = liveRegion(component);
-		const history = [];
+		// This page view's answered questions, oldest first; the latest go along as
+		// context for a follow-up. A removed answer leaves it.
+		const turns = [];
 		// Each answer card's controls, by its element.
 		const cards = new WeakMap();
 		// Ties this box's follow-ups together in the log; one per page view.
@@ -251,12 +253,12 @@ export function initAiFaq(root = document, { signal } = {}) {
 			input.value = "";
 			input.style.height = "";
 			announce(config.stages[2]);
-			card.open();
 
 			const answer = await stream(question, card, id);
 
 			// Cancelled, or the page went: the card has nothing to keep.
 			if (answer === null) {
+				card.halt();
 				if (!signal?.aborted) giveRoom(card.element);
 				announcer.querySelector("[data-ai-faq-note]")?.remove();
 				return;
@@ -268,8 +270,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			announce(card.spoken(), true);
 
 			if (answer) {
-				history.push({ role: "user", content: question }, { role: "assistant", content: answer });
-				history.splice(0, Math.max(0, history.length - config.historyTurns * 2));
+				turns.push({ id, question, answer });
 				const item = { id, question, answer, pages: card.pages() };
 				keepAnswer(item);
 				card.keep(item);
@@ -281,22 +282,24 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 		/**
 		 * A question this page already answers isn't asked again. A written FAQ
-		 * that matches opens where it is; an earlier AI answer moves back under the
-		 * box and opens. Matching is by words, ignoring case and punctuation: the
-		 * same words, or one more or fewer, count. One word swapped for another
-		 * doesn't ("website" for "migration"), so different questions still go.
+		 * that matches opens where it is; an earlier AI answer opens where it is;
+		 * one still being written is left to finish. A failed answer doesn't
+		 * count, so it can be asked again. See sameQuestion for what matches.
 		 */
 		function answerAgain(question) {
 			const written = [...(component.parentElement?.querySelectorAll('[data-accordion="item"]') ?? [])].find((item) =>
 				sameQuestion(question, item.querySelector('[data-accordion="trigger"]')?.textContent ?? ""),
 			);
-			const earlier = [...component.querySelectorAll('[data-ai-faq="answer"]:not([aria-busy])')].find((element) =>
-				sameQuestion(question, cards.get(element)?.question ?? ""),
-			);
+			const earlier = [...component.querySelectorAll('[data-ai-faq="answer"]')]
+				.map((element) => cards.get(element))
+				.find((card) => card && (card.kept() || card.busy()) && sameQuestion(question, card.question));
 			if (!written && !earlier) return false;
 
 			input.value = "";
 			input.style.height = "";
+			if (earlier?.busy()) return true;
+
+			component.querySelectorAll('[data-ai-faq="answer"]').forEach((element) => element !== earlier?.element && cards.get(element)?.close());
 			if (written) {
 				track("ai_faq_written");
 				if (written.dataset.accordionOpen !== "true") written.querySelector('[data-accordion="trigger"]').click();
@@ -306,16 +309,18 @@ export function initAiFaq(root = document, { signal } = {}) {
 			}
 
 			track("ai_faq_repeat");
-			const card = cards.get(earlier);
-			component.querySelectorAll('[data-ai-faq="answer"]').forEach((element) => element !== earlier && cards.get(element)?.close());
-			if (ask.nextElementSibling !== earlier) {
-				ask.after(earlier);
-				makeRoom(earlier);
-			}
-			card?.reopen();
-			if (card?.kept()) keepAnswer(card.kept());
-			announce(card?.spoken() ?? "", true);
+			earlier.reopen();
+			earlier.element.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+			keepAnswer(earlier.kept());
+			announce(earlier.spoken(), true);
 			return true;
+		}
+
+		function context() {
+			return turns.slice(-config.historyTurns).flatMap((turn) => [
+				{ role: "user", content: turn.question },
+				{ role: "assistant", content: turn.answer },
+			]);
 		}
 
 		/**
@@ -330,6 +335,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 			line.textContent = message;
 			if (!answer) line.dataset.aiFaqNote = "";
 			announcer.append(line);
+			// Gone once read, so browsing the page doesn't meet it a second time.
+			if (answer) setTimeout(() => line.remove(), 30000);
 		}
 
 		/**
@@ -355,18 +362,19 @@ export function initAiFaq(root = document, { signal } = {}) {
 				stop();
 			});
 			let answer = "";
+			let ended = false;
 
 			try {
 				let response;
 				for (let tries = 1; ; tries++) {
 					clearTimeout(silence);
-					await turn(card, abort);
 					const token = await botCheck(abort);
+					await turn(card, abort);
 					listen();
 					response = await fetch(config.endpoint, {
 						method: "POST",
 						headers: { "content-type": "application/json" },
-						body: JSON.stringify({ question, history, page: location.pathname, id, conversation, clarity: clarityIds(), token }),
+						body: JSON.stringify({ question, history: context(), page: location.pathname, id, conversation, clarity: clarityIds(), token }),
 						signal: abort,
 					});
 					if (response.ok || tries === config.tries || ![403, 429].includes(response.status)) break;
@@ -391,8 +399,12 @@ export function initAiFaq(root = document, { signal } = {}) {
 						return "";
 					} else if (event === "error") {
 						throw new Error(data.message);
+					} else if (event === "done") {
+						ended = true;
 					}
 				}
+				// Closed without its end: cut off, not finished.
+				if (!ended) throw new Error("answer ended early");
 
 				track("ai_faq_answered");
 				return answer;
@@ -445,6 +457,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			let handedOff = false;
 			let held = false;
 			let open = true;
+			let carry = "";
 			let cancel = () => {};
 			// The browser's copy of this answer, once there is one.
 			let kept = saved ?? null;
@@ -455,6 +468,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 			content.id = `ai-faq-answer-${crypto.randomUUID()}`;
 			head.setAttribute("aria-controls", content.id);
 			title.textContent = question;
+			// The row opens and closes the answer once it's written, not before.
+			if (!saved) head.setAttribute("aria-disabled", "true");
 			head.append(title, status);
 			heading.append(head);
 			body.append(text);
@@ -475,12 +490,11 @@ export function initAiFaq(root = document, { signal } = {}) {
 				star.removeAttribute("style");
 				star.removeAttribute("width");
 				star.removeAttribute("height");
-				// Drawn at the question's 22px, as in the design, over the 16px icon
-				// slot; the negative margin keeps it centred there.
 				Object.assign(star.style, { display: "block", width: "100%", height: "100%" });
 				const mark = aiMark();
 				mark.prepend(star);
-				Object.assign(mark.style, { width: "1.375rem", height: "1.375rem", margin: "-0.1875rem" });
+				// The question's own size, centred over the icon slot.
+				Object.assign(mark.style, { width: "1em", height: "1em", margin: "calc((100% - 1em) / 2)" });
 				status.append(mark);
 				if (!reduceMotion && !saved) {
 					twinkle = [...star.querySelectorAll("path")].map((path, index) => {
@@ -504,7 +518,11 @@ export function initAiFaq(root = document, { signal } = {}) {
 				const button = node("button", "ai-faq_cancel");
 				button.type = "button";
 				button.textContent = config.cancel;
-				button.addEventListener("click", () => cancel());
+				// Focus goes back to the box, not to the top of the page.
+				button.addEventListener("click", () => {
+					input.focus({ preventScroll: true });
+					cancel();
+				});
 				meta.append(button);
 				show(0);
 			}
@@ -594,7 +612,13 @@ export function initAiFaq(root = document, { signal } = {}) {
 				text.removeAttribute("style");
 			}
 
-			async function write(piece) {
+			async function write(arrived) {
+				// Newlines at a piece's end wait for the next piece, so a paragraph
+				// break split across two still breaks.
+				let piece = carry + arrived;
+				carry = piece.match(/\n+$/)?.[0] ?? "";
+				piece = piece.slice(0, piece.length - carry.length);
+				if (!piece) return;
 				const first = !writing;
 				if (first) {
 					await settle();
@@ -631,6 +655,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 				handedOff = true;
 				stopShimmer();
 				pages = [];
+				// Whatever was written before it failed goes.
+				body.replaceChildren(text);
+				paragraph = text;
 				const link = node("a", "text-style-link");
 				link.href = discoveryLink(asked);
 				link.textContent = config.handoffLink;
@@ -644,10 +671,15 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 			// The star stops twinkling and settles as the card's icon, and the
 			// pages it drew on and the AI line rise in underneath.
-			function finish() {
-				writing = true;
+			// Stops the looping motion: on finishing, cancelling, or the page going.
+			function halt() {
 				stopShimmer();
 				twinkle.forEach((controls) => controls.stop());
+			}
+
+			function finish() {
+				writing = true;
+				halt();
 				const paths = [...status.querySelectorAll("path")];
 				if (paths.length && !reduceMotion) animate(paths, { scale: 1, rotate: 0, opacity: 1 }, { duration: 0.35, ease: EASE });
 				element.removeAttribute("aria-busy");
@@ -658,6 +690,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 			// The finished card: its sources, then the AI line and Remove in place of Cancel.
 			function settleCard() {
 				done = true;
+				head.removeAttribute("aria-disabled");
+				const hadFocus = meta.contains(document.activeElement);
 				if (pages.length) {
 					const from = node("p");
 					from.dataset.aiFaqSources = "";
@@ -694,6 +728,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 				remove.setAttribute("aria-label", `${config.remove}: ${question}`);
 				remove.addEventListener("click", removeCard);
 				meta.append(remove);
+				// Cancel had focus as it went: Remove takes its place.
+				if (hadFocus) remove.focus({ preventScroll: true });
 			}
 
 			/**
@@ -701,13 +737,18 @@ export function initAiFaq(root = document, { signal } = {}) {
 			 * Focus goes back to the box, so it doesn't drop to the top of the page.
 			 */
 			function removeCard() {
+				// Already leaving: a second press does nothing.
+				if (element.inert) return;
+				element.inert = true;
 				const place = element.previousElementSibling;
 				const order = kept ? loadAnswers().findIndex((item) => item.id === kept.id) : -1;
 				if (kept) forgetAnswer(kept.id);
+				const turn = turns.findIndex((entry) => entry.id === kept?.id);
+				if (turn !== -1) turns.splice(turn, 1);
 				giveRoom(element);
-				input.focus({ preventScroll: true });
 				track("ai_faq_remove");
-				note.show(config.removed, () => {
+				note.show(config.removed, input, () => {
+					element.inert = false;
 					element.getAnimations().forEach((running) => running.cancel());
 					element.removeAttribute("style");
 					(place?.isConnected ? place : ask).after(element);
@@ -729,8 +770,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 			return {
 				element,
 				question,
-				// Opens from nothing, like an FAQ answer.
-				open: () => resize(() => {}, 0),
 				stage,
 				hold,
 				release,
@@ -738,7 +777,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 				cite,
 				handoff,
 				finish,
+				halt,
 				spoken,
+				busy: () => element.hasAttribute("aria-busy"),
 				pages: () => pages,
 				close: () => done && open && toggle(false),
 				reopen: () => done && !open && toggle(true),
@@ -751,9 +792,11 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 	/**
 	 * One note for the page, "Question removed · Undo", shown for a few seconds
-	 * after a removal. A second removal replaces the first: only the latest can
-	 * be undone. It shows in the browser's top layer: on a phone the cookie
-	 * banner sits where the note does, in a layer no z-index gets above.
+	 * after a removal, with focus on Undo so a keyboard reaches it. A second
+	 * removal replaces the first: only the latest can be undone. It waits while
+	 * the pointer is over it. It shows in the browser's top layer: on a phone the
+	 * cookie banner sits where the note does, in a layer no z-index gets above.
+	 * It's on the page from the start, so its first message is heard.
 	 */
 	function undoNote() {
 		const box = node("div", "ai-faq_toast");
@@ -761,36 +804,45 @@ export function initAiFaq(root = document, { signal } = {}) {
 		const button = node("button", "ai-faq_undo");
 		let timer;
 		let undo = null;
+		let back = null;
 		box.setAttribute("role", "status");
 		box.popover = "manual";
 		box.hidden = true;
 		button.type = "button";
 		button.textContent = config.undo;
 		box.append(label, button);
+		document.body.append(box);
 		button.addEventListener("click", () => {
 			undo?.();
 			hide();
+		});
+		box.addEventListener("pointerenter", () => clearTimeout(timer));
+		box.addEventListener("pointerleave", () => {
+			if (!box.hidden) timer = setTimeout(hide, config.undoMs);
 		});
 		signal?.addEventListener("abort", () => {
 			clearTimeout(timer);
 			box.remove();
 		});
 
+		// Focus goes back to the box it came from, without scrolling to it.
 		function hide() {
 			clearTimeout(timer);
 			undo = null;
+			if (box.contains(document.activeElement)) back?.focus({ preventScroll: true });
 			if (box.matches?.(":popover-open")) box.hidePopover();
 			box.hidden = true;
 		}
 
 		return {
-			show(message, action) {
-				if (!box.isConnected) document.body.append(box);
+			show(message, from, action) {
 				clearTimeout(timer);
 				undo = action;
+				back = from;
 				label.textContent = message;
 				box.hidden = false;
 				if (box.showPopover && !box.matches(":popover-open")) box.showPopover();
+				button.focus({ preventScroll: true });
 				rise(box);
 				timer = setTimeout(hide, config.undoMs);
 			},
@@ -871,14 +923,22 @@ export async function* readEvents(body) {
 	}
 }
 
-/** The same question: the same words, ignoring case and punctuation, or one more or fewer. */
+// Words that don't change what's being asked: "How much does a project cost?"
+// and "how much does a website cost" ask the same thing.
+const FILLER = new Set(
+	"a an the do does did is are be can could will would you your we our us i my me it of to for in on at with and please website site project".split(" "),
+);
+
+/**
+ * The same question: the same words that matter, ignoring case, punctuation and
+ * filler. Any other word added or swapped makes a different question, which
+ * the AI answers ("a Webflow website audit" isn't "a Webflow website").
+ */
 export function sameQuestion(a, b) {
-	const words = (text) => new Set(text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+	const words = (text) => new Set((text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((word) => !FILLER.has(word)));
 	const one = words(a);
 	const two = words(b);
-	if (!one.size || !two.size) return false;
-	const shared = [...one].filter((word) => two.has(word)).length;
-	return shared / (one.size + two.size - shared) >= 0.8;
+	return one.size > 0 && one.size === two.size && [...one].every((word) => two.has(word));
 }
 
 function discoveryLink(question) {
@@ -968,7 +1028,10 @@ const fresh = () => spare && spare.key === config.turnstileSiteKey && Date.now()
 export function prepareToken() {
 	if (!config.turnstileSiteKey || fresh()) return;
 	const pass = newPass();
-	pass.catch(() => {});
+	// A spare that fails is dropped at once, so a question doesn't spend a try on it.
+	pass.catch(() => {
+		if (spare?.pass === pass) spare = null;
+	});
 	spare = { pass, at: Date.now(), key: config.turnstileSiteKey };
 }
 
