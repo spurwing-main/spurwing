@@ -27,12 +27,14 @@ import { initWave } from "./wave.js";
 import { initWorkArchive } from "./work-archive.js";
 import { initWorkSlide } from "./work-slide.js";
 import { initWorkSlider } from "./work-slider.js";
+import { initWorkTags } from "./work-tags.js";
 
 // Modules that build or reveal DOM come before the ones that measure or animate
 // what they produced. Order matters nowhere else: each runs independently, and
 // a module that throws does not stop the next.
 export const modules = [
 	{ name: "cms-counts", init: initCmsCounts },
+	{ name: "work-tags", init: initWorkTags },
 	{ name: "impact-slider", init: initImpactSlider },
 	{ name: "booking-details", init: initBookingDetails },
 	{ name: "image-fade", init: initImageFade },

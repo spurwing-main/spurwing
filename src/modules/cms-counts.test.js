@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bootModules, resetModules, restartModules } from "../boot.js";
+import { forgetDataPage } from "../data-page.js";
 import { initCmsCounts } from "./cms-counts.js";
 
 describe("initCmsCounts", () => {
 	beforeEach(() => {
 		resetModules();
+		forgetDataPage();
 	});
 
 	afterEach(() => {
@@ -44,6 +46,7 @@ describe("initCmsCounts", () => {
 		const fetch = vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
 
 		await bootModules([{ name: "cms-counts", init: initCmsCounts }]);
+		document.dispatchEvent(new CustomEvent("spw:page"));
 		restartModules();
 
 		expect(fetch).toHaveBeenCalledTimes(2);

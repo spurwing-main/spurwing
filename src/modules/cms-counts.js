@@ -1,9 +1,10 @@
+import { loadDataPage } from "../data-page.js";
+
 // Webflow has no count of a Collection's items, so a hidden page lists each
 // Collection and this counts the children of the matching list. Every
 // [data-cms-count-target="x"] gets the count of [data-cms-count="x"].
 
 const cmsCountsConfig = {
-	endpoint: "/dev/data",
 	targetAttr: "data-cms-count-target",
 	sourceAttr: "data-cms-count",
 	doneAttr: "data-cms-count-ok",
@@ -29,7 +30,7 @@ export function initCmsCounts(root = document) {
 }
 
 async function fillIn(targets) {
-	const source = await fetchSource();
+	const source = await loadDataPage();
 
 	if (!source) return;
 
@@ -40,22 +41,6 @@ async function fillIn(targets) {
 		if (!list) continue;
 
 		target.textContent = String(list.children.length);
-	}
-}
-
-async function fetchSource() {
-	try {
-		const response = await fetch(cmsCountsConfig.endpoint, {
-			credentials: "same-origin",
-			cache: "force-cache",
-			headers: { Accept: "text/html" },
-		});
-
-		if (!response.ok) return null;
-
-		return new DOMParser().parseFromString(await response.text(), "text/html");
-	} catch {
-		return null;
 	}
 }
 
