@@ -44,6 +44,8 @@ const settled = () =>
 describe("initAiFaq", () => {
 	beforeEach(() => {
 		config.minStageMs = 0;
+		// No minute to wait out, unless a test sets one.
+		config.minuteMs = 0;
 		config.turnstileSiteKey = "";
 		motion.animate.mockReset().mockReturnValue({ stop: vi.fn(), finished: Promise.resolve() });
 		vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
@@ -167,7 +169,7 @@ describe("initAiFaq", () => {
 	});
 
 	it("hands off when the service fails", async () => {
-		respondWith("", { status: 429 });
+		respondWith("", { status: 500 });
 		initAiFaq();
 
 		ask("How much is a website?");
@@ -222,6 +224,7 @@ describe("initAiFaq", () => {
 		expect(twinkles.map(([path]) => path)).toEqual([...star.querySelectorAll("path")]);
 		expect(card.querySelector(".rich-text p").textContent).toBe("Reading the site…");
 
+		await vi.waitFor(() => expect(finish).toBeDefined());
 		finish(new Response(sse([["token", "Yes."]])));
 		await settled();
 		expect(card.querySelector(".faq-card_icon svg")).toBe(star);
@@ -382,6 +385,79 @@ describe("initAiFaq", () => {
 		trigger.click();
 		expect(trigger.getAttribute("aria-expanded")).toBe("true");
 		expect(content.inert).toBe(false);
+	});
+
+	it("answers a question asked while another is being answered, alongside it", async () => {
+		let finishFirst;
+		const fetch = vi.fn(async () => {
+			if (fetch.mock.calls.length === 1) {
+				await new Promise((resolve) => (finishFirst = resolve));
+				return new Response(sse([["token", "Six people."]]));
+			}
+			return new Response(sse([["token", "From £15,000."]]));
+		});
+		vi.stubGlobal("fetch", fetch);
+		initAiFaq();
+
+		ask("How many?");
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+		ask("How much?");
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+		await vi.waitFor(() => expect($('[data-ai-faq="answer"] p').textContent).toBe("From £15,000."));
+		finishFirst();
+		await settled();
+
+		const answers = [...document.querySelectorAll('[data-ai-faq="answer"] .rich-text p')].map((p) => p.textContent);
+		expect(answers).toEqual(["From £15,000.", "Six people."]);
+		expect($('[data-ai-faq="component"] [role="status"]').textContent).toBe("From £15,000.Six people.");
+	});
+
+	it("holds a sixth question in a minute until the minute is up, then sends it", async () => {
+		config.minuteMs = 300;
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		const fetch = respondWith(sse([["token", "Yes."]]));
+		fetch.mockImplementation(async () => new Response(sse([["token", "Yes."]])));
+		initAiFaq();
+
+		for (const n of [1, 2, 3, 4, 5]) ask(`Question ${n}?`);
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(5));
+		ask("Question 6?");
+		const waiting = $('[data-ai-faq="answer"]');
+		expect(waiting.textContent).toContain(config.waiting);
+		expect(fetch).toHaveBeenCalledTimes(5);
+
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(6));
+		await vi.waitFor(() => expect(waiting.querySelector(".rich-text p").textContent).toBe("Yes."));
+	});
+
+	it("waits and tries again when the service says too many", async () => {
+		config.minuteMs = 50;
+		const fetch = vi.fn(async () =>
+			fetch.mock.calls.length === 1 ? new Response("", { status: 429 }) : new Response(sse([["token", "Yes."]])),
+		);
+		vi.stubGlobal("fetch", fetch);
+		initAiFaq();
+
+		ask("Busy office?");
+		await settled();
+
+		expect(fetch).toHaveBeenCalledTimes(2);
+		expect($('[data-ai-faq="answer"] .rich-text p').textContent).toBe("Yes.");
+	});
+
+	it("cancels a waiting question without sending it", async () => {
+		config.minuteMs = 300;
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		const fetch = respondWith(sse([["token", "Yes."]]));
+		fetch.mockImplementation(async () => new Response(sse([["token", "Yes."]])));
+		initAiFaq();
+
+		for (const n of [1, 2, 3, 4, 5, 6]) ask(`Question ${n}?`);
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(5));
+		$('[data-ai-faq="answer"] .ai-faq_cancel').click();
+		await new Promise((resolve) => setTimeout(resolve, 400));
+
+		expect(fetch).toHaveBeenCalledTimes(5);
 	});
 
 	it("cancels a question: the request stops and its card goes", async () => {

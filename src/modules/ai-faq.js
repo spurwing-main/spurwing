@@ -21,7 +21,8 @@ import { claimOnce, requireElement } from "../dom.js";
  * it, newest first, so earlier answers move down rather than away. The sparkle
  * twinkles beside shimmering stage words ("Checking 6 pages…") until the answer
  * streams in, then stays as the finished card's icon, over the pages the answer
- * came from. Asking again closes the earlier answers to their questions. A finished card opens and closes like an FAQ, says the answer was
+ * came from. A question asked while another is answered is answered alongside
+ * it; past the Worker's 5 a minute, it waits on its card for its turn. Asking again closes the earlier answers to their questions. A finished card opens and closes like an FAQ, says the answer was
  * written by AI, and can be removed, with a few seconds to undo.
  *
  * Answers are kept in the visitor's own browser (the newest few), so they are
@@ -53,6 +54,13 @@ export const config = {
 	// Each stage stays at least this long, so a fast answer doesn't flicker.
 	minStageMs: 300,
 	timeoutMs: 15000,
+	// The Worker answers 5 questions a minute per connection. Past that, a
+	// question waits its turn rather than failing; tries is how many times one
+	// is sent when the Worker still says too many.
+	perMinute: 5,
+	minuteMs: 60000,
+	tries: 3,
+	waiting: "Waiting to send…",
 	// Earlier questions and answers sent along, so a follow-up has its context.
 	historyTurns: 2,
 	handoffPath: "/discovery-call",
@@ -99,7 +107,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 		const cards = new WeakMap();
 		// Ties this box's follow-ups together in the log; one per page view.
 		const conversation = crypto.randomUUID();
-		let busy = false;
 
 		revealWithTheList();
 
@@ -181,8 +188,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 				input.focus();
 				return;
 			}
-			if (busy) return;
-			busy = true;
 
 			// Each question's ID is in the log, and tagged in Clarity, so the two
 			// can be matched: filter Clarity's recordings by ai_faq_question_id.
@@ -191,8 +196,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 			window.clarity?.("set", "ai_faq_conversation", conversation);
 			track("ai_faq_ask");
 
-			// The earlier answers close to their questions, as in the design, so the
-			// new one is the only one open.
+			// The earlier finished answers close to their questions, as in the design.
+			// One still being written stays open: several are answered at once.
 			component.querySelectorAll('[data-ai-faq="answer"]').forEach((element) => cards.get(element)?.close());
 
 			// The box clears and stays, so the next question can be typed while this
@@ -203,23 +208,22 @@ export function initAiFaq(root = document, { signal } = {}) {
 			makeRoom(card.element);
 			input.value = "";
 			input.style.height = "";
-			announcer.textContent = config.stages[2];
+			announce(config.stages[2]);
 			card.open();
 
 			const answer = await stream(question, card, id);
-			busy = false;
 
 			// Cancelled, or the page went: the card has nothing to keep.
 			if (answer === null) {
 				if (!signal?.aborted) giveRoom(card.element);
-				announcer.textContent = "";
+				announcer.querySelector("[data-ai-faq-note]")?.remove();
 				return;
 			}
 
 			card.finish();
 			// Read once, whole: announced word by word as it streams, a screen
 			// reader missed the start and spoke the rest in fragments.
-			announcer.textContent = card.spoken();
+			announce(card.spoken(), true);
 
 			if (answer) {
 				history.push({ role: "user", content: question }, { role: "assistant", content: answer });
@@ -233,6 +237,20 @@ export function initAiFaq(root = document, { signal } = {}) {
 			prepareToken();
 		}
 
+		/**
+		 * "Writing an answer…" replaces whatever was said before. A finished answer
+		 * is added after the others instead, so two finishing together are both
+		 * read, one after the other.
+		 */
+		function announce(message, answer = false) {
+			if (answer) announcer.querySelector("[data-ai-faq-note]")?.remove();
+			else announcer.replaceChildren();
+			const line = node("p");
+			line.textContent = message;
+			if (!answer) line.dataset.aiFaqNote = "";
+			announcer.append(line);
+		}
+
 		/** The answer as text, "" after a hand-off, or null when cancelled or the page went. */
 		async function stream(question, card, id) {
 			const controller = new AbortController();
@@ -244,24 +262,21 @@ export function initAiFaq(root = document, { signal } = {}) {
 				track("ai_faq_cancel");
 				stop();
 			});
-			const timeout = setTimeout(stop, config.timeoutMs);
+			let timeout;
 			let answer = "";
 
 			try {
-				const response = await fetch(config.endpoint, {
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify({
-						question,
-						history,
-						page: location.pathname,
-						id,
-						conversation,
-						clarity: clarityIds(),
-						token: await turnstileToken(),
-					}),
-					signal: controller.signal,
-				});
+				let response;
+				for (let tries = 1; ; tries++) {
+					await turn(card, controller.signal);
+					timeout = setTimeout(stop, config.timeoutMs);
+					response = await post(question, id, controller.signal);
+					if (response.status !== 429 || tries === config.tries) break;
+					// Too many from this connection, which others may share: the minute
+					// counts as used, and the question waits for the next one.
+					clearTimeout(timeout);
+					sent.splice(0, sent.length, ...Array(config.perMinute).fill(Date.now()));
+				}
 				if (!response.ok || !response.body) throw new Error(`ask failed: ${response.status}`);
 
 				for await (const { event, data } of readEvents(response.body)) {
@@ -296,6 +311,23 @@ export function initAiFaq(root = document, { signal } = {}) {
 			}
 		}
 
+		async function post(question, id, abort) {
+			return fetch(config.endpoint, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					question,
+					history,
+					page: location.pathname,
+					id,
+					conversation,
+					clarity: clarityIds(),
+					token: await turnstileToken(),
+				}),
+				signal: abort,
+			});
+		}
+
 		/**
 		 * One answer card, built from the classes a curated FAQ card carries so the
 		 * Designer's styles apply, in its shape: a heading around a button row. It
@@ -322,6 +354,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			let writing = false;
 			let done = false;
 			let handedOff = false;
+			let held = false;
 			let open = true;
 			let cancel = () => {};
 			// The browser's copy of this answer, once there is one.
@@ -433,6 +466,22 @@ export function initAiFaq(root = document, { signal } = {}) {
 				text.textContent = config.stages[index].replace("{n}", count);
 				startShimmer();
 				shownAt = Date.now();
+			}
+
+			// Waiting its turn to be sent, then back to the first stage once it is.
+			function hold() {
+				if (held) return;
+				held = true;
+				track("ai_faq_wait");
+				text.textContent = config.waiting;
+				startShimmer();
+				shownAt = Date.now();
+			}
+
+			function release() {
+				if (!held) return;
+				held = false;
+				show(0);
 			}
 
 			function settle() {
@@ -589,6 +638,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 				heading,
 				open: begin,
 				stage,
+				hold,
+				release,
 				write,
 				cite,
 				handoff,
@@ -664,6 +715,32 @@ export function initAiFaq(root = document, { signal } = {}) {
 	function rise(element, delay = 0) {
 		if (reduceMotion) return;
 		animate(element, { opacity: [0, 1], y: [8, 0] }, { duration: 0.4, delay, ease: EASE });
+	}
+}
+
+// When this page's latest questions were sent, oldest first: a minute's worth
+// at most, across every box on the page.
+const sent = [];
+
+/**
+ * Waits until this page has sent fewer than the Worker's minute allows, then
+ * counts the question as sent. A question that has to wait says so on its card.
+ */
+async function turn(card, abort) {
+	for (;;) {
+		abort.throwIfAborted();
+		const now = Date.now();
+		while (sent.length && now - sent[0] >= config.minuteMs) sent.shift();
+		if (sent.length < config.perMinute) {
+			sent.push(now);
+			card.release();
+			return;
+		}
+		card.hold();
+		await new Promise((resolve, reject) => {
+			const timer = setTimeout(resolve, sent[0] + config.minuteMs - now);
+			abort.addEventListener("abort", () => (clearTimeout(timer), reject(abort.reason)), { once: true });
+		});
 	}
 }
 
