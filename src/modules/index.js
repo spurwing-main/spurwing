@@ -17,6 +17,7 @@ import { initInsightToc } from "./insight-toc.js";
 import { initMenuToggle } from "./menu-toggle.js";
 import { initNavAutoHide } from "./nav-auto-hide.js";
 import { initNavPanel } from "./nav-panel.js";
+import { initNextCards } from "./next-cards.js";
 import { initProcessTabs } from "./process-tabs.js";
 import { initQuoteFade } from "./quote-fade.js";
 import { initRightway } from "./rightway.js";
@@ -62,6 +63,7 @@ export const modules = [
 	{ name: "process-tabs", init: initProcessTabs },
 	{ name: "card-reveal", init: initCardReveal },
 	{ name: "img-parallax", init: initImgParallax },
+	{ name: "next-cards", init: initNextCards },
 	{ name: "anim", init: initAnim },
 	{ name: "approach-hero", init: initApproachHero },
 	{ name: "approach-slider", init: initApproachSlider },
