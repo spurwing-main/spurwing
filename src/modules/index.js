@@ -16,6 +16,7 @@ import { initImpactSlider } from "./impact-slider.js";
 import { initInsightToc } from "./insight-toc.js";
 import { initMenuToggle } from "./menu-toggle.js";
 import { initNavAutoHide } from "./nav-auto-hide.js";
+import { initNavClear } from "./nav-clear.js";
 import { initNavPanel } from "./nav-panel.js";
 import { initNextCards } from "./next-cards.js";
 import { initProcessTabs } from "./process-tabs.js";
@@ -43,6 +44,7 @@ export const modules = [
 
 	{ name: "menu-toggle", init: initMenuToggle },
 	{ name: "nav-auto-hide", init: initNavAutoHide },
+	{ name: "nav-clear", init: initNavClear },
 	{ name: "nav-panel", init: initNavPanel },
 	{ name: "copy-to-clipboard", init: initCopyToClipboard },
 	{ name: "faq", init: initFaq },

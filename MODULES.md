@@ -100,6 +100,10 @@ Crossfades `main` and the footer through a brief white hold while the nav stays 
 
 The container it fades is built on the first navigation, never on load, so the page as served is the page as designed until someone clicks a link.
 
+### `nav-clear.js`
+
+A see-through nav over a photo hero, as the service-page designs draw it. A page opts in by marking its hero's sky area `data-nav-clear`; the Global code "nav" embed then shows the nav without its bar and with white text, and pulls the marked hero up under the nav so the photo is behind it. Once the hero has scrolled up under the nav, this marks the nav `data-nav-solid` and it returns to the white bar; an open menu or dropdown is always the white bar. The header outlives a page transition, so the mark is cleared when the run is aborted and the next page decides again.
+
 ### `next-cards.js`
 
 Hover motion on the two Next steps cards, all springs. The people card's ring of faces winds up to speed and stretches outward as it spins; hovering off lets it coast down and draw back in, and it stays where it stopped. The projects card's front screenshot drops, passes under the other two once clear of them and rises into the back of the pile, repeating while the pointer stays. Each card is found by its own markup and marked `data-next-card`; the seats, layers and the ring's `--turn` and `--spread` are CSS in the Global code "agency" embed. Touch and reduced motion get the cards as built.
