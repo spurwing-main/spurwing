@@ -1,5 +1,7 @@
 import { animate, stagger } from "motion";
 
+import { trackBooking } from "../visit-source.js";
+
 export function initBookingDetails(root = document) {
 	const section = root.querySelector(".section_booking-details");
 
@@ -18,6 +20,8 @@ export function initBookingDetails(root = document) {
 		section.hidden = true;
 		return;
 	}
+
+	trackBooking(uid);
 
 	const values = {
 		name: params.get("attendeeName"),

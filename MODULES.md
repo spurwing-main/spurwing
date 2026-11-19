@@ -32,7 +32,7 @@ Plays a background video: a `<video data-bg-video>` custom element placed after 
 
 ### `booking-details.js`
 
-Builds the booking confirmation from the Cal.com query parameters — attendee, formatted times, reschedule link — hiding any row it has no value for, then reveals the rows in sequence.
+Builds the booking confirmation from the Cal.com query parameters — attendee, formatted times, reschedule link — hiding any row it has no value for, then reveals the rows in sequence. It also counts the booking once through `visit-source.js`.
 
 ### `approach-slider.js`
 
@@ -165,6 +165,10 @@ Starts each module with a fresh `AbortSignal`, aborting the previous run's signa
 ### `index.js`
 
 Waits for the DOM, starts the router once, then boots the module list.
+
+### `visit-source.js`
+
+Records where the visitor first came from — landing page, referring site, utm values, gclid — once per visit in sessionStorage, and starts when the bundle loads rather than on DOM ready. A link with no utm gets the referring site as `utm_source` ("claude.ai", "google.com"), with search engines marked `organic`. Every Clarity recording is tagged `first_source`, `first_medium`, `first_campaign` and `first_landing_page`; Clarity only loads after Accept and replays them then. On the page with the cal.com embed it writes the first visit into the page's address before the embed reads it (the embed forwards the address into the booking, `forwardQueryParams`), so cal.com saves the utm values on the booking; `landing_page`, `first_referrer` and `gclid` need hidden booking questions of the same name in cal.com. On the booking confirmation it sends Clarity `booked` and the event `booked_call`, and Plausible the goal "Booked call" with the first source, once per booking. It also passes the cookie choice to Clarity (`consentv2`) on load and on every change, so withdrawing analytics removes Clarity's cookies.
 
 ### `dom.js`
 

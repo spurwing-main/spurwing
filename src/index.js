@@ -2,6 +2,7 @@ import { bootModules, restartModules } from "./boot.js";
 import { initCursor } from "./modules/cursor.js";
 import { modules } from "./modules/index.js";
 import { initPageTransition } from "./modules/page-transition.js";
+import { initVisitSource } from "./visit-source.js";
 
 const namespace = document.documentElement.dataset.projectNamespace || "spurwing";
 const project = (window[namespace] = window[namespace] || {});
@@ -10,6 +11,14 @@ project.modules = Object.fromEntries(modules.map((module) => [module.name, modul
 // The router owns navigation for the whole session, so it starts once and is
 // not in the module list. It restarts the modules against each new page.
 document.addEventListener("spw:page", () => restartModules());
+
+// Before DOM ready, so the visit's source is in the booking page's address
+// before the cal.com embed reads it. See visit-source.js.
+try {
+	initVisitSource();
+} catch (error) {
+	console.error("[site] the visit source was not recorded.", error);
+}
 
 async function start() {
   // Outside bootModules' per-module try/catch, so it gets one of its own. The
