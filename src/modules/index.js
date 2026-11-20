@@ -47,8 +47,9 @@ export const modules = [
 	{ name: "nav-clear", init: initNavClear },
 	{ name: "nav-panel", init: initNavPanel },
 	{ name: "copy-to-clipboard", init: initCopyToClipboard },
-	{ name: "faq", init: initFaq },
+	// ai-faq adds the answers kept from earlier; faq then reveals every card.
 	{ name: "ai-faq", init: initAiFaq },
+	{ name: "faq", init: initFaq },
 	{ name: "insight-toc", init: initInsightToc },
 	{ name: "team-switch", init: initTeamSwitch },
 	{ name: "wave", init: initWave },

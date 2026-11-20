@@ -2,6 +2,7 @@ import { animate } from "motion";
 
 import { claimOnce, requireElement } from "../dom.js";
 import { clarityIds, noteQuestion } from "../visit-source.js";
+import { arrive, depart, open, SLIDE } from "./faq.js";
 
 /**
  * Ask a question: the AI box at the top of every FAQ list.
@@ -13,18 +14,17 @@ import { clarityIds, noteQuestion } from "../visit-source.js";
  *         <svg data-ai-faq="sparkle">  <button data-ai-faq="send">
  *
  * The Designer owns the look: the ask card is a curated FAQ card's classes, and
- * an answer is built from those same classes, so it reads as one more card in
- * the list. This module owns the behaviour and the motion; the "Global — FAQ"
- * embed styles the few pieces only an answer has (its AI line, Remove, Cancel
- * and the Undo note).
+ * an answer is built in a written FAQ card's markup, so it is one more card in
+ * the list. faq.js reveals, opens and closes it like any other; this module
+ * owns asking, writing and removing. The "Global — FAQ" embed styles the few
+ * pieces only an answer has (its AI line, Remove, Cancel and the Undo note).
  *
  * The box stays where it is. Each question becomes a new card straight under
  * it, newest first, so earlier answers move down rather than away. The sparkle
  * twinkles beside shimmering stage words ("Checking…", then "Typing…") until the answer
  * streams in, then stays as the finished card's icon, over the pages the answer
- * came from. Asking again closes the earlier finished answers. A finished card
- * opens and closes like an FAQ, says the answer was written by AI, and can be
- * removed, with a few seconds to undo.
+ * came from. Asking closes whichever card was open. A finished card says the
+ * answer was written by AI, and can be removed, with a few seconds to undo.
  *
  * Several questions are answered at once. Past the Worker's 5 a minute, a
  * question waits on its card for its turn. A question the page already answers
@@ -90,10 +90,6 @@ export const config = {
 
 // Spurwing's ease, from the design prototype.
 const EASE = [0.2, 0.7, 0.2, 1];
-// The FAQ cards' own opening (the "Global — FAQ" embed), so an answer opens like one.
-const OPEN = { duration: 400, easing: "cubic-bezier(0.25, 0.1, 0.25, 1)" };
-// A long, gentle ease-out for cards arriving and leaving.
-const SOFT = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 export function initAiFaq(root = document, { signal } = {}) {
 	const components = root.querySelectorAll('[data-ai-faq="component"]');
@@ -112,7 +108,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 		const input = requireElement(component, '[data-ai-faq="input"]');
 		const send = requireElement(component, '[data-ai-faq="send"]');
 		const sparkle = component.querySelector('[data-ai-faq="sparkle"]');
-		const askCard = input.closest(".faq-card");
 		const announcer = liveRegion(component);
 		// This page view's answered questions, oldest first; the latest go along as
 		// context for a follow-up. A removed answer leaves it.
@@ -122,7 +117,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 		// Ties this box's follow-ups together in the log; one per page view.
 		const conversation = crypto.randomUUID();
 
-		const askTurn = revealWithTheList();
 		if (sparkle) {
 			const mark = aiMark();
 			sparkle.before(mark);
@@ -130,13 +124,10 @@ export function initAiFaq(root = document, { signal } = {}) {
 		}
 
 		// The answers kept from earlier, newest straight under the box, closed.
-		// They reveal with the page like the cards around them, each a turn after
-		// the box. This runs before the reveal system starts, which then finds them.
+		// This runs before faq.js, which reveals them with the cards around them.
 		let below = ask;
-		loadAnswers().forEach((item, index) => {
+		loadAnswers().forEach((item) => {
 			const card = answerCard(item.question, item);
-			card.element.setAttribute("data-anim", "card");
-			card.element.style.setProperty("--anim-i", String(Math.min(askTurn + 1 + index, 6)));
 			cards.set(card.element, card);
 			below.after(card.element);
 			below = card.element;
@@ -169,71 +160,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 		});
 		send.addEventListener("click", submit);
 
-		// The space an item takes in the list: its height and the gap above it.
-		function room(element) {
-			return element.getBoundingClientRect().height + (parseFloat(getComputedStyle(component).rowGap) || 0);
-		}
-
-		/**
-		 * Something new in the list first opens its slot, so the page below glides
-		 * down instead of jumping. Before the slot has finished opening the card
-		 * settles into it: up from a little below and slightly smaller, its
-		 * question and then its answer following a beat behind. A card leaving
-		 * fades and shrinks a touch first, then gives its room back.
-		 */
-		function makeRoom(element) {
-			if (reduceMotion) return;
-			element.animate([{ marginTop: `${-room(element)}px` }, { marginTop: "0px" }], { duration: 560, easing: SOFT });
-			element.animate(
-				[
-					{ opacity: 0, transform: "translateY(0.75rem) scale(0.985)" },
-					{ opacity: 1, transform: "none" },
-				],
-				{ duration: 560, delay: 260, easing: SOFT, fill: "backwards" },
-			);
-			[...element.children].forEach((part, index) =>
-				part.animate(
-					[
-						{ opacity: 0, transform: "translateY(0.375rem)" },
-						{ opacity: 1, transform: "none" },
-					],
-					{ duration: 480, delay: 340 + index * 80, easing: SOFT, fill: "backwards" },
-				),
-			);
-		}
-
-		function giveRoom(element) {
-			if (reduceMotion) return element.remove();
-			const leaving = element.animate(
-				[
-					{ opacity: 1, transform: "none" },
-					{ opacity: 0, transform: "scale(0.985)", marginTop: "0px", offset: 0.4 },
-					{ opacity: 0, transform: "scale(0.985)", marginTop: `${-room(element)}px` },
-				],
-				{ duration: 640, easing: SOFT },
-			);
-			leaving.onfinish = () => element.remove();
-		}
-
 		function fit() {
 			input.style.height = "auto";
 			input.style.height = `${input.scrollHeight}px`;
-		}
-
-		/**
-		 * The ask card reveals with the site's scroll animation on the turn after
-		 * the questions above it: first when it leads the list, last when it ends
-		 * it. The site's rule sets --anim-i on every data-anim element, so the turn
-		 * goes on the card itself, and the sparkle inside it comes in with it.
-		 */
-		function revealWithTheList() {
-			if (!askCard) return 0;
-			const questions = component.parentElement?.querySelectorAll('[data-accordion="item"]') ?? [];
-			const above = [...questions].filter((item) => item.compareDocumentPosition(component) & Node.DOCUMENT_POSITION_FOLLOWING);
-			const turn = Math.min(above.length, 6);
-			if (!askCard.hasAttribute("data-anim")) askCard.setAttribute("data-anim", "card");
-			askCard.style.setProperty("--anim-i", String(turn));
-			return turn;
 		}
 
 		async function submit() {
@@ -253,16 +182,15 @@ export function initAiFaq(root = document, { signal } = {}) {
 			track("ai_faq_ask");
 			noteQuestion(conversation);
 
-			// The earlier finished answers close to their questions, as in the design.
-			// One still being written stays open: several are answered at once.
-			component.querySelectorAll('[data-ai-faq="answer"]').forEach((element) => cards.get(element)?.close());
-
 			// The box clears and stays, so the next question can be typed while this
 			// one is answered. Focus stays in it; the status region reads the answer.
+			// The new card opens as the others close; one still being written stays
+			// open, as several are answered at once.
 			const card = answerCard(question);
 			cards.set(card.element, card);
 			ask.after(card.element);
-			makeRoom(card.element);
+			open(card.element);
+			arrive(card.element);
 			input.value = "";
 			input.style.height = "";
 			announce(config.stages[2]);
@@ -272,7 +200,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			// Cancelled, or the page went: the card has nothing to keep.
 			if (answer === null) {
 				card.halt();
-				if (!signal?.aborted) giveRoom(card.element);
+				if (!signal?.aborted) depart(card.element);
 				announcer.querySelector("[data-ai-faq-note]")?.remove();
 				return;
 			}
@@ -300,7 +228,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		 * count, so it can be asked again. See sameQuestion for what matches.
 		 */
 		function answerAgain(question) {
-			const written = [...(component.parentElement?.querySelectorAll('[data-accordion="item"]') ?? [])].find((item) =>
+			const written = [...(component.parentElement?.querySelectorAll('[data-accordion="item"]:not([data-ai-faq])') ?? [])].find((item) =>
 				sameQuestion(question, item.querySelector('[data-accordion="trigger"]')?.textContent ?? ""),
 			);
 			const earlier = [...component.querySelectorAll('[data-ai-faq="answer"]')]
@@ -312,17 +240,16 @@ export function initAiFaq(root = document, { signal } = {}) {
 			input.style.height = "";
 			if (earlier?.busy()) return true;
 
-			component.querySelectorAll('[data-ai-faq="answer"]').forEach((element) => element !== earlier?.element && cards.get(element)?.close());
 			if (written) {
 				track("ai_faq_written");
-				written.open = true;
+				open(written);
 				written.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
 				announce(written.querySelector('[data-accordion="content"]')?.textContent.trim() ?? "", true);
 				return true;
 			}
 
 			track("ai_faq_repeat");
-			earlier.reopen();
+			open(earlier.element);
 			earlier.element.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
 			keepAnswer(earlier.kept());
 			announce(earlier.spoken(), true);
@@ -443,16 +370,16 @@ export function initAiFaq(root = document, { signal } = {}) {
 		}
 
 		/**
-		 * One answer card, built from the classes a curated FAQ card carries so the
-		 * Designer's styles apply, in its shape: a heading around a button row. It
-		 * isn't an accordion item and isn't marked up as a published FAQ: the AI's
-		 * answers are never presented to Google as ours. Given a `saved` answer, it
-		 * is built finished and closed, with no motion.
+		 * One answer card, in a written FAQ card's markup and classes, so faq.js
+		 * opens and closes it with the rest and the Designer's styles apply. It
+		 * isn't marked up as a published FAQ (no itemprop): the AI's answers are
+		 * never presented to Google as ours. Given a `saved` answer, it is built
+		 * finished and closed, with no motion.
 		 */
 		function answerCard(question, saved) {
-			const element = node("div", "faq-card");
+			const element = node("details", "faq-card");
+			const head = node("summary", "faq-card_trigger");
 			const heading = node("h3", "faq-card_title");
-			const head = node("button", "faq-card_trigger");
 			const title = node("span");
 			const status = node("span", "faq-card_icon");
 			const panel = node("div", "faq-card_panel");
@@ -466,10 +393,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 			let pages = saved?.pages ?? [];
 			let shownAt = 0;
 			let writing = false;
-			let done = false;
 			let handedOff = false;
 			let held = false;
-			let open = true;
 			let carry = "";
 			// Inside a **bold** run of the answer.
 			let strong = false;
@@ -478,23 +403,19 @@ export function initAiFaq(root = document, { signal } = {}) {
 			let kept = saved ?? null;
 
 			element.dataset.aiFaq = "answer";
-			head.type = "button";
-			head.setAttribute("aria-expanded", "true");
-			content.id = `ai-faq-answer-${crypto.randomUUID()}`;
-			head.setAttribute("aria-controls", content.id);
+			element.dataset.accordion = "item";
+			element.setAttribute("name", "faq");
+			head.dataset.accordion = "trigger";
+			panel.dataset.accordion = "content";
 			title.textContent = question;
 			// The row opens and closes the answer once it's written, not before.
 			if (!saved) head.setAttribute("aria-disabled", "true");
-			head.append(title, status);
-			heading.append(head);
+			heading.append(title);
+			head.append(heading, status);
 			body.append(text);
 			content.append(body, meta);
 			panel.append(content);
-			element.append(heading, panel);
-
-			head.addEventListener("click", () => {
-				if (done) toggle(!open);
-			});
+			element.append(head, panel);
 
 			// The thinking star is the ask card's own sparkle, twinkling as in the
 			// design: each star shrinks, turns and dims in turn.
@@ -527,7 +448,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 			if (saved) {
 				writeAll(saved.answer);
 				settleCard();
-				toggle(false, true);
 			} else {
 				element.setAttribute("aria-busy", "true");
 				const button = node("button", "ai-faq_cancel");
@@ -543,31 +463,19 @@ export function initAiFaq(root = document, { signal } = {}) {
 			}
 
 			/**
-			 * Every change in the card's height eases like an FAQ answer opening: a
-			 * new line, the hand-off, the sources. The panel goes from the height it
-			 * shows now to the one its content needs. This is the browser's own
-			 * animation, which starts on the frame it's asked for; a Motion height
-			 * tween showed the card fully open for a frame, then fell behind and
-			 * snapped.
+			 * While it is written, every change in the card's height eases like an
+			 * FAQ answer opening: a new line, the hand-off, the sources. The panel
+			 * goes from the height it shows now to the one its content needs. This
+			 * is the browser's own animation, which starts on the frame it's asked
+			 * for; a Motion height tween showed the card fully open for a frame,
+			 * then fell behind and snapped.
 			 */
 			function resize(change, from = panel.getBoundingClientRect().height) {
 				change();
-				if (reduceMotion || !open) return;
+				if (reduceMotion || !element.open) return;
 				const to = content.offsetHeight;
 				if (Math.abs(to - from) < 1) return;
-				panel.animate([{ height: `${from}px` }, { height: `${to}px` }], OPEN);
-			}
-
-			// Opens and closes like an FAQ answer. A closed answer is out of the tab
-			// order and hidden from screen readers, as faq.js does.
-			function toggle(next, immediate = false) {
-				const from = panel.getBoundingClientRect().height;
-				open = next;
-				head.setAttribute("aria-expanded", String(open));
-				panel.style.height = open ? "" : "0px";
-				content.inert = !open;
-				if (immediate || reduceMotion) return;
-				panel.animate([{ height: `${from}px` }, { height: `${open ? content.offsetHeight : 0}px` }], OPEN);
+				panel.animate([{ height: `${from}px` }, { height: `${to}px` }], SLIDE);
 			}
 
 			// Waits out the stage on screen first, so a fast answer doesn't flicker
@@ -704,13 +612,14 @@ export function initAiFaq(root = document, { signal } = {}) {
 				const paths = [...status.querySelectorAll("path")];
 				if (paths.length && !reduceMotion) animate(paths, { scale: 1, rotate: 0, opacity: 1 }, { duration: 0.35, ease: EASE });
 				element.removeAttribute("aria-busy");
+				// Back in its group, open, as the others close.
+				open(element);
 				resize(settleCard);
 				rise(meta);
 			}
 
 			// The finished card: its sources, then the AI line and Remove in place of Cancel.
 			function settleCard() {
-				done = true;
 				head.removeAttribute("aria-disabled");
 				const hadFocus = meta.contains(document.activeElement);
 				if (pages.length) {
@@ -766,14 +675,14 @@ export function initAiFaq(root = document, { signal } = {}) {
 				if (kept) forgetAnswer(kept.id);
 				const turn = turns.findIndex((entry) => entry.id === kept?.id);
 				if (turn !== -1) turns.splice(turn, 1);
-				giveRoom(element);
+				depart(element);
 				track("ai_faq_remove");
 				note.show(config.removed, input, () => {
 					element.inert = false;
 					element.getAnimations().forEach((running) => running.cancel());
 					element.removeAttribute("style");
 					(place?.isConnected ? place : ask).after(element);
-					makeRoom(element);
+					arrive(element);
 					if (kept) keepAnswer(kept, Math.max(order, 0));
 				});
 			}
@@ -802,8 +711,6 @@ export function initAiFaq(root = document, { signal } = {}) {
 				spoken,
 				busy: () => element.hasAttribute("aria-busy"),
 				pages: () => pages,
-				close: () => done && open && toggle(false),
-				reopen: () => done && !open && toggle(true),
 				kept: () => kept,
 				onCancel: (stop) => (cancel = stop),
 				keep: (item) => (kept = item),
