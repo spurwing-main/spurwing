@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { initFaq } from "./faq.js";
 
@@ -12,7 +12,14 @@ function card(question = "Question") {
 }
 
 describe("initFaq", () => {
+	let run;
+
+	beforeEach(() => {
+		run = new AbortController();
+	});
+
 	afterEach(() => {
+		run.abort();
 		document.body.innerHTML = "";
 	});
 
@@ -22,7 +29,7 @@ describe("initFaq", () => {
 				<section data-accordion="component">${card("First")}${card("Second")}</section>
 			</main>
 		`;
-		initFaq(document);
+		initFaq(document, { signal: run.signal });
 		const cards = document.querySelectorAll("details");
 
 		expect(cards[0].open).toBe(true);
@@ -31,7 +38,7 @@ describe("initFaq", () => {
 
 	it("leaves every answer closed on a page that does not ask", () => {
 		document.body.innerHTML = `<main><section data-accordion="component">${card()}</section></main>`;
-		initFaq(document);
+		initFaq(document, { signal: run.signal });
 
 		expect(document.querySelector("details").open).toBe(false);
 	});
@@ -42,7 +49,7 @@ describe("initFaq", () => {
 			<main><section data-accordion="component">${card("Incoming")}</section></main>
 		`;
 		const pages = document.querySelectorAll("main");
-		initFaq(pages[1]);
+		initFaq(pages[1], { signal: run.signal });
 
 		expect(document.querySelectorAll("details")[1].open).toBe(false);
 	});
@@ -55,8 +62,27 @@ describe("initFaq", () => {
 				</section>
 			</main>
 		`;
-		initFaq(document);
+		initFaq(document, { signal: run.signal });
 
 		expect(document.querySelector("details").open).toBe(true);
+	});
+
+	it("opens a question on click, closing the one already open in its group", () => {
+		document.body.innerHTML = `<main><section data-accordion="component">${card("First")}${card("Second")}</section></main>`;
+		initFaq(document, { signal: run.signal });
+		const [first, second] = document.querySelectorAll("details");
+		const summaries = document.querySelectorAll("summary");
+
+		summaries[0].click();
+		expect(first.open).toBe(true);
+
+		summaries[1].click();
+		expect(second.open).toBe(true);
+		expect(first.open).toBe(false);
+		expect(first.getAttribute("name")).toBe("faq");
+		expect(first.hasAttribute("data-closing")).toBe(false);
+
+		summaries[1].click();
+		expect(second.open).toBe(false);
 	});
 });

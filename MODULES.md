@@ -64,7 +64,7 @@ Runs the one pill that follows the pointer over anything carrying `data-cursor-t
 
 ### `faq.js`
 
-Opens the first FAQ answer on a page that carries `data-faq-open-first`. Each FAQ card is a `<details name="faq">`, so the browser does the rest: one answer open at a time, closed answers out of Tab order and screen readers, and find-in-page opening the one it lands in. The "Global — FAQ" embed animates the opening (0.4s on the CSS `ease` curve) where the browser can animate a `<details>`; elsewhere an answer opens at once.
+Each FAQ card is a `<details name="faq">`, so the browser keeps one answer open at a time, hides a closed one from Tab and screen readers, and opens one that find-in-page lands in. This module slides an answer open and shut over 0.4s in every browser (CSS alone animates a details' height only in Chrome): it takes over the question's click, slides the others in its group shut, and keeps a closing card out of its group until it has shut. Opens that arrive on their own (find-in-page, the ask box opening a matching question) slide open from the toggle event. It also opens the first answer on a page that carries `data-faq-open-first`, already open, not sliding. The "Global — FAQ" embed turns the plus to a minus on `[open]`, and back on `[data-closing]`.
 
 ### `image-fade.js`
 
