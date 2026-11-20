@@ -231,6 +231,25 @@ describe("initAiFaq", () => {
 		]);
 	});
 
+	it("shows **bold** as bold, even when a marker is split between two pieces", async () => {
+		respondWith(
+			sse([
+				["token", "Most projects take *"],
+				["token", "*8–12 weeks**, depending on scope.\n\nSmaller ones are **faster"],
+				["token", "**."],
+				["done", {}],
+			]),
+		);
+		initAiFaq();
+
+		ask("How long does a project take?");
+		await settled();
+
+		const card = $('[data-ai-faq="answer"]');
+		expect([...card.querySelectorAll(".rich-text strong")].map((b) => b.textContent)).toEqual(["8–12 weeks", "faster"]);
+		expect(card.querySelector(".rich-text").textContent).not.toContain("*");
+	});
+
 	it("is never marked up as a published FAQ or an accordion item", async () => {
 		respondWith(sse([["token", "Yes."]]));
 		initAiFaq();

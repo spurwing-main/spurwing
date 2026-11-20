@@ -468,6 +468,8 @@ export function initAiFaq(root = document, { signal } = {}) {
 			let held = false;
 			let open = true;
 			let carry = "";
+			// Inside a **bold** run of the answer.
+			let strong = false;
 			let cancel = () => {};
 			// The browser's copy of this answer, once there is one.
 			let kept = saved ?? null;
@@ -623,10 +625,10 @@ export function initAiFaq(root = document, { signal } = {}) {
 			}
 
 			async function write(arrived) {
-				// Newlines at a piece's end wait for the next piece, so a paragraph
-				// break split across two still breaks.
+				// Newlines, or a lone "*", at a piece's end wait for the next piece,
+				// so a paragraph break or a "**" split across two still works.
 				let piece = carry + arrived;
-				carry = piece.match(/\n+$/)?.[0] ?? "";
+				carry = piece.match(/\n+$|(?<!\*)\*$/)?.[0] ?? "";
 				piece = piece.slice(0, piece.length - carry.length);
 				if (!piece) return;
 				const first = !writing;
@@ -642,17 +644,23 @@ export function initAiFaq(root = document, { signal } = {}) {
 				});
 			}
 
+			// "**" marks bold in the answer, as the model writes it; a bold run
+			// never carries into the next paragraph.
 			function writeAll(piece, fade = false) {
 				piece.split(/\n{2,}/).forEach((part, index) => {
 					if (index) {
 						paragraph = node("p");
 						body.append(paragraph);
+						strong = false;
 					}
-					if (!part) return;
-					const words = node("span");
-					words.textContent = part;
-					paragraph.append(words);
-					if (fade) animate(words, { opacity: [0, 1] }, { duration: 0.25 });
+					part.split("**").forEach((words, index) => {
+						if (index) strong = !strong;
+						if (!words) return;
+						const span = node(strong ? "strong" : "span");
+						span.textContent = words;
+						paragraph.append(span);
+						if (fade) animate(span, { opacity: [0, 1] }, { duration: 0.25 });
+					});
 				});
 			}
 
