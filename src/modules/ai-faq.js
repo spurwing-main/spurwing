@@ -122,7 +122,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		// Ties this box's follow-ups together in the log; one per page view.
 		const conversation = crypto.randomUUID();
 
-		revealWithTheList();
+		const askTurn = revealWithTheList();
 		if (sparkle) {
 			const mark = aiMark();
 			sparkle.before(mark);
@@ -130,13 +130,17 @@ export function initAiFaq(root = document, { signal } = {}) {
 		}
 
 		// The answers kept from earlier, newest straight under the box, closed.
+		// They reveal with the page like the cards around them, each a turn after
+		// the box. This runs before the reveal system starts, which then finds them.
 		let below = ask;
-		for (const item of loadAnswers()) {
+		loadAnswers().forEach((item, index) => {
 			const card = answerCard(item.question, item);
+			card.element.setAttribute("data-anim", "card");
+			card.element.style.setProperty("--anim-i", String(Math.min(askTurn + 1 + index, 6)));
 			cards.set(card.element, card);
 			below.after(card.element);
 			below = card.element;
-		}
+		});
 
 		// Vouch for the visitor before they ask, not after.
 		const near = new IntersectionObserver(
@@ -220,12 +224,13 @@ export function initAiFaq(root = document, { signal } = {}) {
 		 * goes on the card itself, and the sparkle inside it comes in with it.
 		 */
 		function revealWithTheList() {
-			if (!askCard) return;
+			if (!askCard) return 0;
 			const questions = component.parentElement?.querySelectorAll('[data-accordion="item"]') ?? [];
 			const above = [...questions].filter((item) => item.compareDocumentPosition(component) & Node.DOCUMENT_POSITION_FOLLOWING);
 			const turn = Math.min(above.length, 6);
 			if (!askCard.hasAttribute("data-anim")) askCard.setAttribute("data-anim", "card");
 			askCard.style.setProperty("--anim-i", String(turn));
+			return turn;
 		}
 
 		async function submit() {

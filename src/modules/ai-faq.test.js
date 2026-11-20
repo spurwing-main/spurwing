@@ -768,6 +768,9 @@ describe("initAiFaq", () => {
 
 		const card = $('[data-ai-faq="answer"]');
 		expect(card.previousElementSibling).toBe($('[data-ai-faq="ask"]'));
+		// Revealed with the page, the turn after the box.
+		expect(card.getAttribute("data-anim")).toBe("card");
+		expect(card.style.getPropertyValue("--anim-i")).toBe("1");
 		expect(card.querySelector(".faq-card_trigger > span:first-child").textContent).toBe("How many?");
 		expect(card.querySelector(".rich-text p").textContent).toBe("Six people.");
 		expect(card.querySelector("[data-ai-faq-sources]").textContent).toBe("From: About");
