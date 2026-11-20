@@ -95,6 +95,7 @@ export function open(item) {
  * list's own stagger would otherwise move as well.
  */
 function reveal(component) {
+	component.setAttribute("data-anim-together", "");
 	component.querySelectorAll(".faq-card").forEach((card, index) => {
 		const unit = card.closest(".w-dyn-item") ?? card;
 		unit.setAttribute("data-anim", "card");

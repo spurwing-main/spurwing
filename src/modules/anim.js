@@ -12,6 +12,7 @@
  *   <div data-anim="card">                   work or team card: sweep plus a rise
  *   <div data-anim="fade-up" data-anim-on="load">   plays on load, not on scroll
  *   <div data-anim="off">                    never animates
+ *   <div data-anim-together>                 everything tagged inside arrives as one set
  *
  * No class name maps to a behaviour and nothing is implicit: if an element
  * animates, the attribute is on it and visible in the Designer. A group's
@@ -179,12 +180,24 @@ function startObserver(root) {
 		return;
 	}
 
-	const below = observable.filter((element) => {
-		if (!onScreen(element)) return true;
+	// Everything inside one [data-anim-together] container arrives as a set,
+	// when its first member does, so a stagger spread across several wrappers
+	// (an FAQ component's ask box, saved answers, list and slot) plays as one
+	// sequence instead of each piece starting as it crosses the fold.
+	const released = new Set();
+	const arrive = (element) => {
+		const set = element.closest("[data-anim-together]");
+		const members = set ? observable.filter((other) => set.contains(other)) : [element];
+		for (const member of members) {
+			if (released.has(member)) continue;
+			released.add(member);
+			release(member);
+		}
+		return members;
+	};
 
-		release(element);
-		return false;
-	});
+	observable.filter(onScreen).forEach(arrive);
+	const below = observable.filter((element) => !released.has(element));
 
 	const observer = new IntersectionObserver(
 		(entries) => {
@@ -198,8 +211,7 @@ function startObserver(root) {
 
 				if (!entry.isIntersecting && !passedAbove) continue;
 
-				release(entry.target);
-				observer.unobserve(entry.target);
+				arrive(entry.target).forEach((member) => observer.unobserve(member));
 			}
 		},
 		// No negative bottom margin. It shrank the root, and an element sitting
