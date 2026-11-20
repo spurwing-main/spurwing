@@ -157,6 +157,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 		// Enter sends, as the card shows no send arrow; a phone keyboard labels
 		// its return key "Send" to say so.
 		input.enterKeyHint = "send";
+		// The send button is hidden from sight but kept for screen readers; out of
+		// the Tab order, so the keyboard never lands on something it can't see.
+		send.tabIndex = -1;
 		input.addEventListener("focus", prepareToken);
 		input.addEventListener("input", fit);
 		input.addEventListener("keydown", (event) => {
