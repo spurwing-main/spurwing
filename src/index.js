@@ -12,8 +12,7 @@ project.modules = Object.fromEntries(modules.map((module) => [module.name, modul
 // not in the module list. It restarts the modules against each new page.
 document.addEventListener("spw:page", () => restartModules());
 
-// Before DOM ready, so the visit's source is in the booking page's address
-// before the cal.com embed reads it. See visit-source.js.
+// As soon as the bundle runs, not on DOM ready. See visit-source.js.
 try {
 	initVisitSource();
 } catch (error) {

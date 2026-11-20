@@ -1,15 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-	captureFirstVisit,
-	firstVisit,
-	forwardToBooking,
-	syncClarityConsent,
-	tagClarity,
-	trackBooking,
-} from "./visit-source.js";
+import { notePage, noteQuestion, startVisit, syncClarityConsent, tagClarity, trackBooking } from "./visit-source.js";
 
 const page = (path, search = "") => ({ pathname: path, search, hostname: "www.spurwing.co.uk" });
+const start = Date.UTC(2026, 10, 20, 10, 0);
+const fields = () => JSON.parse(sessionStorage.getItem("spw_booking"));
 
 describe("visit source", () => {
 	beforeEach(() => {
@@ -19,15 +14,14 @@ describe("visit source", () => {
 	});
 
 	afterEach(() => {
-		history.replaceState(null, "", "/");
+		vi.useRealTimers();
 		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
 		delete window.FinsweetConsentPro;
 	});
 
 	it("names the site a visitor came from when the link has no utm", () => {
-		const visit = captureFirstVisit(page("/work"), "https://claude.ai/");
-
-		expect(visit).toMatchObject({
+		expect(startVisit(page("/work"), "https://claude.ai/")).toMatchObject({
 			utm_source: "claude.ai",
 			utm_medium: "referral",
 			first_referrer: "claude.ai",
@@ -35,103 +29,143 @@ describe("visit source", () => {
 		});
 	});
 
-	it("marks a search engine as organic", () => {
-		expect(captureFirstVisit(page("/"), "https://www.google.co.uk/").utm_medium).toBe("organic");
+	it("marks a search engine as organic, and no referrer as direct", () => {
+		expect(startVisit(page("/"), "https://www.google.co.uk/").utm_medium).toBe("organic");
+		sessionStorage.clear();
+		expect(startVisit(page("/"), "https://mail.google.com/").utm_medium).toBe("referral");
+		sessionStorage.clear();
+		expect(startVisit(page("/"), "https://search.yahoo.com/").utm_medium).toBe("organic");
+		sessionStorage.clear();
+		expect(startVisit(page("/"), "").utm_source).toBe("direct");
 	});
 
-	it("keeps the link's own utm and gclid over the referrer", () => {
-		const visit = captureFirstVisit(
-			page("/", "?utm_source=newsletter&utm_medium=email&gclid=abc"),
-			"https://www.google.com/",
-		);
-
-		expect(visit).toMatchObject({ utm_source: "newsletter", utm_medium: "email", gclid: "abc" });
+	it("marks an ad click as paid", () => {
+		expect(startVisit(page("/", "?gclid=abc"), "https://www.google.com/")).toMatchObject({
+			utm_source: "google",
+			utm_medium: "cpc",
+			gclid: "abc",
+		});
+		sessionStorage.clear();
+		expect(startVisit(page("/", "?msclkid=x"), "")).toMatchObject({ utm_source: "bing", utm_medium: "cpc" });
 	});
 
-	it("does not count this site as a source", () => {
-		expect(captureFirstVisit(page("/about"), "https://www.spurwing.co.uk/").utm_source).toBe("");
+	it("keeps the utm values from the link", () => {
+		expect(startVisit(page("/", "?utm_source=linkedin&utm_medium=social"), "https://claude.ai/")).toMatchObject({
+			utm_source: "linkedin",
+			utm_medium: "social",
+		});
 	});
 
-	it("keeps the first page of the visit, not later ones", () => {
-		captureFirstVisit(page("/work"), "https://claude.ai/");
-		captureFirstVisit(page("/discovery-call"), "https://www.google.com/");
+	it("records the first page only, and ignores this site as a referrer", () => {
+		startVisit(page("/work"), "https://claude.ai/");
 
-		expect(firstVisit().utm_source).toBe("claude.ai");
+		expect(startVisit(page("/about"), "https://www.spurwing.co.uk/work").landing_page).toBe("/work");
+		sessionStorage.clear();
+		expect(startVisit(page("/about"), "https://www.spurwing.co.uk/work").first_referrer).toBe("");
 	});
 
 	it("tags the recording with the first source", () => {
-		tagClarity(captureFirstVisit(page("/work"), "https://claude.ai/"));
+		tagClarity(startVisit(page("/work"), "https://claude.ai/"));
 
 		expect(clarity).toHaveBeenCalledWith("set", "first_source", "claude.ai");
 		expect(clarity).toHaveBeenCalledWith("set", "first_landing_page", "/work");
 	});
 
-	it("tags a visit with no source as direct", () => {
-		tagClarity(captureFirstVisit(page("/"), ""));
+	it("saves what a booking should carry, with everything in utm_content", () => {
+		vi.useFakeTimers({ now: start });
+		startVisit(page("/"), "https://claude.ai/", start);
+		notePage("/");
+		notePage("/webflow-agency");
+		noteQuestion("c-1");
+		noteQuestion("c-1");
+		vi.setSystemTime(start + 5 * 60_000);
+		notePage("/discovery-call");
 
-		expect(clarity).toHaveBeenCalledWith("set", "first_source", "direct");
+		expect(fields()).toEqual({
+			utm_source: "claude.ai",
+			utm_medium: "referral",
+			utm_content:
+				"landing_page: / | first_referrer: claude.ai | booking_page: /webflow-agency | pages_viewed: 3 | visit_minutes: 5 | ask_box_used: yes (2) | ask_conversation: c-1",
+			landing_page: "/",
+			first_referrer: "claude.ai",
+			booking_page: "/webflow-agency",
+			pages_viewed: "3",
+			visit_minutes: "5",
+			ask_box_used: "yes (2)",
+			ask_conversation: "c-1",
+		});
 	});
 
-	it("writes the first visit into the booking page's address, keeping what is there", () => {
-		const visit = captureFirstVisit(page("/work"), "https://claude.ai/");
-		history.replaceState(null, "", "/discovery-call?notes=hello&utm_campaign=faq");
+	it("puts the link's own utm_content first", () => {
+		startVisit(page("/work", "?utm_content=banner"), "");
 
-		forwardToBooking(visit, true);
-
-		const params = new URLSearchParams(location.search);
-		expect(location.pathname).toBe("/discovery-call");
-		expect(params.get("notes")).toBe("hello");
-		expect(params.get("utm_campaign")).toBe("faq");
-		expect(params.get("utm_source")).toBe("claude.ai");
-		expect(params.get("landing_page")).toBe("/work");
+		expect(fields().utm_content).toMatch(/^banner \| landing_page: \/work \|/);
 	});
 
-	it("leaves pages without the booking embed alone", () => {
-		const visit = captureFirstVisit(page("/work"), "https://claude.ai/");
-		history.replaceState(null, "", "/work");
+	it("names the booking page itself when the visit started there", () => {
+		startVisit(page("/discovery-call"), "");
+		notePage("/discovery-call");
 
-		forwardToBooking(visit, false);
-
-		expect(location.search).toBe("");
+		expect(fields()).toMatchObject({ booking_page: "/discovery-call", ask_box_used: "no" });
 	});
 
-	it("counts a booking once, with its first source", () => {
-		captureFirstVisit(page("/work"), "https://claude.ai/");
+	it("keeps working when storage is blocked", () => {
+		vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+			throw new Error("blocked");
+		});
+		vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			throw new Error("blocked");
+		});
+
+		expect(startVisit(page("/"), "https://claude.ai/").utm_source).toBe("claude.ai");
+		expect(() => notePage("/work")).not.toThrow();
+		expect(() => trackBooking("uid-1")).not.toThrow();
+	});
+
+	it("counts a booking once, with where the visitor came from", () => {
+		startVisit(page("/"), "https://claude.ai/");
+		notePage("/");
+		notePage("/faq");
+		noteQuestion("c-1");
+		notePage("/discovery-call");
+		notePage("/discovery-call/booked");
 
 		trackBooking("uid-1");
 		trackBooking("uid-1");
 
 		expect(plausible).toHaveBeenCalledTimes(1);
 		expect(plausible).toHaveBeenCalledWith("Booked call", {
-			props: { source: "claude.ai", medium: "referral", landing_page: "/work" },
+			props: {
+				utm_source: "claude.ai",
+				utm_medium: "referral",
+				landing_page: "/",
+				first_referrer: "claude.ai",
+				booking_page: "/faq",
+				pages_viewed: "4",
+				visit_minutes: "0",
+				ask_box_used: "yes (1)",
+			},
 		});
+		expect(clarity).toHaveBeenCalledWith("set", "booking_uid", "uid-1");
 		expect(clarity).toHaveBeenCalledWith("event", "booked_call");
 	});
 
 	it("passes the cookie choice to Clarity, and again when it changes", () => {
 		let choices = { analytics: false, marketing: false };
 		let onUpdate;
-		window.FinsweetConsentPro = {
-			push: (entry) => entry[1](consent),
-		};
 		const consent = {
 			consents: { get: () => choices },
 			on: (name, handler) => {
 				if (name === "consent-updated") onUpdate = handler;
 			},
 		};
+		window.FinsweetConsentPro = { push: (entry) => entry[1](consent) };
 
 		syncClarityConsent();
-		expect(clarity).toHaveBeenLastCalledWith("consentv2", {
-			ad_Storage: "denied",
-			analytics_Storage: "denied",
-		});
+		expect(clarity).toHaveBeenLastCalledWith("consentv2", { ad_Storage: "denied", analytics_Storage: "denied" });
 
 		choices = { analytics: true, marketing: false };
 		onUpdate();
-		expect(clarity).toHaveBeenLastCalledWith("consentv2", {
-			ad_Storage: "denied",
-			analytics_Storage: "granted",
-		});
+		expect(clarity).toHaveBeenLastCalledWith("consentv2", { ad_Storage: "denied", analytics_Storage: "granted" });
 	});
 });

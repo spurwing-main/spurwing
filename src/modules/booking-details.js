@@ -21,8 +21,6 @@ export function initBookingDetails(root = document) {
 		return;
 	}
 
-	trackBooking(uid);
-
 	const values = {
 		name: params.get("attendeeName"),
 		email: params.get("email"),
@@ -30,6 +28,12 @@ export function initBookingDetails(root = document) {
 		"start time": formatBookingDate(params.get("startTime")),
 		"end time": formatBookingDate(params.get("endTime")),
 	};
+
+	// Counted first, then cal.com's name and email are taken out of this
+	// address, so a copied, refreshed or bookmarked link doesn't carry them.
+	// Tags in the head have already read the address by now.
+	trackBooking(uid);
+	history.replaceState(history.state, "", location.pathname);
 
 	const hasVisibleValues = Object.values(values).some(Boolean);
 

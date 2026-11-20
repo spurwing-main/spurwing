@@ -1,41 +1,39 @@
-// Where a visitor first came from, kept for the length of the visit so the
-// recording, the booking and the "Booked call" goal all say it.
+// Where a visitor came from and what they did before booking, so the booking,
+// its Clarity recording and the "Booked call" goal in Plausible all say it.
 //
 // A visitor who asks an AI assistant about us, then searches for us and books,
 // arrives on one page and books on another. The booking page only knows its own
 // address, so without this the booking says nothing about how they found us.
 //
-// Kept in sessionStorage: it lasts until the tab closes and is never sent
-// anywhere on its own. It goes to Clarity (which only loads after Accept),
-// to Plausible on a booking, and into the cal.com booking the visitor makes.
+// Kept in sessionStorage until the tab closes. On every page the fields a
+// booking should carry are saved as "spw_booking"; the cal.com embed on
+// /discovery-call reads them itself when it builds the form, so the calendar
+// never waits for this code and nothing is written into the page's address.
 
-const storageKey = "spw_first_visit";
+const visitKey = "spw_visit";
+const fieldsKey = "spw_booking";
 const bookedKey = "spw_booked";
-const utmKeys = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
-
-// Sent into the booking. cal.com saves the utm values on every booking; the
-// other three need a hidden booking question of the same name in cal.com.
-const bookingKeys = [...utmKeys, "gclid", "landing_page", "first_referrer"];
-
-const searchEngines = /(^|\.)(google|bing|duckduckgo|yahoo|ecosia|baidu|yandex)\.[a-z.]+$/;
-const calEmbed = '[id^="my-cal-inline"]';
 const bookingPath = "/discovery-call";
+const utmKeys = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
+// Any subdomain of a search engine (search.yahoo.com, cn.bing.com) except its mail.
+const searchEngines = /^(?!mail\.)(.+\.)?(google|bing|duckduckgo|yahoo|ecosia|baidu|yandex)\.[a-z.]+$/;
+const adClicks = { gclid: "google", gbraid: "google", wbraid: "google", msclkid: "bing" };
 
-function read(key) {
+function load(key) {
 	try {
-		return sessionStorage.getItem(key);
+		return JSON.parse(sessionStorage.getItem(key));
 	} catch {
 		return null;
 	}
 }
 
-function write(key, value) {
+function store(key, value) {
 	try {
-		sessionStorage.setItem(key, value);
+		sessionStorage.setItem(key, JSON.stringify(value));
 	} catch {}
 }
 
-function bareHost(url) {
+function host(url) {
 	try {
 		return new URL(url).hostname.replace(/^www\./, "");
 	} catch {
@@ -43,95 +41,125 @@ function bareHost(url) {
 	}
 }
 
-export function firstVisit() {
-	try {
-		return JSON.parse(read(storageKey)) || null;
-	} catch {
-		return null;
-	}
-}
-
-// Recorded once per visit, on the page the visitor arrived on. A referrer from
-// this site is not a source: it means the record was lost, not a new arrival.
-export function captureFirstVisit(loc = location, referrer = document.referrer) {
-	const saved = firstVisit();
+// Recorded once, on the page the visitor arrived on. A referrer from this site
+// is not a source: it means the record was lost, not a new arrival.
+export function startVisit(loc = location, referrer = document.referrer, now = Date.now()) {
+	const saved = load(visitKey);
 
 	if (saved) return saved;
 
 	const params = new URLSearchParams(loc.search);
-	const from = bareHost(referrer);
-	const external = from && from !== loc.hostname.replace(/^www\./, "") ? from : "";
-	const visit = {
-		landing_page: loc.pathname,
-		first_referrer: external,
-		gclid: params.get("gclid") || "",
-	};
+	const from = host(referrer);
+	const external = from === loc.hostname.replace(/^www\./, "") ? "" : from;
+	const click = Object.keys(adClicks).find((key) => params.get(key));
+	const visit = { landing_page: loc.pathname, first_referrer: external, gclid: params.get("gclid") || "" };
 
 	for (const key of utmKeys) visit[key] = params.get(key) || "";
 
-	// No utm on the link: name the site they came from, so the booking still
-	// shows "claude.ai" or "google.com" where cal.com keeps utm_source.
-	if (!visit.utm_source && external) {
-		visit.utm_source = external;
-		visit.utm_medium = searchEngines.test(external) ? "organic" : "referral";
+	// No utm on the link: an ad click is paid, a search engine organic, any
+	// other site a referral, and nothing at all direct.
+	if (!visit.utm_source) {
+		visit.utm_source = click ? adClicks[click] : external || "direct";
+		visit.utm_medium = click ? "cpc" : searchEngines.test(external) ? "organic" : external ? "referral" : "";
 	}
 
-	write(storageKey, JSON.stringify(visit));
+	return save({ ...visit, started: now, pages: 0, asked: 0, conversations: [], last_page: "" }, now);
+}
 
+function save(visit, now = Date.now()) {
+	store(visitKey, visit);
+	store(fieldsKey, bookingFields(visit, now));
 	return visit;
 }
 
-function sourceProps(visit) {
-	const props = {
-		source: visit.utm_source || "direct",
-		medium: visit.utm_medium,
-		campaign: visit.utm_campaign,
+function update(change) {
+	const visit = load(visitKey);
+
+	if (!visit) return;
+	change(visit);
+	save(visit);
+}
+
+export function notePage(path = location.pathname) {
+	update((visit) => {
+		visit.pages += 1;
+		if (!path.startsWith(bookingPath)) visit.last_page = path;
+	});
+}
+
+// The ask box's conversation ID, as it goes to the question log, so a booking
+// can be matched to the questions asked before it.
+export function noteQuestion(conversation) {
+	update((visit) => {
+		visit.asked += 1;
+		visit.conversations = [...new Set([...(visit.conversations || []), conversation].filter(Boolean))];
+	});
+}
+
+// What a booking is told. cal.com saves the utm values with no setup; every
+// other name needs a hidden booking question of that name, or is dropped. Until
+// those exist, utm_content carries all of it in one line, after any
+// utm_content the link brought.
+export function bookingFields(visit, now = Date.now()) {
+	const fields = {
 		landing_page: visit.landing_page,
+		first_referrer: visit.first_referrer,
+		booking_page: visit.last_page || bookingPath,
+		pages_viewed: String(visit.pages),
+		visit_minutes: String(Math.max(0, Math.round((now - visit.started) / 60000))),
+		ask_box_used: visit.asked ? `yes (${visit.asked})` : "no",
+		ask_conversation: (visit.conversations || []).join(", "),
+		gclid: visit.gclid,
+		clarity_id: clarityIds().user,
+	};
+	const summary = Object.entries(fields)
+		.filter(([, value]) => value)
+		.map(([key, value]) => `${key}: ${value}`);
+	const all = {
+		...Object.fromEntries(utmKeys.map((key) => [key, visit[key]])),
+		utm_content: [visit.utm_content, ...summary].filter(Boolean).join(" | "),
+		...fields,
 	};
 
-	return Object.fromEntries(Object.entries(props).filter(([, value]) => value));
+	return Object.fromEntries(Object.entries(all).filter(([, value]) => value));
+}
+
+// Clarity's own visitor and session IDs, from its cookies (the first part of
+// _clck and _clsk, split on ^ as Clarity writes them today, or |). Empty
+// until the visitor accepts cookies.
+export function clarityIds() {
+	const first = (name) => {
+		try {
+			const value = document.cookie
+				.split("; ")
+				.find((cookie) => cookie.startsWith(`${name}=`))
+				?.slice(name.length + 1);
+			return value ? decodeURIComponent(value).split(/[|^]/)[0] : "";
+		} catch {
+			return "";
+		}
+	};
+	return { user: first("_clck"), session: first("_clsk") };
 }
 
 // Clarity queues these until it loads, which is after Accept, then files them
 // against the whole recording so it can be filtered by first source.
 export function tagClarity(visit) {
-	for (const [key, value] of Object.entries(sourceProps(visit))) {
-		window.clarity?.("set", `first_${key}`, value);
+	for (const key of ["utm_source", "utm_medium", "landing_page"]) {
+		if (visit[key]) window.clarity?.("set", `first_${key.replace("utm_", "")}`, visit[key]);
 	}
-}
-
-// cal.com copies the page's own query string into the booking form
-// (forwardQueryParams in the Designer embed), and reads it when it builds the
-// form. So the first visit is written into this page's address before then.
-// Values already in the address win.
-export function forwardToBooking(visit, hasEmbed) {
-	if (!visit || !hasEmbed) return;
-
-	const params = new URLSearchParams(location.search);
-	let changed = false;
-
-	for (const key of bookingKeys) {
-		if (visit[key] && !params.has(key)) {
-			params.set(key, visit[key]);
-			changed = true;
-		}
-	}
-
-	if (!changed) return;
-
-	history.replaceState(history.state, "", `${location.pathname}?${params}${location.hash}`);
 }
 
 // Called by booking-details.js on the confirmation page. A refresh of that page
-// is the same booking, so each booking counts once.
+// is the same booking, so each booking counts once. The booking's uid is tagged
+// in Clarity, so its recording is found by filtering on booking_uid.
 export function trackBooking(uid) {
-	if (!uid || read(bookedKey) === uid) return;
+	if (!uid || load(bookedKey) === uid) return;
+	store(bookedKey, uid);
 
-	write(bookedKey, uid);
+	const { utm_content, ask_conversation, gclid, clarity_id, ...props } = load(fieldsKey) || {};
 
-	const props = sourceProps(firstVisit() || {});
-
-	window.clarity?.("set", "booked", "yes");
+	window.clarity?.("set", "booking_uid", uid);
 	window.clarity?.("event", "booked_call");
 	window.plausible?.("Booked call", { props });
 }
@@ -157,19 +185,19 @@ export function syncClarityConsent() {
 	]);
 }
 
-// Runs when the bundle loads, not on DOM ready: on a full load of the booking
-// page the embed may build its form before then, so the page is known by its
-// address while the body may still be arriving.
+// The router fires spw:page before it runs the incoming page's scripts, so the
+// fields are saved before the cal.com embed on the booking page reads them.
+// On a full load of the booking page the embed may run first: it then falls
+// back to what it can see itself (see the "Discovery / Cal embed" component).
 export function initVisitSource() {
-	const visit = captureFirstVisit();
-
-	tagClarity(visit);
-	syncClarityConsent();
-	forwardToBooking(visit, location.pathname === bookingPath || !!document.querySelector(calEmbed));
-
-	// The router fires spw:page before it runs the incoming page's scripts, so
-	// the address is ready before the cal.com embed reads it.
-	document.addEventListener("spw:page", (event) => {
-		forwardToBooking(firstVisit(), !!event.detail?.container?.querySelector(calEmbed));
+	document.addEventListener("spw:page", ({ detail }) => {
+		notePage(new URL(detail?.url ?? location.href, location.href).pathname);
 	});
+
+	tagClarity(startVisit());
+	syncClarityConsent();
+
+	// A prerendered page counts once the visitor actually sees it.
+	if (document.prerendering) document.addEventListener("prerenderingchange", () => notePage(), { once: true });
+	else notePage();
 }

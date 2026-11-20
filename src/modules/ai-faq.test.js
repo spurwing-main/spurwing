@@ -309,7 +309,7 @@ describe("initAiFaq", () => {
 		expect(star.hasAttribute("class")).toBe(false);
 		const twinkles = motion.animate.mock.calls.filter(([, keyframes]) => keyframes.rotate?.[1] === 45);
 		expect(twinkles.map(([path]) => path)).toEqual([...star.querySelectorAll("path")]);
-		expect(card.querySelector(".rich-text p").textContent).toBe("Reading the site…");
+		expect(card.querySelector(".rich-text p").textContent).toBe("Checking…");
 
 		await vi.waitFor(() => expect(finish).toBeDefined());
 		finish(new Response(sse([["token", "Yes."]])));
@@ -344,7 +344,7 @@ describe("initAiFaq", () => {
 		expect(status.textContent).toBe("");
 
 		ask("How many?");
-		expect(status.textContent).toBe("Writing an answer…");
+		expect(status.textContent).toBe("Typing…");
 		await settled();
 
 		expect(status.textContent).toBe("Six people.");
@@ -573,13 +573,11 @@ describe("initAiFaq", () => {
 	it("opens a written FAQ that asks the same question instead of asking the AI", async () => {
 		const fetch = respondWith(sse([["token", "Yes."]]));
 		document.body.innerHTML = `<div class="list">${markup}
-			<div data-accordion="item" data-accordion-open="false">
-				<button data-accordion="trigger">How much does a Webflow website cost?</button>
+			<details data-accordion="item">
+				<summary data-accordion="trigger">How much does a Webflow website cost?</summary>
 				<div data-accordion="content">From £15,000.</div>
-			</div></div>`;
-		const trigger = $('[data-accordion="trigger"]');
-		const opened = vi.fn();
-		trigger.addEventListener("click", opened);
+			</details></div>`;
+		const written = $('[data-accordion="item"]');
 		initAiFaq();
 
 		// A word that matters added: a different question, so the AI answers it.
@@ -588,7 +586,7 @@ describe("initAiFaq", () => {
 		ask("how much does a webflow website cost");
 
 		expect(fetch).toHaveBeenCalledTimes(1);
-		expect(opened).toHaveBeenCalledTimes(1);
+		expect(written.open).toBe(true);
 		expect($('[data-ai-faq="component"] [role="status"]').lastElementChild.textContent).toBe("From £15,000.");
 	});
 

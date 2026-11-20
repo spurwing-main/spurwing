@@ -1,6 +1,7 @@
 import { animate } from "motion";
 
 import { claimOnce, requireElement } from "../dom.js";
+import { clarityIds, noteQuestion } from "../visit-source.js";
 
 /**
  * Ask a question: the AI box at the top of every FAQ list.
@@ -19,7 +20,7 @@ import { claimOnce, requireElement } from "../dom.js";
  *
  * The box stays where it is. Each question becomes a new card straight under
  * it, newest first, so earlier answers move down rather than away. The sparkle
- * twinkles beside shimmering stage words ("Checking 6 pages…") until the answer
+ * twinkles beside shimmering stage words ("Checking…", then "Typing…") until the answer
  * streams in, then stays as the finished card's icon, over the pages the answer
  * came from. Asking again closes the earlier finished answers. A finished card
  * opens and closes like an FAQ, says the answer was written by AI, and can be
@@ -54,7 +55,7 @@ export const config = {
 	// The "spurwing-ask" Turnstile widget (invisible, spurwing.co.uk and
 	// spurwing.webflow.io). Public by design; its secret lives only in the Worker.
 	turnstileSiteKey: "0x4AAAAAAF2LSWTlSOLzJuaH",
-	stages: ["Reading the site…", "Checking {n} pages…", "Writing an answer…"],
+	stages: ["Checking…", "Checking…", "Typing…"],
 	waiting: "Waiting to send…",
 	// Each stage stays at least this long, so a fast answer doesn't flicker.
 	minStageMs: 300,
@@ -89,7 +90,7 @@ export const config = {
 
 // Spurwing's ease, from the design prototype.
 const EASE = [0.2, 0.7, 0.2, 1];
-// The FAQ cards' own opening (faq.js), so an answer opens like one.
+// The FAQ cards' own opening (the "Global — FAQ" embed), so an answer opens like one.
 const OPEN = { duration: 400, easing: "cubic-bezier(0.25, 0.1, 0.25, 1)" };
 // A long, gentle ease-out for cards arriving and leaving.
 const SOFT = "cubic-bezier(0.22, 1, 0.36, 1)";
@@ -149,6 +150,9 @@ export function initAiFaq(root = document, { signal } = {}) {
 		near.observe(component);
 		signal?.addEventListener("abort", () => near.disconnect());
 
+		// Enter sends, as the card shows no send arrow; a phone keyboard labels
+		// its return key "Send" to say so.
+		input.enterKeyHint = "send";
 		input.addEventListener("focus", prepareToken);
 		input.addEventListener("input", fit);
 		input.addEventListener("keydown", (event) => {
@@ -239,6 +243,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			window.clarity?.("set", "ai_faq_question_id", id);
 			window.clarity?.("set", "ai_faq_conversation", conversation);
 			track("ai_faq_ask");
+			noteQuestion(conversation);
 
 			// The earlier finished answers close to their questions, as in the design.
 			// One still being written stays open: several are answered at once.
@@ -302,7 +307,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 			component.querySelectorAll('[data-ai-faq="answer"]').forEach((element) => element !== earlier?.element && cards.get(element)?.close());
 			if (written) {
 				track("ai_faq_written");
-				if (written.dataset.accordionOpen !== "true") written.querySelector('[data-accordion="trigger"]').click();
+				written.open = true;
 				written.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
 				announce(written.querySelector('[data-accordion="content"]')?.textContent.trim() ?? "", true);
 				return true;
@@ -324,7 +329,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 		}
 
 		/**
-		 * "Writing an answer…" replaces whatever was said before. A finished answer
+		 * "Typing…" replaces whatever was said before. A finished answer
 		 * is added after the others instead, so two finishing together are both
 		 * read, one after the other.
 		 */
@@ -990,20 +995,6 @@ function pause(ms) {
 // Clarity loads only after cookie consent, so before then there is nothing to tell.
 function track(name) {
 	window.clarity?.("event", name);
-}
-
-// Clarity's own visitor and session IDs, from its cookies (the first part of
-// _clck and _clsk, split on ^ as Clarity writes them today, or |), so a logged question can be found in its recording. Empty
-// until the visitor accepts cookies.
-export function clarityIds() {
-	const first = (name) => {
-		const value = document.cookie
-			.split("; ")
-			.find((cookie) => cookie.startsWith(`${name}=`))
-			?.slice(name.length + 1);
-		return value ? decodeURIComponent(value).split(/[|^]/)[0] : "";
-	};
-	return { user: first("_clck"), session: first("_clsk") };
 }
 
 /**
