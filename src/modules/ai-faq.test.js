@@ -802,6 +802,15 @@ describe("initAiFaq", () => {
 		config.keep = 10;
 	});
 
+	it("forgets an answer a day after it was asked", () => {
+		const day = 24 * 60 * 60 * 1000;
+		const item = (question, at) => ({ id: question, question, answer: "Yes.", pages: [], at });
+		localStorage.setItem(config.storageKey, JSON.stringify([item("Today?", Date.now() - day + 60000), item("Yesterday?", Date.now() - day - 60000), { id: "x", question: "Untimed?", answer: "Yes." }]));
+		initAiFaq();
+
+		expect([...document.querySelectorAll('[data-ai-faq="answer"] .faq-card_title > span')].map((title) => title.textContent)).toEqual(["Today?"]);
+	});
+
 	it("removes an answer from the page and the browser, and Undo brings it back", async () => {
 		respondWith(sse([["token", "Yes."]]));
 		Element.prototype.getAnimations = vi.fn(() => []);

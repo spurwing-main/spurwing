@@ -30,8 +30,8 @@ import { arrive, depart, open, SLIDE } from "./faq.js";
  * question waits on its card for its turn. A question the page already answers
  * (a written FAQ, or an earlier AI answer) opens that answer where it is.
  *
- * Answers are kept in the visitor's own browser (the newest few), so they are
- * still there on the next page or the next visit. Removing one removes it only
+ * Answers are kept in the visitor's own browser (the newest few, for a day),
+ * so they are still there on the next page or a visit later that day. Removing one removes it only
  * there: the question stays in the Worker's log. Follow-ups only carry this
  * page view's questions, as before.
  *
@@ -83,9 +83,10 @@ export const config = {
 	removed: "Question removed",
 	undo: "Undo",
 	undoMs: 7000,
-	// Answers kept in the visitor's browser, newest first.
+	// Answers kept in the visitor's browser, newest first, for a day.
 	storageKey: "spurwing-ai-faq",
 	keep: 10,
+	keepMs: 24 * 60 * 60 * 1000,
 };
 
 // Spurwing's ease, from the design prototype.
@@ -212,7 +213,7 @@ export function initAiFaq(root = document, { signal } = {}) {
 
 			if (answer) {
 				turns.push({ id, question, answer });
-				const item = { id, question, answer, pages: card.pages() };
+				const item = { id, question, answer, pages: card.pages(), at: Date.now() };
 				keepAnswer(item);
 				card.keep(item);
 			}
@@ -874,14 +875,18 @@ function discoveryLink(question) {
 }
 
 /**
- * The answers kept in this browser, newest first. Storage can be refused (a
+ * The answers kept in this browser in the last day, newest first. An older
+ * one, or one saved before answers had a time, is gone. Storage can be refused (a
  * private window, blocked site data), and then nothing is kept: the box still
  * answers, it just forgets on the next page.
  */
 export function loadAnswers() {
 	try {
 		const list = JSON.parse(localStorage.getItem(config.storageKey) || "[]");
-		return Array.isArray(list) ? list.filter((item) => typeof item?.question === "string" && typeof item.answer === "string") : [];
+		const since = Date.now() - config.keepMs;
+		return Array.isArray(list)
+			? list.filter((item) => typeof item?.question === "string" && typeof item.answer === "string" && item.at > since)
+			: [];
 	} catch {
 		return [];
 	}
