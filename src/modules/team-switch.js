@@ -36,24 +36,44 @@ export function initTeamSwitch(root = document, { signal } = {}) {
 		});
 	}
 
+	// The pills are Div Blocks in the Designer. aria-pressed is only allowed on a
+	// button, and a div is not in the Tab order, so each one is made a button for
+	// keyboards and screen readers here.
+	for (const pill of pills) {
+		if (pill.tagName === "BUTTON") continue;
+		pill.setAttribute("role", "button");
+		pill.tabIndex = 0;
+	}
+
 	const start = Number(control.getAttribute(teamSwitchConfig.activeAttr));
 	let active = Number.isInteger(start) && pills[start] ? start : 0;
 
 	show(active);
 
+	function choose(index) {
+		if (index === -1 || index === active) return;
+
+		active = index;
+
+		// A view transition cross-fades the two team lists for free where the
+		// browser has one; elsewhere the swap is instant, which is also fine.
+		if (document.startViewTransition) document.startViewTransition(() => show(active));
+		else show(active);
+	}
+
+	control.addEventListener("click", (event) => choose(pills.indexOf(event.target.closest(teamSwitchConfig.pillSelector))), {
+		signal,
+	});
+
+	// Enter and Space press a button; a div given the role has to be told.
 	control.addEventListener(
-		"click",
+		"keydown",
 		(event) => {
+			if (event.key !== "Enter" && event.key !== " ") return;
 			const index = pills.indexOf(event.target.closest(teamSwitchConfig.pillSelector));
-
-			if (index === -1 || index === active) return;
-
-			active = index;
-
-			// A view transition cross-fades the two team lists for free where the
-			// browser has one; elsewhere the swap is instant, which is also fine.
-			if (document.startViewTransition) document.startViewTransition(() => show(active));
-			else show(active);
+			if (index === -1) return;
+			event.preventDefault();
+			choose(index);
 		},
 		{ signal },
 	);
