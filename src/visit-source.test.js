@@ -85,14 +85,14 @@ describe("visit source", () => {
 			utm_source: "claude.ai",
 			utm_medium: "referral",
 			utm_content:
-				"landing_page: / | first_referrer: claude.ai | booking_page: /webflow-agency | pages_viewed: 3 | visit_minutes: 5 | ask_box_used: yes (2) | ask_conversation: c-1",
+				"landing_page: / | first_referrer: claude.ai | booking_page: /webflow-agency | pages_viewed: 3 | visit_minutes: 5 | ask_box_used: yes (2) | ask_box_id: c-1",
 			landing_page: "/",
 			first_referrer: "claude.ai",
 			booking_page: "/webflow-agency",
 			pages_viewed: "3",
 			visit_minutes: "5",
 			ask_box_used: "yes (2)",
-			ask_conversation: "c-1",
+			ask_box_id: "c-1",
 		});
 	});
 

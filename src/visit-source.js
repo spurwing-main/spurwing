@@ -108,7 +108,7 @@ export function bookingFields(visit, now = Date.now()) {
 		pages_viewed: String(visit.pages),
 		visit_minutes: String(Math.max(0, Math.round((now - visit.started) / 60000))),
 		ask_box_used: visit.asked ? `yes (${visit.asked})` : "no",
-		ask_conversation: (visit.conversations || []).join(", "),
+		ask_box_id: (visit.conversations || []).join(", "),
 		gclid: visit.gclid,
 		clarity_id: clarityIds().user,
 	};
@@ -157,7 +157,7 @@ export function trackBooking(uid) {
 	if (!uid || load(bookedKey) === uid) return;
 	store(bookedKey, uid);
 
-	const { utm_content, ask_conversation, gclid, clarity_id, ...props } = load(fieldsKey) || {};
+	const { utm_content, ask_box_id, gclid, clarity_id, ...props } = load(fieldsKey) || {};
 
 	window.clarity?.("set", "booking_uid", uid);
 	window.clarity?.("event", "booked_call");
